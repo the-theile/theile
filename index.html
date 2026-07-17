@@ -204,6 +204,48 @@
     text-transform:uppercase;
   }
 
+  /* De-emphasized rows: gig work and volunteer/political roles */
+  .rev-row.minor{
+    padding:14px 0;
+  }
+  .rev-row.minor .rev-year{
+    font-size:12.5px;
+    color:var(--slate);
+    opacity:0.75;
+  }
+  .rev-row.minor .rev-body h3{
+    font-size:14px;
+    font-weight:500;
+    color:var(--slate);
+  }
+  .rev-row.minor .rev-body p{
+    font-size:13px;
+    opacity:0.8;
+  }
+
+  /* Volunteering section reads quieter than Experience/Education */
+  #volunteering .annot{
+    opacity:0.85;
+  }
+  #volunteering .rev-row{
+    padding:14px 0;
+  }
+  #volunteering .rev-year{
+    font-size:12.5px;
+    color:var(--slate);
+    opacity:0.75;
+  }
+  #volunteering .rev-body h3{
+    font-size:14px;
+    font-weight:500;
+    color:var(--slate);
+  }
+  #volunteering .rev-body p{
+    font-size:13px;
+    opacity:0.8;
+    max-width:520px;
+  }
+
   /* Capabilities — skill chips grouped like a materials legend */
   .cap-group{
     margin-bottom:34px;
@@ -395,20 +437,20 @@
       <div class="rev-row">
         <div class="rev-year">2023–Now</div>
         <div class="rev-body">
-          <h3>Amazon Flex — Driver (Contract)</h3>
-          <p>Delivers packages from Amazon Station Hubs and retail partners in the Sarasota, FL area — over
-             26,000 packages delivered and 3,000+ customer compliments.</p>
-        </div>
-      </div>
-      <div class="rev-row">
-        <div class="rev-year">2023–Now</div>
-        <div class="rev-body">
           <h3>Inteum Company — Implementation Manager</h3>
           <p>Leads end-to-end implementation and onboarding for new and existing Minuet clients — custom
              configurations, data migration, Inventor and Agreement Portals, and integrations. Primary point
              of contact coordinating across Account Management, Data Migration, Support, and Operations to
              get clients live and satisfied.</p>
           <span class="rev-tag">Client Success</span>
+        </div>
+      </div>
+      <div class="rev-row minor">
+        <div class="rev-year">2023–Now</div>
+        <div class="rev-body">
+          <h3>Amazon Flex — Driver (Contract)</h3>
+          <p>Delivers packages from Amazon Station Hubs and retail partners in the Sarasota, FL area — over
+             26,000 packages delivered and 3,000+ customer compliments.</p>
         </div>
       </div>
       <div class="rev-row">
@@ -420,14 +462,14 @@
              in 2023.</p>
         </div>
       </div>
-      <div class="rev-row">
+      <div class="rev-row minor">
         <div class="rev-year">2016–2017</div>
         <div class="rev-body">
           <h3>Uber &amp; Lyft — Driver</h3>
           <p>Rideshare driving across the Greater Tampa Bay Area.</p>
         </div>
       </div>
-      <div class="rev-row">
+      <div class="rev-row minor">
         <div class="rev-year">2014–2017</div>
         <div class="rev-body">
           <h3>Liberty First Network — Director of Marketing/Engagement</h3>
@@ -453,7 +495,7 @@
              on social media and marketing strategy.</p>
         </div>
       </div>
-      <div class="rev-row">
+      <div class="rev-row minor">
         <div class="rev-year">2013–2017</div>
         <div class="rev-body">
           <h3>Florida Tenth Amendment Center — Assistant Outreach Director</h3>
@@ -469,7 +511,7 @@
              working directly with the Research Foundation's CFO.</p>
         </div>
       </div>
-      <div class="rev-row">
+      <div class="rev-row minor">
         <div class="rev-year">2012–2014</div>
         <div class="rev-body">
           <h3>Republican Liberty Caucus of Tampa Bay — Membership Director</h3>
