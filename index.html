@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theile Riordan — Implementation Manager, Inteum</title>
+<meta name="description" content="Theile Riordan — Implementation Manager at Inteum Company, specializing in innovative technology management.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B2545;
+    --ink-2:#0E2E52;
+    --line:#7FA8C9;
+    --line-soft:rgba(127,168,201,0.28);
+    --paper:#EAF2F8;
+    --amber:#E8A33D;
+    --slate:#9FB3C8;
+    --white:#F5F8FB;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--ink);
+    color:var(--white);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* Faint blueprint grid */
+  .grid-bg{
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:40px 40px;
+    opacity:0.35;
+    pointer-events:none;
+    z-index:0;
+  }
+  .grid-bg::after{
+    content:"";
+    position:absolute; inset:0;
+    background:radial-gradient(ellipse at 50% 0%, rgba(11,37,69,0) 0%, var(--ink) 78%);
+  }
+
+  .sheet{
+    position:relative;
+    max-width:920px;
+    margin:0 auto;
+    padding:0 28px;
+    z-index:1;
+  }
+
+  /* Corner marks like a drawing sheet */
+  .corner-marks span{
+    position:fixed;
+    width:22px; height:22px;
+    z-index:2;
+    opacity:0.55;
+  }
+  .corner-marks .tl{top:20px; left:20px; border-top:1.5px solid var(--line); border-left:1.5px solid var(--line);}
+  .corner-marks .tr{top:20px; right:20px; border-top:1.5px solid var(--line); border-right:1.5px solid var(--line);}
+  .corner-marks .bl{bottom:20px; left:20px; border-bottom:1.5px solid var(--line); border-left:1.5px solid var(--line);}
+  .corner-marks .br{bottom:20px; right:20px; border-bottom:1.5px solid var(--line); border-right:1.5px solid var(--line);}
+
+  header.hero{
+    padding:120px 0 80px;
+    position:relative;
+  }
+  .doc-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.18em;
+    color:var(--line);
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:36px;
+    opacity:0;
+    animation:fadeUp 0.7s ease forwards;
+  }
+  .doc-label::before{
+    content:"";
+    width:26px; height:1px;
+    background:var(--line);
+    display:inline-block;
+  }
+
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:clamp(46px, 8vw, 84px);
+    line-height:1.02;
+    letter-spacing:-0.01em;
+    color:var(--white);
+    opacity:0;
+    animation:fadeUp 0.8s ease 0.12s forwards;
+  }
+
+  .role-line{
+    margin-top:22px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:15px;
+    color:var(--amber);
+    letter-spacing:0.02em;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px 14px;
+    align-items:baseline;
+    opacity:0;
+    animation:fadeUp 0.8s ease 0.24s forwards;
+  }
+  .role-line .org{color:var(--slate);}
+  .role-line .sep{color:var(--line-soft);}
+
+  .lede{
+    margin-top:34px;
+    max-width:620px;
+    font-size:17.5px;
+    line-height:1.68;
+    color:var(--paper);
+    opacity:0;
+    animation:fadeUp 0.8s ease 0.36s forwards;
+  }
+  .lede strong{color:var(--white); font-weight:600;}
+
+  @keyframes fadeUp{
+    from{opacity:0; transform:translateY(14px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+
+  /* Section divider styled as drawing annotation */
+  .annot{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin:0 0 40px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--slate);
+  }
+  .annot .num{color:var(--amber);}
+  .annot::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--line-soft);
+  }
+
+  section{
+    padding:70px 0;
+    border-top:1px solid var(--line-soft);
+    position:relative;
+  }
+
+  /* Revision history / timeline */
+  .rev-table{
+    display:flex;
+    flex-direction:column;
+  }
+  .rev-row{
+    display:grid;
+    grid-template-columns:96px 1fr;
+    gap:22px;
+    padding:22px 0;
+    border-top:1px solid var(--line-soft);
+    align-items:start;
+  }
+  .rev-row:first-child{border-top:none;}
+  .rev-year{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    color:var(--amber);
+    padding-top:2px;
+  }
+  .rev-body h3{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:16.5px;
+    color:var(--white);
+    margin-bottom:6px;
+  }
+  .rev-body p{
+    font-size:15px;
+    line-height:1.6;
+    color:var(--slate);
+    max-width:520px;
+  }
+  .rev-tag{
+    display:inline-block;
+    margin-top:10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    color:var(--line);
+    border:1px solid var(--line-soft);
+    padding:3px 8px;
+    text-transform:uppercase;
+  }
+
+  /* Title block — the signature element */
+  .title-block{
+    margin-top:0;
+    border:1px solid var(--line);
+    background:rgba(127,168,201,0.05);
+  }
+  .tb-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+  .tb-row + .tb-row{border-top:1px solid var(--line-soft);}
+  .tb-cell{
+    padding:20px 24px;
+    border-left:1px solid var(--line-soft);
+  }
+  .tb-cell:first-child{border-left:none;}
+  .tb-cell .k{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--line);
+    margin-bottom:8px;
+  }
+  .tb-cell .v{
+    font-size:15.5px;
+    color:var(--white);
+  }
+  .tb-cell a.v{
+    color:var(--white);
+    text-decoration:none;
+    border-bottom:1px solid var(--line-soft);
+    transition:border-color 0.2s ease, color 0.2s ease;
+  }
+  .tb-cell a.v:hover{
+    color:var(--amber);
+    border-color:var(--amber);
+  }
+  .tb-full{
+    grid-column:1 / -1;
+  }
+
+  footer{
+    padding:50px 0 90px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    letter-spacing:0.1em;
+    color:var(--line);
+    text-transform:uppercase;
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+
+  @media (max-width:600px){
+    header.hero{padding:90px 0 56px;}
+    .rev-row{grid-template-columns:1fr; gap:6px;}
+    .tb-row{grid-template-columns:1fr;}
+    .tb-cell{border-left:none; border-top:1px solid var(--line-soft);}
+    .tb-cell:first-child{border-top:none;}
+    .corner-marks span{width:14px; height:14px;}
+    footer{flex-direction:column;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms !important; animation-delay:0s !important;}
+  }
+
+  a:focus-visible, button:focus-visible{
+    outline:2px solid var(--amber);
+    outline-offset:3px;
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="corner-marks">
+  <span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span>
+</div>
+
+<div class="sheet">
+
+  <header class="hero">
+    <div class="doc-label">Sheet 01 — Profile</div>
+    <h1>Theile Riordan</h1>
+    <div class="role-line">
+      <span>Implementation Manager</span>
+      <span class="sep">/</span>
+      <span class="org">Inteum Company</span>
+    </div>
+    <p class="lede">
+      Theile specializes in <strong>innovative technology management</strong> — helping research institutions
+      and technology transfer offices implement the systems that turn discovery into impact. His work sits
+      at the intersection of research administration and practical deployment, informed by more than a
+      decade inside a university tech transfer office before moving to the vendor side.
+    </p>
+  </header>
+
+  <section id="background">
+    <div class="annot"><span class="num">§01</span> Background</div>
+    <div class="rev-table">
+      <div class="rev-row">
+        <div class="rev-year">2010–2024</div>
+        <div class="rev-body">
+          <h3>University of South Florida — Technology Transfer Office</h3>
+          <p>Spent over ten years in the Research &amp; Innovation arm of the university, working
+             on the front lines of moving academic research toward real-world application.</p>
+          <span class="rev-tag">Research &amp; Innovation</span>
+        </div>
+      </div>
+      <div class="rev-row">
+        <div class="rev-year">Present</div>
+        <div class="rev-body">
+          <h3>Inteum Company — Implementation Manager</h3>
+          <p>Now works with Inteum, a platform built for innovative technology management, helping
+             organizations implement systems for managing IP, licensing, and research commercialization.</p>
+        </div>
+      </div>
+      <div class="rev-row">
+        <div class="rev-year">2013</div>
+        <div class="rev-body">
+          <h3>B.A., Criminology</h3>
+          <p>University of South Florida.</p>
+        </div>
+      </div>
+      <div class="rev-row">
+        <div class="rev-year">2010</div>
+        <div class="rev-body">
+          <h3>B.S., Management</h3>
+          <p>University of South Florida.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact">
+    <div class="annot"><span class="num">§02</span> Title Block</div>
+    <div class="title-block">
+      <div class="tb-row">
+        <div class="tb-cell">
+          <div class="k">Name</div>
+          <div class="v">Theile Riordan</div>
+        </div>
+        <div class="tb-cell">
+          <div class="k">Title</div>
+          <div class="v">Implementation Manager</div>
+        </div>
+      </div>
+      <div class="tb-row">
+        <div class="tb-cell">
+          <div class="k">Organization</div>
+          <div class="v">Inteum Company</div>
+        </div>
+        <div class="tb-cell">
+          <div class="k">Location</div>
+          <div class="v">Tampa Bay, FL</div>
+        </div>
+      </div>
+      <div class="tb-row">
+        <div class="tb-cell">
+          <div class="k">Email</div>
+          <a class="v" href="mailto:Theile.secure@proton.me">Theile.secure@proton.me</a>
+        </div>
+        <div class="tb-cell">
+          <div class="k">LinkedIn</div>
+          <a class="v" href="https://www.linkedin.com/in/theileriordan" target="_blank" rel="noopener">linkedin.com/in/theileriordan</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Theile Riordan</span>
+    <span>Rev. 2026</span>
+  </footer>
+
+</div>
+
+</body>
+</html>
