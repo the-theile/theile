@@ -232,6 +232,60 @@
     padding:7px 14px;
   }
 
+  /* Recommendations — endorsement cards */
+  .rec-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1px;
+    background:var(--line-soft);
+    border:1px solid var(--line-soft);
+  }
+  .rec-card{
+    background:var(--ink);
+    padding:26px 24px;
+    display:flex;
+    flex-direction:column;
+  }
+  .rec-quote{
+    font-family:'Fraunces', serif;
+    font-size:15.5px;
+    line-height:1.6;
+    color:var(--paper);
+    flex:1;
+  }
+  .rec-quote::before{
+    content:"“";
+    color:var(--amber);
+  }
+  .rec-quote::after{
+    content:"”";
+    color:var(--amber);
+  }
+  .rec-meta{
+    margin-top:18px;
+    padding-top:14px;
+    border-top:1px solid var(--line-soft);
+  }
+  .rec-name{
+    font-size:14px;
+    font-weight:600;
+    color:var(--white);
+  }
+  .rec-role{
+    margin-top:3px;
+    font-size:12.5px;
+    color:var(--slate);
+    line-height:1.5;
+  }
+  .rec-context{
+    margin-top:6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--line);
+  }
+
   /* Title block — the signature element */
   .title-block{
     margin-top:0;
@@ -290,6 +344,7 @@
   @media (max-width:600px){
     header.hero{padding:90px 0 56px;}
     .rev-row{grid-template-columns:1fr; gap:6px;}
+    .rec-grid{grid-template-columns:1fr;}
     .tb-row{grid-template-columns:1fr;}
     .tb-cell{border-left:none; border-top:1px solid var(--line-soft);}
     .tb-cell:first-child{border-top:none;}
@@ -545,8 +600,58 @@
     </div>
   </section>
 
+  <section id="recommendations">
+    <div class="annot"><span class="num">§04</span> Recommendations</div>
+    <div class="rec-grid">
+      <div class="rec-card">
+        <p class="rec-quote">Theile is an asset to any professional team. He is always ready and willing to
+          help others, and still manages to prioritize his own tasks masterfully. He is both professional and
+          kind. His ambition is admirable and his willingness to learn new things and be considerate of others
+          along the way is even more so. I wish him the very best in all his endeavors.</p>
+        <div class="rec-meta">
+          <div class="rec-name">Kris Mathews</div>
+          <div class="rec-role">Senior Director, Finance &amp; Administration, Duke University School of Medicine</div>
+          <div class="rec-context">Worked together, 2015</div>
+        </div>
+      </div>
+      <div class="rec-card">
+        <p class="rec-quote">TJ was one of my top sales associates. He provided impeccable customer service
+          and he set the standard for other employees. I could always count on him for anything. In addition,
+          TJ played a key role in assisting the store to reach its first million dollar mark. TJ is an
+          incredible asset to anyone who should be so lucky to have him as a member of their team.</p>
+        <div class="rec-meta">
+          <div class="rec-name">Jaclyn Croke</div>
+          <div class="rec-role">Business Manager &amp; Customer Service Professional</div>
+          <div class="rec-context">Managed Theile directly, 2013</div>
+        </div>
+      </div>
+      <div class="rec-card">
+        <p class="rec-quote">Theile was an excellent asset to the Research Foundation at USF. He worked to
+          ensure all the components of his work were taken care of. Theile always followed through if he saw
+          an inaccuracy, making sure to approach others to confirm he had the most accurate representation
+          before submitting an item. I highly recommend Theile.</p>
+        <div class="rec-meta">
+          <div class="rec-name">Molly Bailey</div>
+          <div class="rec-role">Media &amp; Special Events Management</div>
+          <div class="rec-context">Worked together, 2013</div>
+        </div>
+      </div>
+      <div class="rec-card">
+        <p class="rec-quote">TJ is a great asset to any organization. He is a self-starter, critical thinker,
+          team player and pays great attention to details. His work product is superior and far exceeds
+          expectations and he continuously meets and beats deadlines. I would welcome the opportunity to work
+          with TJ again.</p>
+        <div class="rec-meta">
+          <div class="rec-name">Matt Lowell</div>
+          <div class="rec-role">Principal, Site Selection &amp; Business Incentives, Ryan</div>
+          <div class="rec-context">Managed Theile directly, 2011</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="capabilities">
-    <div class="annot"><span class="num">§04</span> Capabilities</div>
+    <div class="annot"><span class="num">§05</span> Capabilities</div>
     <div class="cap-group">
       <div class="cap-label">Industry Knowledge</div>
       <div class="chip-row">
@@ -579,7 +684,7 @@
   </section>
 
   <section id="contact">
-    <div class="annot"><span class="num">§05</span> Title Block</div>
+    <div class="annot"><span class="num">§06</span> Title Block</div>
     <div class="title-block">
       <div class="tb-row">
         <div class="tb-cell">
