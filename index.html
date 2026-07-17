@@ -204,6 +204,34 @@
     text-transform:uppercase;
   }
 
+  /* Capabilities — skill chips grouped like a materials legend */
+  .cap-group{
+    margin-bottom:34px;
+  }
+  .cap-group:last-child{
+    margin-bottom:0;
+  }
+  .cap-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--slate);
+    margin-bottom:14px;
+  }
+  .chip-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .chip{
+    font-size:13.5px;
+    color:var(--paper);
+    border:1px solid var(--line-soft);
+    background:rgba(127,168,201,0.05);
+    padding:7px 14px;
+  }
+
   /* Title block — the signature element */
   .title-block{
     margin-top:0;
@@ -365,8 +393,41 @@
     </div>
   </section>
 
+  <section id="capabilities">
+    <div class="annot"><span class="num">§02</span> Capabilities</div>
+    <div class="cap-group">
+      <div class="cap-label">Industry Knowledge</div>
+      <div class="chip-row">
+        <span class="chip">Technology Transfer</span>
+        <span class="chip">Software Implementation</span>
+        <span class="chip">Client Onboarding</span>
+        <span class="chip">Requirements Gathering</span>
+        <span class="chip">Product Strategy</span>
+      </div>
+    </div>
+    <div class="cap-group">
+      <div class="cap-label">Tools &amp; Technologies</div>
+      <div class="chip-row">
+        <span class="chip">Data Analysis</span>
+        <span class="chip">Microsoft Excel</span>
+        <span class="chip">CRM</span>
+        <span class="chip">AI Productivity Tools</span>
+      </div>
+    </div>
+    <div class="cap-group">
+      <div class="cap-label">Interpersonal Skills</div>
+      <div class="chip-row">
+        <span class="chip">Project Management</span>
+        <span class="chip">Cross-functional Collaboration</span>
+        <span class="chip">Customer Success</span>
+        <span class="chip">Strategic Planning</span>
+        <span class="chip">Workflow Optimization</span>
+      </div>
+    </div>
+  </section>
+
   <section id="contact">
-    <div class="annot"><span class="num">§02</span> Title Block</div>
+    <div class="annot"><span class="num">§03</span> Title Block</div>
     <div class="title-block">
       <div class="tb-row">
         <div class="tb-cell">
