@@ -249,6 +249,12 @@
     border:1px solid var(--line-soft);
     background:rgba(127,168,201,0.05);
     padding:7px 14px;
+    text-decoration:none;
+    transition:border-color 0.2s ease, color 0.2s ease;
+  }
+  a.chip:hover{
+    color:var(--amber);
+    border-color:var(--amber);
   }
 
   .personal-text{
@@ -728,6 +734,7 @@
     </p>
     <div class="chip-row">
       <span class="chip">Music Festivals</span>
+      <a class="chip" href="https://myravefam.com" target="_blank" rel="noopener">RaveFAM</a>
       <span class="chip">Travel</span>
       <span class="chip">Theme Parks</span>
       <span class="chip">Food &amp; Brews</span>
