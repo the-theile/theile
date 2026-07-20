@@ -349,6 +349,37 @@
   .search-wrap{position:relative;}
   .search-wrap input{padding-left:38px;}
   .search-wrap svg{position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--slate);}
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:12px;
+  }
+  .tab-btn{
+    flex:1;
+    background:transparent;
+    border:1px solid var(--line-soft);
+    color:var(--slate);
+    border-radius:8px;
+    padding:9px 10px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .tab-btn.active{
+    background:var(--amber-soft);
+    border-color:var(--amber);
+    color:var(--amber);
+  }
+
+  .danger-card{border-color:rgba(232,106,92,0.45);}
+  .danger-name{
+    font-weight:600;
+    font-size:15px;
+    line-height:1.3;
+    color:#FFD8D2;
+  }
 </style>
 </head>
 <body>
@@ -380,6 +411,10 @@
       <button class="btn btn-ghost btn-small" id="signout-btn">Sign out</button>
     </div>
     <div id="offline-banner" class="offline-banner">Showing last saved data — couldn't reach the server.</div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-gates" data-tab="gates">Gates</button>
+      <button class="tab-btn" id="tab-danger" data-tab="danger">Dangerous Addresses</button>
+    </div>
     <div class="search-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <input type="search" id="search-input" placeholder="Search city, community, or code…">
@@ -388,7 +423,7 @@
   <main id="gate-list">
     <div class="empty-msg">Loading…</div>
   </main>
-  <button class="fab" id="add-fab" title="Add gate">+</button>
+  <button class="fab" id="add-fab" title="Add">+</button>
 </div>
 
 <div id="modal-root"></div>
@@ -401,6 +436,7 @@ const SUPABASE_KEY = 'sb_publishable_eoHldj45IyICDc8W-14Gcg_jo7HEEhM';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CACHE_KEY = 'gates_cache_v1';
+const DANGER_CACHE_KEY = 'dangerous_addresses_cache_v1';
 
 const loginView = document.getElementById('login-view');
 const appView = document.getElementById('app-view');
@@ -413,10 +449,27 @@ const gateList = document.getElementById('gate-list');
 const offlineBanner = document.getElementById('offline-banner');
 const addFab = document.getElementById('add-fab');
 const modalRoot = document.getElementById('modal-root');
+const tabGatesBtn = document.getElementById('tab-gates');
+const tabDangerBtn = document.getElementById('tab-danger');
 
 let allGates = [];
+let allDanger = [];
 let openCities = new Set();
 let searchActive = false;
+let activeTab = 'gates';
+let gatesOffline = false;
+let dangerOffline = false;
+
+function updateOfflineBanner(){
+  const offline = activeTab === 'gates' ? gatesOffline : dangerOffline;
+  offlineBanner.classList.toggle('show', offline);
+}
+
+function allKnownCities(){
+  return [...new Set([...allGates.map(g => g.city), ...allDanger.map(d => d.city)])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+}
 
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -445,7 +498,26 @@ function showApp(){
   loginView.classList.add('hidden');
   appView.classList.remove('hidden');
   loadGates();
+  loadDanger();
 }
+
+function switchTab(tab){
+  if (tab === activeTab) return;
+  activeTab = tab;
+  openCities = new Set();
+  searchInput.value = '';
+  tabGatesBtn.classList.toggle('active', tab === 'gates');
+  tabDangerBtn.classList.toggle('active', tab === 'danger');
+  searchInput.placeholder = tab === 'gates'
+    ? 'Search city, community, or code…'
+    : 'Search city, address, or notation…';
+  addFab.title = tab === 'gates' ? 'Add gate' : 'Add dangerous address';
+  updateOfflineBanner();
+  render();
+}
+
+tabGatesBtn.addEventListener('click', () => switchTab('gates'));
+tabDangerBtn.addEventListener('click', () => switchTab('danger'));
 
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -479,16 +551,42 @@ async function loadGates(){
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       allGates = JSON.parse(cached);
-      offlineBanner.classList.add('show');
-    } else {
+      gatesOffline = true;
+    } else if (activeTab === 'gates') {
       gateList.innerHTML = `<div class="empty-msg">Couldn't load gates and no cached data is available.<br>${escapeHtml(error.message)}</div>`;
       return;
     }
   } else {
     allGates = data;
-    offlineBanner.classList.remove('show');
+    gatesOffline = false;
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
   }
+  updateOfflineBanner();
+  render();
+}
+
+async function loadDanger(){
+  const { data, error } = await supabase
+    .from('dangerous_addresses')
+    .select('*')
+    .order('city', { ascending: true })
+    .order('address', { ascending: true });
+
+  if (error) {
+    const cached = localStorage.getItem(DANGER_CACHE_KEY);
+    if (cached) {
+      allDanger = JSON.parse(cached);
+      dangerOffline = true;
+    } else if (activeTab === 'danger') {
+      gateList.innerHTML = `<div class="empty-msg">Couldn't load dangerous addresses and no cached data is available.<br>${escapeHtml(error.message)}</div>`;
+      return;
+    }
+  } else {
+    allDanger = data;
+    dangerOffline = false;
+    localStorage.setItem(DANGER_CACHE_KEY, JSON.stringify(data));
+  }
+  updateOfflineBanner();
   render();
 }
 
@@ -501,16 +599,26 @@ function groupByCity(rows){
   return groups;
 }
 
-function matchesSearch(row, q){
+function matchesGateSearch(row, q){
   if (!q) return true;
   const hay = `${row.city} ${row.community} ${row.codes} ${row.notes}`.toLowerCase();
   return hay.includes(q);
 }
 
+function matchesDangerSearch(row, q){
+  if (!q) return true;
+  const hay = `${row.city} ${row.address} ${row.notation}`.toLowerCase();
+  return hay.includes(q);
+}
+
 function render(){
+  if (activeTab === 'gates') renderGates(); else renderDanger();
+}
+
+function renderGates(){
   const q = searchInput.value.trim().toLowerCase();
   searchActive = q.length > 0;
-  const filtered = allGates.filter(row => matchesSearch(row, q));
+  const filtered = allGates.filter(row => matchesGateSearch(row, q));
 
   if (filtered.length === 0) {
     gateList.innerHTML = `<div class="empty-msg">No gates match "${escapeHtml(searchInput.value)}"</div>`;
@@ -539,6 +647,38 @@ function render(){
   gateList.innerHTML = html.join('');
 }
 
+function renderDanger(){
+  const q = searchInput.value.trim().toLowerCase();
+  searchActive = q.length > 0;
+  const filtered = allDanger.filter(row => matchesDangerSearch(row, q));
+
+  if (filtered.length === 0) {
+    gateList.innerHTML = `<div class="empty-msg">No dangerous addresses match "${escapeHtml(searchInput.value)}"</div>`;
+    return;
+  }
+
+  const groups = groupByCity(filtered);
+  const html = [];
+  for (const [city, rows] of groups) {
+    const isOpen = searchActive || openCities.has(city);
+    html.push(`
+      <div class="city-group ${isOpen ? 'open' : ''}" data-city="${escapeHtml(city)}">
+        <div class="city-header" data-toggle-city="${escapeHtml(city)}">
+          <h2>${escapeHtml(city)}</h2>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="count">${rows.length}</span>
+            <span class="chevron">▶</span>
+          </div>
+        </div>
+        <div class="city-entries">
+          ${rows.map(renderDangerCard).join('')}
+        </div>
+      </div>
+    `);
+  }
+  gateList.innerHTML = html.join('');
+}
+
 function renderCard(row){
   const hasCode = row.codes && row.codes.trim().length > 0;
   return `
@@ -550,6 +690,21 @@ function renderCard(row){
       ${row.notes ? `<div class="gate-notes">${escapeHtml(row.notes)}</div>` : ''}
       <div class="gate-actions">
         ${hasCode ? `<button class="copy-btn" data-copy="${escapeHtml(row.codes)}">Copy</button>` : ''}
+        <button class="copy-btn" data-edit="${row.id}">Edit</button>
+        <button class="copy-btn" data-delete="${row.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDangerCard(row){
+  return `
+    <div class="gate-card danger-card" data-id="${row.id}">
+      <div class="gate-top">
+        <div class="danger-name">⚠ ${escapeHtml(row.address)}</div>
+      </div>
+      ${row.notation ? `<div class="gate-notes">${escapeHtml(row.notation)}</div>` : ''}
+      <div class="gate-actions">
         <button class="copy-btn" data-edit="${row.id}">Edit</button>
         <button class="copy-btn" data-delete="${row.id}">Delete</button>
       </div>
@@ -581,20 +736,36 @@ gateList.addEventListener('click', async (e) => {
 
   const editBtn = e.target.closest('[data-edit]');
   if (editBtn) {
-    const row = allGates.find(g => g.id === editBtn.dataset.edit);
-    if (row) openGateModal(row);
+    if (activeTab === 'gates') {
+      const row = allGates.find(g => g.id === editBtn.dataset.edit);
+      if (row) openGateModal(row);
+    } else {
+      const row = allDanger.find(d => d.id === editBtn.dataset.edit);
+      if (row) openDangerModal(row);
+    }
     return;
   }
 
   const deleteBtn = e.target.closest('[data-delete]');
   if (deleteBtn) {
-    const row = allGates.find(g => g.id === deleteBtn.dataset.delete);
-    if (row && confirm(`Delete "${row.community}" (${row.city})?`)) {
-      const { error } = await supabase.from('gates').delete().eq('id', row.id);
-      if (error) { alert(error.message); return; }
-      allGates = allGates.filter(g => g.id !== row.id);
-      localStorage.setItem(CACHE_KEY, JSON.stringify(allGates));
-      render();
+    if (activeTab === 'gates') {
+      const row = allGates.find(g => g.id === deleteBtn.dataset.delete);
+      if (row && confirm(`Delete "${row.community}" (${row.city})?`)) {
+        const { error } = await supabase.from('gates').delete().eq('id', row.id);
+        if (error) { alert(error.message); return; }
+        allGates = allGates.filter(g => g.id !== row.id);
+        localStorage.setItem(CACHE_KEY, JSON.stringify(allGates));
+        render();
+      }
+    } else {
+      const row = allDanger.find(d => d.id === deleteBtn.dataset.delete);
+      if (row && confirm(`Delete "${row.address}" (${row.city})?`)) {
+        const { error } = await supabase.from('dangerous_addresses').delete().eq('id', row.id);
+        if (error) { alert(error.message); return; }
+        allDanger = allDanger.filter(d => d.id !== row.id);
+        localStorage.setItem(DANGER_CACHE_KEY, JSON.stringify(allDanger));
+        render();
+      }
     }
     return;
   }
@@ -603,7 +774,15 @@ gateList.addEventListener('click', async (e) => {
 searchInput.addEventListener('input', render);
 
 // ---------- Add / edit modal ----------
-addFab.addEventListener('click', () => openGateModal(null));
+addFab.addEventListener('click', () => {
+  if (activeTab === 'gates') openGateModal(null); else openDangerModal(null);
+});
+
+function cityDatalist(){
+  return `<datalist id="city-options">
+    ${allKnownCities().map(c => `<option value="${escapeHtml(c)}">`).join('')}
+  </datalist>`;
+}
 
 function openGateModal(row){
   const isEdit = !!row;
@@ -616,9 +795,7 @@ function openGateModal(row){
           <div class="field">
             <label for="f-city">City / area</label>
             <input type="text" id="f-city" value="${escapeHtml(row?.city ?? '')}" required list="city-options">
-            <datalist id="city-options">
-              ${[...new Set(allGates.map(g => g.city))].map(c => `<option value="${escapeHtml(c)}">`).join('')}
-            </datalist>
+            ${cityDatalist()}
           </div>
           <div class="field">
             <label for="f-community">Community</label>
@@ -680,6 +857,72 @@ function openGateModal(row){
     closeModal();
     if (!isEdit) openCities.add(payload.city);
     loadGates();
+  });
+}
+
+function openDangerModal(row){
+  const isEdit = !!row;
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>${isEdit ? 'Edit dangerous address' : 'Add dangerous address'}</h2>
+        <div id="modal-error" class="error-msg hidden"></div>
+        <form id="danger-form">
+          <div class="field">
+            <label for="f-danger-city">City / area</label>
+            <input type="text" id="f-danger-city" value="${escapeHtml(row?.city ?? '')}" required list="city-options">
+            ${cityDatalist()}
+          </div>
+          <div class="field">
+            <label for="f-address">Address / street name</label>
+            <input type="text" id="f-address" value="${escapeHtml(row?.address ?? '')}" required placeholder="e.g. 4th St, or 123 Main Ave">
+          </div>
+          <div class="field">
+            <label for="f-notation">Warning notation</label>
+            <input type="text" id="f-notation" value="${escapeHtml(row?.notation ?? '')}" placeholder="e.g. loose dog, dead end, no turnaround">
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn" id="modal-save">${isEdit ? 'Save' : 'Add'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const backdrop = document.getElementById('modal-backdrop');
+  const form = document.getElementById('danger-form');
+  const modalError = document.getElementById('modal-error');
+
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('modal-save');
+    saveBtn.disabled = true;
+    const payload = {
+      city: document.getElementById('f-danger-city').value.trim(),
+      address: document.getElementById('f-address').value.trim(),
+      notation: document.getElementById('f-notation').value.trim(),
+    };
+
+    let error;
+    if (isEdit) {
+      ({ error } = await supabase.from('dangerous_addresses').update(payload).eq('id', row.id));
+    } else {
+      ({ error } = await supabase.from('dangerous_addresses').insert(payload));
+    }
+
+    saveBtn.disabled = false;
+    if (error) {
+      modalError.textContent = error.message;
+      modalError.classList.remove('hidden');
+      return;
+    }
+    closeModal();
+    if (!isEdit) openCities.add(payload.city);
+    loadDanger();
   });
 }
 
