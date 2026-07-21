@@ -22,7 +22,11 @@ Open [http://localhost:3000](http://localhost:3000) (portfolio) and [http://loca
 
 ## Dictabird
 
-AI notepad: live scratchpad, browser mic transcription (no meeting bots), enhance notes / chat / actions via xAI Grok. Notes stay in `localStorage` until you enhance (then text is sent to the xAI API).
+AI notepad: live scratchpad, browser mic transcription (no meeting bots), enhance notes / chat / actions via free providers (Groq/Gemini) or paid xAI.
+
+- **Auth**: same Supabase email/password login as Gates (no public sign-up).
+- **Data**: notes/transcripts stay in `localStorage` on the device; only enhance/chat text is sent to the AI API.
+- **AI env**: `GROQ_API_KEY` / `GEMINI_API_KEY` / `XAI_API_KEY` (see `.env.local.example`).
 
 ## Gates
 

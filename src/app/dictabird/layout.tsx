@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   title: "Dictabird",
   description:
     "Dictabird: live meeting notes, mic transcription, enhanced summaries. No meeting bots.",
+  robots: { index: false, follow: false },
 };
 
 export default function DictabirdLayout({

@@ -23,6 +23,7 @@ export function Sidebar({
   onQueryChange,
   open,
   onClose,
+  onSignOut,
 }: {
   meetings: Meeting[];
   onNew: () => void;
@@ -30,6 +31,7 @@ export function Sidebar({
   onQueryChange: (q: string) => void;
   open: boolean;
   onClose: () => void;
+  onSignOut: () => void;
 }) {
   const pathname = usePathname();
   const filtered = meetings.filter((m) => {
@@ -143,10 +145,17 @@ export function Sidebar({
       </div>
 
       <div className="border-t border-stone-200/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-[11px] text-stone-400">
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="mb-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-left text-xs font-medium text-stone-700 hover:bg-stone-50"
+        >
+          Sign out
+        </button>
         <a href="/" className="block text-stone-500 underline-offset-2 hover:underline">
           ← Back to Theile
         </a>
-        <p className="mt-1">Private by default · this browser only</p>
+        <p className="mt-1">Locked login · notes stay in this browser</p>
       </div>
     </aside>
   );

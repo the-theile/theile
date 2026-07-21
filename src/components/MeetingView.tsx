@@ -27,7 +27,11 @@ export function MeetingView({ id }: { id: string }) {
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("notes");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [morePos, setMorePos] = useState<{ top: number; right: number } | null>(
+    null
+  );
   const notesRef = useRef<HTMLTextAreaElement>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const meetingRef = useRef(meeting);
 
@@ -155,6 +159,7 @@ export function MeetingView({ id }: { id: string }) {
     setError(null);
     setActionResult(null);
     setMoreOpen(false);
+    setMorePos(null);
     try {
       const res = await fetch("/api/action", {
         method: "POST",
@@ -241,22 +246,44 @@ export function MeetingView({ id }: { id: string }) {
         ? meeting.enhancedNotes
         : meeting.notes;
     await navigator.clipboard.writeText(text);
-    setMoreOpen(false);
   };
 
   const openChat = () => {
     setChatOpen(true);
     setMobilePanel("chat");
     setMoreOpen(false);
+    setMorePos(null);
   };
 
   const displayError = error || speechError;
   const showChatPanel = mobilePanel === "chat" || chatOpen;
 
+  const toggleMore = () => {
+    if (moreOpen) {
+      setMoreOpen(false);
+      setMorePos(null);
+      return;
+    }
+    const el = moreBtnRef.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setMorePos({
+        top: r.bottom + 6,
+        right: Math.max(8, window.innerWidth - r.right),
+      });
+    }
+    setMoreOpen(true);
+  };
+
+  const closeMore = () => {
+    setMoreOpen(false);
+    setMorePos(null);
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Header */}
-      <header className="shrink-0 border-b border-stone-200/80 bg-white/80 backdrop-blur">
+      {/* Header — z-index keeps menus above notes panel */}
+      <header className="relative z-30 shrink-0 border-b border-stone-200/80 bg-white/90 backdrop-blur">
         <div className="flex items-start gap-2 px-3 py-2.5 sm:px-5 sm:py-3">
           <input
             value={meeting.title}
@@ -280,8 +307,8 @@ export function MeetingView({ id }: { id: string }) {
           </select>
         </div>
 
-        {/* Primary actions — wrap cleanly, larger touch targets on mobile */}
-        <div className="flex gap-2 overflow-x-auto px-3 pb-2.5 scrollbar-none sm:flex-wrap sm:overflow-visible sm:px-5 sm:pb-3">
+        {/* Primary actions — no overflow clip so menus can escape */}
+        <div className="flex flex-wrap gap-2 px-3 pb-2.5 sm:px-5 sm:pb-3">
           <button
             type="button"
             onClick={toggleRecord}
@@ -319,65 +346,83 @@ export function MeetingView({ id }: { id: string }) {
           >
             Ask
           </button>
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => setMoreOpen((v) => !v)}
-              className="inline-flex items-center rounded-full border border-stone-200 bg-white px-3.5 py-2 text-sm text-stone-700 hover:bg-stone-50"
-              aria-expanded={moreOpen}
-            >
-              More
-            </button>
-            {moreOpen && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-10 cursor-default"
-                  aria-label="Close menu"
-                  onClick={() => setMoreOpen(false)}
-                />
-                <div className="absolute right-0 z-20 mt-1 w-48 rounded-xl border border-stone-200 bg-white py-1 shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => void copyNotes()}
-                    className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
-                  >
-                    Copy notes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void runAction("actions")}
-                    className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
-                  >
-                    List actions
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void runAction("follow-up")}
-                    className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
-                  >
-                    Follow-up email
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void runAction("project-plan")}
-                    className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
-                  >
-                    Project plan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
-                  >
-                    Delete meeting
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <button
+            ref={moreBtnRef}
+            type="button"
+            onClick={toggleMore}
+            className="inline-flex shrink-0 items-center rounded-full border border-stone-200 bg-white px-3.5 py-2 text-sm text-stone-700 hover:bg-stone-50"
+            aria-expanded={moreOpen}
+            aria-haspopup="menu"
+          >
+            More
+          </button>
         </div>
       </header>
+
+      {/* Fixed More menu — escapes header/panel stacking so it isn’t covered */}
+      {moreOpen && morePos && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-[80] cursor-default bg-transparent"
+            aria-label="Close menu"
+            onClick={closeMore}
+          />
+          <div
+            role="menu"
+            className="fixed z-[90] w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-xl"
+            style={{ top: morePos.top, right: morePos.right }}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                void copyNotes();
+                closeMore();
+              }}
+              className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+            >
+              Copy notes
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => void runAction("actions")}
+              className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+            >
+              List actions
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => void runAction("follow-up")}
+              className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+            >
+              Follow-up email
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => void runAction("project-plan")}
+              className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+            >
+              Project plan
+            </button>
+            <div className="my-1 border-t border-stone-100" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMore();
+                handleDelete();
+              }}
+              className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+            >
+              Delete meeting
+            </button>
+          </div>
+        </>
+      )}
 
       {displayError && (
         <div className="shrink-0 border-b border-red-100 bg-red-50 px-3 py-2 text-sm leading-snug text-red-700 sm:px-5">

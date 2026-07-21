@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import {
   MeetingsProvider,
   useMeetingsContext,
 } from "@/lib/MeetingsContext";
+import { AuthGate, signOutDictabird } from "./AuthGate";
 import { Sidebar } from "./Sidebar";
 
 function ShellInner({ children }: { children: React.ReactNode }) {
@@ -16,12 +16,10 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Close mobile drawer on navigation
   useEffect(() => {
     setNavOpen(false);
   }, [pathname]);
 
-  // Prevent body scroll when drawer is open on mobile
   useEffect(() => {
     if (!navOpen) return;
     const prev = document.body.style.overflow;
@@ -35,6 +33,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     const m = addMeeting();
     setNavOpen(false);
     router.push(`/dictabird/meeting/${m.id}`);
+  };
+
+  const handleSignOut = async () => {
+    setNavOpen(false);
+    await signOutDictabird();
   };
 
   if (!ready) {
@@ -78,7 +81,6 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
-      {/* Backdrop */}
       {navOpen && (
         <button
           type="button"
@@ -95,6 +97,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         onQueryChange={setQuery}
         open={navOpen}
         onClose={() => setNavOpen(false)}
+        onSignOut={handleSignOut}
       />
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pt-[calc(3.25rem+env(safe-area-inset-top))] md:pt-0">
@@ -106,9 +109,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <MeetingsProvider>
-      <ShellInner>{children}</ShellInner>
-    </MeetingsProvider>
+    <AuthGate>
+      <MeetingsProvider>
+        <ShellInner>{children}</ShellInner>
+      </MeetingsProvider>
+    </AuthGate>
   );
 }
 
