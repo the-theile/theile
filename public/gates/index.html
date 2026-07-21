@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Gates — theile.me</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B2545;
+    --ink-2:#0E2E52;
+    --card:#12345F;
+    --line:#7FA8C9;
+    --line-soft:rgba(127,168,201,0.22);
+    --amber:#E8A33D;
+    --amber-soft:rgba(232,163,61,0.16);
+    --red:#E86A5C;
+    --slate:#9FB3C8;
+    --white:#F5F8FB;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    background:var(--ink);
+    color:var(--white);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+  }
+  a{color:inherit;}
+  button, input{font-family:inherit;}
+
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  .hidden{display:none !important;}
+
+  /* ---------- Login ---------- */
+  #login-view{
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .login-card{
+    width:100%;
+    max-width:360px;
+    background:var(--card);
+    border:1px solid var(--line-soft);
+    border-radius:16px;
+    padding:32px 28px;
+  }
+  .login-card h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:32px;
+    margin-bottom:6px;
+  }
+  .login-card p.sub{
+    color:var(--slate);
+    font-size:14px;
+    margin-bottom:28px;
+  }
+  label{
+    display:block;
+    font-size:12px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--slate);
+    margin-bottom:6px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .field{margin-bottom:16px;}
+  input[type=email], input[type=password], input[type=text], input[type=search]{
+    width:100%;
+    background:var(--ink);
+    border:1px solid var(--line-soft);
+    color:var(--white);
+    border-radius:10px;
+    padding:13px 14px;
+    font-size:16px;
+    outline:none;
+    transition:border-color .15s;
+  }
+  input:focus{border-color:var(--line);}
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:var(--amber);
+    color:var(--ink);
+    border:none;
+    border-radius:10px;
+    padding:13px 18px;
+    font-weight:600;
+    font-size:15px;
+    cursor:pointer;
+    width:100%;
+    transition:filter .15s, transform .05s;
+  }
+  .btn:hover{filter:brightness(1.06);}
+  .btn:active{transform:scale(0.98);}
+  .btn:disabled{opacity:0.6; cursor:default;}
+  .btn-ghost{
+    background:transparent;
+    color:var(--slate);
+    border:1px solid var(--line-soft);
+  }
+  .btn-small{
+    width:auto;
+    padding:8px 12px;
+    font-size:13px;
+    border-radius:8px;
+  }
+  .btn-danger{background:var(--red); color:var(--white);}
+  .error-msg{
+    background:rgba(232,106,92,0.14);
+    border:1px solid rgba(232,106,92,0.4);
+    color:#FFD8D2;
+    padding:10px 12px;
+    border-radius:8px;
+    font-size:13px;
+    margin-bottom:16px;
+  }
+  .hint-msg{
+    color:var(--slate);
+    font-size:12px;
+    margin-top:14px;
+    line-height:1.5;
+  }
+
+  /* ---------- App ---------- */
+  #app-view{
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    min-height:100dvh;
+  }
+  header.top{
+    position:sticky;
+    top:0;
+    z-index:10;
+    background:var(--ink);
+    border-bottom:1px solid var(--line-soft);
+    padding:14px 16px 12px;
+  }
+  .top-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .top-row h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:22px;
+  }
+  .offline-banner{
+    background:var(--amber-soft);
+    color:var(--amber);
+    font-size:12px;
+    padding:8px 12px;
+    border-radius:8px;
+    margin-bottom:10px;
+    display:none;
+  }
+  .offline-banner.show{display:block;}
+
+  main{
+    flex:1;
+    padding:14px 16px 100px;
+    max-width:640px;
+    width:100%;
+    margin:0 auto;
+  }
+  .empty-msg{
+    color:var(--slate);
+    text-align:center;
+    padding:60px 20px;
+    font-size:14px;
+  }
+
+  .city-group{margin-bottom:10px;}
+  .city-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 4px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .city-header h2{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--line);
+  }
+  .city-header .count{
+    color:var(--slate);
+    font-size:12px;
+  }
+  .city-header .chevron{
+    color:var(--slate);
+    transition:transform .15s;
+    font-size:12px;
+  }
+  .city-group.open .chevron{transform:rotate(90deg);}
+  .city-entries{display:none; flex-direction:column; gap:8px;}
+  .city-group.open .city-entries{display:flex;}
+
+  .gate-card{
+    background:var(--card);
+    border:1px solid var(--line-soft);
+    border-radius:12px;
+    padding:14px 16px;
+  }
+  .gate-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .gate-name{
+    font-weight:600;
+    font-size:15px;
+    line-height:1.3;
+  }
+  .badge-unverified{
+    display:inline-block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--amber);
+    background:var(--amber-soft);
+    border-radius:5px;
+    padding:2px 6px;
+    margin-left:8px;
+    vertical-align:middle;
+  }
+  .gate-codes{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:0.02em;
+    margin-top:6px;
+    word-break:break-word;
+  }
+  .gate-codes.empty{
+    color:var(--slate);
+    font-size:14px;
+    font-weight:400;
+    font-style:italic;
+  }
+  .gate-notes{
+    color:var(--slate);
+    font-size:13px;
+    margin-top:6px;
+    line-height:1.4;
+  }
+  .gate-actions{
+    display:flex;
+    gap:8px;
+    margin-top:12px;
+  }
+  .copy-btn{
+    flex-shrink:0;
+    background:var(--ink);
+    border:1px solid var(--line-soft);
+    color:var(--white);
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:12px;
+    cursor:pointer;
+    height:fit-content;
+  }
+  .copy-btn.copied{color:var(--amber); border-color:var(--amber);}
+
+  .fab{
+    position:fixed;
+    right:20px;
+    bottom:20px;
+    z-index:20;
+    background:var(--amber);
+    color:var(--ink);
+    border:none;
+    border-radius:999px;
+    width:56px;
+    height:56px;
+    font-size:28px;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+  }
+  .fab:active{transform:scale(0.96);}
+
+  /* ---------- Modal / edit form ---------- */
+  .modal-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(6,18,36,0.7);
+    z-index:30;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+  }
+  .modal-sheet{
+    width:100%;
+    max-width:480px;
+    background:var(--card);
+    border:1px solid var(--line-soft);
+    border-radius:16px 16px 0 0;
+    padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+    max-height:88vh;
+    overflow-y:auto;
+  }
+  @media (min-width:560px){
+    .modal-backdrop{align-items:center;}
+    .modal-sheet{border-radius:16px; max-height:80vh;}
+  }
+  .modal-sheet h2{
+    font-family:'Fraunces', serif;
+    font-size:20px;
+    font-weight:600;
+    margin-bottom:18px;
+  }
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .checkbox-row input{width:18px; height:18px;}
+  .checkbox-row label{margin:0; text-transform:none; letter-spacing:0; font-size:14px; color:var(--white); font-family:'Inter',sans-serif;}
+  .modal-actions{display:flex; gap:10px; margin-top:6px;}
+  .modal-actions .btn{flex:1;}
+
+  .search-wrap{position:relative;}
+  .search-wrap input{padding-left:38px;}
+  .search-wrap svg{position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--slate);}
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:12px;
+  }
+  .tab-btn{
+    flex:1;
+    background:transparent;
+    border:1px solid var(--line-soft);
+    color:var(--slate);
+    border-radius:8px;
+    padding:9px 10px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .tab-btn.active{
+    background:var(--amber-soft);
+    border-color:var(--amber);
+    color:var(--amber);
+  }
+
+  .danger-card{border-color:rgba(232,106,92,0.45);}
+  .danger-name{
+    font-weight:600;
+    font-size:15px;
+    line-height:1.3;
+    color:#FFD8D2;
+  }
+</style>
+</head>
+<body>
+
+<div id="login-view">
+  <div class="login-card">
+    <h1>Gates</h1>
+    <p class="sub">Private gate-code tool for <a href="https://theile.me">theile.me</a>. Sign in to continue.</p>
+    <div id="login-error" class="error-msg hidden"></div>
+    <form id="login-form">
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn" id="login-btn">Sign in</button>
+    </form>
+    <p class="hint-msg">No account yet? Accounts are created manually in the Supabase dashboard — see the repo README.</p>
+  </div>
+</div>
+
+<div id="app-view" class="hidden">
+  <header class="top">
+    <div class="top-row">
+      <h1>Gates</h1>
+      <button class="btn btn-ghost btn-small" id="signout-btn">Sign out</button>
+    </div>
+    <div id="offline-banner" class="offline-banner">Showing last saved data — couldn't reach the server.</div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-gates" data-tab="gates">Gates</button>
+      <button class="tab-btn" id="tab-danger" data-tab="danger">Dangerous Addresses</button>
+    </div>
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="search-input" placeholder="Search city, community, or code…">
+    </div>
+  </header>
+  <main id="gate-list">
+    <div class="empty-msg">Loading…</div>
+  </main>
+  <button class="fab" id="add-fab" title="Add">+</button>
+</div>
+
+<div id="modal-root"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPABASE_URL = 'https://iugxcfyczuvqwadnobvf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_eoHldj45IyICDc8W-14Gcg_jo7HEEhM';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const CACHE_KEY = 'gates_cache_v1';
+const DANGER_CACHE_KEY = 'dangerous_addresses_cache_v1';
+
+const loginView = document.getElementById('login-view');
+const appView = document.getElementById('app-view');
+const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
+const loginBtn = document.getElementById('login-btn');
+const signoutBtn = document.getElementById('signout-btn');
+const searchInput = document.getElementById('search-input');
+const gateList = document.getElementById('gate-list');
+const offlineBanner = document.getElementById('offline-banner');
+const addFab = document.getElementById('add-fab');
+const modalRoot = document.getElementById('modal-root');
+const tabGatesBtn = document.getElementById('tab-gates');
+const tabDangerBtn = document.getElementById('tab-danger');
+
+let allGates = [];
+let allDanger = [];
+let openCities = new Set();
+let searchActive = false;
+let activeTab = 'gates';
+let gatesOffline = false;
+let dangerOffline = false;
+
+function updateOfflineBanner(){
+  const offline = activeTab === 'gates' ? gatesOffline : dangerOffline;
+  offlineBanner.classList.toggle('show', offline);
+}
+
+function allKnownCities(){
+  return [...new Set([...allGates.map(g => g.city), ...allDanger.map(d => d.city)])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- Auth ----------
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (session) {
+    showApp();
+  } else {
+    showLogin();
+  }
+});
+
+async function init(){
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) showApp(); else showLogin();
+}
+
+function showLogin(){
+  loginView.classList.remove('hidden');
+  appView.classList.add('hidden');
+}
+
+function showApp(){
+  loginView.classList.add('hidden');
+  appView.classList.remove('hidden');
+  loadGates();
+  loadDanger();
+}
+
+function switchTab(tab){
+  if (tab === activeTab) return;
+  activeTab = tab;
+  openCities = new Set();
+  searchInput.value = '';
+  tabGatesBtn.classList.toggle('active', tab === 'gates');
+  tabDangerBtn.classList.toggle('active', tab === 'danger');
+  searchInput.placeholder = tab === 'gates'
+    ? 'Search city, community, or code…'
+    : 'Search city, address, or notation…';
+  addFab.title = tab === 'gates' ? 'Add gate' : 'Add dangerous address';
+  updateOfflineBanner();
+  render();
+}
+
+tabGatesBtn.addEventListener('click', () => switchTab('gates'));
+tabDangerBtn.addEventListener('click', () => switchTab('danger'));
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  loginError.classList.add('hidden');
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'Signing in…';
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  loginBtn.disabled = false;
+  loginBtn.textContent = 'Sign in';
+  if (error) {
+    loginError.textContent = error.message;
+    loginError.classList.remove('hidden');
+  }
+});
+
+signoutBtn.addEventListener('click', async () => {
+  await supabase.auth.signOut();
+});
+
+// ---------- Data ----------
+async function loadGates(){
+  const { data, error } = await supabase
+    .from('gates')
+    .select('*')
+    .order('city', { ascending: true })
+    .order('community', { ascending: true });
+
+  if (error) {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      allGates = JSON.parse(cached);
+      gatesOffline = true;
+    } else if (activeTab === 'gates') {
+      gateList.innerHTML = `<div class="empty-msg">Couldn't load gates and no cached data is available.<br>${escapeHtml(error.message)}</div>`;
+      return;
+    }
+  } else {
+    allGates = data;
+    gatesOffline = false;
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  }
+  updateOfflineBanner();
+  render();
+}
+
+async function loadDanger(){
+  const { data, error } = await supabase
+    .from('dangerous_addresses')
+    .select('*')
+    .order('city', { ascending: true })
+    .order('address', { ascending: true });
+
+  if (error) {
+    const cached = localStorage.getItem(DANGER_CACHE_KEY);
+    if (cached) {
+      allDanger = JSON.parse(cached);
+      dangerOffline = true;
+    } else if (activeTab === 'danger') {
+      gateList.innerHTML = `<div class="empty-msg">Couldn't load dangerous addresses and no cached data is available.<br>${escapeHtml(error.message)}</div>`;
+      return;
+    }
+  } else {
+    allDanger = data;
+    dangerOffline = false;
+    localStorage.setItem(DANGER_CACHE_KEY, JSON.stringify(data));
+  }
+  updateOfflineBanner();
+  render();
+}
+
+function groupByCity(rows){
+  const groups = new Map();
+  for (const row of rows) {
+    if (!groups.has(row.city)) groups.set(row.city, []);
+    groups.get(row.city).push(row);
+  }
+  return groups;
+}
+
+function matchesGateSearch(row, q){
+  if (!q) return true;
+  const hay = `${row.city} ${row.community} ${row.codes} ${row.notes}`.toLowerCase();
+  return hay.includes(q);
+}
+
+function matchesDangerSearch(row, q){
+  if (!q) return true;
+  const hay = `${row.city} ${row.address} ${row.notation}`.toLowerCase();
+  return hay.includes(q);
+}
+
+function render(){
+  if (activeTab === 'gates') renderGates(); else renderDanger();
+}
+
+function renderGates(){
+  const q = searchInput.value.trim().toLowerCase();
+  searchActive = q.length > 0;
+  const filtered = allGates.filter(row => matchesGateSearch(row, q));
+
+  if (filtered.length === 0) {
+    gateList.innerHTML = `<div class="empty-msg">No gates match "${escapeHtml(searchInput.value)}"</div>`;
+    return;
+  }
+
+  const groups = groupByCity(filtered);
+  const html = [];
+  for (const [city, rows] of groups) {
+    const isOpen = searchActive || openCities.has(city);
+    html.push(`
+      <div class="city-group ${isOpen ? 'open' : ''}" data-city="${escapeHtml(city)}">
+        <div class="city-header" data-toggle-city="${escapeHtml(city)}">
+          <h2>${escapeHtml(city)}</h2>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="count">${rows.length}</span>
+            <span class="chevron">▶</span>
+          </div>
+        </div>
+        <div class="city-entries">
+          ${rows.map(renderCard).join('')}
+        </div>
+      </div>
+    `);
+  }
+  gateList.innerHTML = html.join('');
+}
+
+function renderDanger(){
+  const q = searchInput.value.trim().toLowerCase();
+  searchActive = q.length > 0;
+  const filtered = allDanger.filter(row => matchesDangerSearch(row, q));
+
+  if (filtered.length === 0) {
+    gateList.innerHTML = `<div class="empty-msg">No dangerous addresses match "${escapeHtml(searchInput.value)}"</div>`;
+    return;
+  }
+
+  const groups = groupByCity(filtered);
+  const html = [];
+  for (const [city, rows] of groups) {
+    const isOpen = searchActive || openCities.has(city);
+    html.push(`
+      <div class="city-group ${isOpen ? 'open' : ''}" data-city="${escapeHtml(city)}">
+        <div class="city-header" data-toggle-city="${escapeHtml(city)}">
+          <h2>${escapeHtml(city)}</h2>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="count">${rows.length}</span>
+            <span class="chevron">▶</span>
+          </div>
+        </div>
+        <div class="city-entries">
+          ${rows.map(renderDangerCard).join('')}
+        </div>
+      </div>
+    `);
+  }
+  gateList.innerHTML = html.join('');
+}
+
+function renderCard(row){
+  const hasCode = row.codes && row.codes.trim().length > 0;
+  return `
+    <div class="gate-card" data-id="${row.id}">
+      <div class="gate-top">
+        <div class="gate-name">${escapeHtml(row.community)}${row.verified ? '' : '<span class="badge-unverified">verify</span>'}</div>
+      </div>
+      <div class="gate-codes ${hasCode ? '' : 'empty'}">${hasCode ? escapeHtml(row.codes) : 'no code recorded'}</div>
+      ${row.notes ? `<div class="gate-notes">${escapeHtml(row.notes)}</div>` : ''}
+      <div class="gate-actions">
+        ${hasCode ? `<button class="copy-btn" data-copy="${escapeHtml(row.codes)}">Copy</button>` : ''}
+        <button class="copy-btn" data-edit="${row.id}">Edit</button>
+        <button class="copy-btn" data-delete="${row.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDangerCard(row){
+  return `
+    <div class="gate-card danger-card" data-id="${row.id}">
+      <div class="gate-top">
+        <div class="danger-name">⚠ ${escapeHtml(row.address)}</div>
+      </div>
+      ${row.notation ? `<div class="gate-notes">${escapeHtml(row.notation)}</div>` : ''}
+      <div class="gate-actions">
+        <button class="copy-btn" data-edit="${row.id}">Edit</button>
+        <button class="copy-btn" data-delete="${row.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+gateList.addEventListener('click', async (e) => {
+  const toggle = e.target.closest('[data-toggle-city]');
+  if (toggle) {
+    const city = toggle.dataset.toggleCity;
+    if (openCities.has(city)) openCities.delete(city); else openCities.add(city);
+    render();
+    return;
+  }
+
+  const copyBtn = e.target.closest('[data-copy]');
+  if (copyBtn) {
+    try {
+      await navigator.clipboard.writeText(copyBtn.dataset.copy);
+      copyBtn.textContent = 'Copied';
+      copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 1200);
+    } catch (err) {
+      alert('Could not copy — long-press the code to copy it manually.');
+    }
+    return;
+  }
+
+  const editBtn = e.target.closest('[data-edit]');
+  if (editBtn) {
+    if (activeTab === 'gates') {
+      const row = allGates.find(g => g.id === editBtn.dataset.edit);
+      if (row) openGateModal(row);
+    } else {
+      const row = allDanger.find(d => d.id === editBtn.dataset.edit);
+      if (row) openDangerModal(row);
+    }
+    return;
+  }
+
+  const deleteBtn = e.target.closest('[data-delete]');
+  if (deleteBtn) {
+    if (activeTab === 'gates') {
+      const row = allGates.find(g => g.id === deleteBtn.dataset.delete);
+      if (row && confirm(`Delete "${row.community}" (${row.city})?`)) {
+        const { error } = await supabase.from('gates').delete().eq('id', row.id);
+        if (error) { alert(error.message); return; }
+        allGates = allGates.filter(g => g.id !== row.id);
+        localStorage.setItem(CACHE_KEY, JSON.stringify(allGates));
+        render();
+      }
+    } else {
+      const row = allDanger.find(d => d.id === deleteBtn.dataset.delete);
+      if (row && confirm(`Delete "${row.address}" (${row.city})?`)) {
+        const { error } = await supabase.from('dangerous_addresses').delete().eq('id', row.id);
+        if (error) { alert(error.message); return; }
+        allDanger = allDanger.filter(d => d.id !== row.id);
+        localStorage.setItem(DANGER_CACHE_KEY, JSON.stringify(allDanger));
+        render();
+      }
+    }
+    return;
+  }
+});
+
+searchInput.addEventListener('input', render);
+
+// ---------- Add / edit modal ----------
+addFab.addEventListener('click', () => {
+  if (activeTab === 'gates') openGateModal(null); else openDangerModal(null);
+});
+
+function cityDatalist(){
+  return `<datalist id="city-options">
+    ${allKnownCities().map(c => `<option value="${escapeHtml(c)}">`).join('')}
+  </datalist>`;
+}
+
+function openGateModal(row){
+  const isEdit = !!row;
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>${isEdit ? 'Edit gate' : 'Add gate'}</h2>
+        <div id="modal-error" class="error-msg hidden"></div>
+        <form id="gate-form">
+          <div class="field">
+            <label for="f-city">City / area</label>
+            <input type="text" id="f-city" value="${escapeHtml(row?.city ?? '')}" required list="city-options">
+            ${cityDatalist()}
+          </div>
+          <div class="field">
+            <label for="f-community">Community</label>
+            <input type="text" id="f-community" value="${escapeHtml(row?.community ?? '')}" required>
+          </div>
+          <div class="field">
+            <label for="f-codes">Code(s)</label>
+            <input type="text" id="f-codes" value="${escapeHtml(row?.codes ?? '')}" placeholder="e.g. #1234">
+          </div>
+          <div class="field">
+            <label for="f-notes">Notes</label>
+            <input type="text" id="f-notes" value="${escapeHtml(row?.notes ?? '')}" placeholder="e.g. ped gate, locker code, until 7pm">
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="f-verified" ${row ? (row.verified ? 'checked' : '') : 'checked'}>
+            <label for="f-verified">Code confirmed / verified</label>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn" id="modal-save">${isEdit ? 'Save' : 'Add'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const backdrop = document.getElementById('modal-backdrop');
+  const form = document.getElementById('gate-form');
+  const modalError = document.getElementById('modal-error');
+
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('modal-save');
+    saveBtn.disabled = true;
+    const payload = {
+      city: document.getElementById('f-city').value.trim(),
+      community: document.getElementById('f-community').value.trim(),
+      codes: document.getElementById('f-codes').value.trim(),
+      notes: document.getElementById('f-notes').value.trim(),
+      verified: document.getElementById('f-verified').checked,
+    };
+
+    let error;
+    if (isEdit) {
+      ({ error } = await supabase.from('gates').update(payload).eq('id', row.id));
+    } else {
+      ({ error } = await supabase.from('gates').insert(payload));
+    }
+
+    saveBtn.disabled = false;
+    if (error) {
+      modalError.textContent = error.message;
+      modalError.classList.remove('hidden');
+      return;
+    }
+    closeModal();
+    if (!isEdit) openCities.add(payload.city);
+    loadGates();
+  });
+}
+
+function openDangerModal(row){
+  const isEdit = !!row;
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal-sheet">
+        <h2>${isEdit ? 'Edit dangerous address' : 'Add dangerous address'}</h2>
+        <div id="modal-error" class="error-msg hidden"></div>
+        <form id="danger-form">
+          <div class="field">
+            <label for="f-danger-city">City / area</label>
+            <input type="text" id="f-danger-city" value="${escapeHtml(row?.city ?? '')}" required list="city-options">
+            ${cityDatalist()}
+          </div>
+          <div class="field">
+            <label for="f-address">Address / street name</label>
+            <input type="text" id="f-address" value="${escapeHtml(row?.address ?? '')}" required placeholder="e.g. 4th St, or 123 Main Ave">
+          </div>
+          <div class="field">
+            <label for="f-notation">Warning notation</label>
+            <input type="text" id="f-notation" value="${escapeHtml(row?.notation ?? '')}" placeholder="e.g. loose dog, dead end, no turnaround">
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+            <button type="submit" class="btn" id="modal-save">${isEdit ? 'Save' : 'Add'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const backdrop = document.getElementById('modal-backdrop');
+  const form = document.getElementById('danger-form');
+  const modalError = document.getElementById('modal-error');
+
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('modal-save');
+    saveBtn.disabled = true;
+    const payload = {
+      city: document.getElementById('f-danger-city').value.trim(),
+      address: document.getElementById('f-address').value.trim(),
+      notation: document.getElementById('f-notation').value.trim(),
+    };
+
+    let error;
+    if (isEdit) {
+      ({ error } = await supabase.from('dangerous_addresses').update(payload).eq('id', row.id));
+    } else {
+      ({ error } = await supabase.from('dangerous_addresses').insert(payload));
+    }
+
+    saveBtn.disabled = false;
+    if (error) {
+      modalError.textContent = error.message;
+      modalError.classList.remove('hidden');
+      return;
+    }
+    closeModal();
+    if (!isEdit) openCities.add(payload.city);
+    loadDanger();
+  });
+}
+
+function closeModal(){
+  modalRoot.innerHTML = '';
+}
+
+init();
+</script>
+</body>
+</html>

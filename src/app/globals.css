@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Shared defaults — portfolio HTML brings its own body styles;
+   Dictabird scopes its shell via AppShell. */
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d6d3d1 transparent;
+}

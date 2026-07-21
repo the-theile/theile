@@ -1,13 +1,40 @@
 # theile
-About Theile and his creations
+
+Personal site and creations for [Theile Riordan](https://github.com/the-theile).
+
+| Path | What |
+| --- | --- |
+| `/` | Portfolio home (from `content/portfolio.html`) |
+| `/dictabird` | **Dictabird** — AI meeting notepad (Granola-style) |
+| `/gates` | Private Amazon Flex gate codes app (static, Supabase auth) |
+
+## Local development
+
+```bash
+cp .env.local.example .env.local
+# Set XAI_API_KEY for Dictabird AI features (https://console.x.ai)
+
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) (portfolio) and [http://localhost:3000/dictabird](http://localhost:3000/dictabird).
+
+## Dictabird
+
+AI notepad: live scratchpad, browser mic transcription (no meeting bots), enhance notes / chat / actions via xAI Grok. Notes stay in `localStorage` until you enhance (then text is sent to the xAI API).
 
 ## Gates
 
-`/gates` is a private, password-protected reference app for Amazon Flex gate/access codes, served as a static page alongside the main site (e.g. `<site>/gates`). It's a single self-contained HTML file — no build step, no framework — using the Supabase JS client (loaded from a CDN) directly against the `theile` Supabase project for auth and data.
+See previous docs: password-protected reference app at `/gates`, backed by Supabase.
 
-- **Auth**: Supabase Auth (email + password). There is no public sign-up. To create your login, go to the Supabase dashboard → Authentication → Users → **Add user**, and set an email + password. Use those to sign in at `/gates`.
-- **Data**: a `gates` table (`city`, `community`, `codes`, `notes`, `verified`) and a `dangerous_addresses` table (`city`, `address`, `notation`), both protected by row-level security so only authenticated users can read or write them. Codes are kept exactly as entered (including `*`/`#` characters, which can be meaningful on real gate keypads).
-- **Editing**: once signed in, you can add, edit, and delete entries directly in the app — no separate admin tool needed. A tab switcher at the top toggles between the Gates list and the Dangerous Addresses list.
-- **City autocomplete**: the "City / area" field on both the gate and dangerous-address forms suggests from every city already used across both tables, so re-entering an existing city (or seeing it while typing a new one) doesn't require scrolling the list.
-- **Dangerous addresses**: a flat list of streets/addresses worth flagging, each with a city and a free-text warning notation (e.g. "loose dog", "dead end, no turnaround"). Grouped and searchable the same way as gates.
-- A handful of imported entries are flagged with a "verify" badge — these came from ambiguous or uncertain lines in the original source list and are worth double-checking (or fixing) next time you're at that gate.
+## Deploy (Vercel)
+
+This repo is a **Next.js** app (so Dictabird API routes work on your custom domain).
+
+1. Import the `theile` GitHub repo in Vercel (or reconnect the existing project).
+2. Framework: **Next.js** (auto-detected).
+3. Add env var `XAI_API_KEY` for production Dictabird AI features.
+4. Keep your custom domain pointed at this project.
+
+`/gates` is served from `public/gates/index.html`.
