@@ -32,7 +32,7 @@ AI notepad: live scratchpad, browser mic transcription (no meeting bots), enhanc
 
 1. Record on iPhone with **Voice Memos** only (typed notes in Dictabird optional).
 2. Transfer `.m4a` to this PC.
-3. Run **`tools/dictabird-processor`** (see its README) → `*.dictabird.json`.
+3. Double-click **`tools/dictabird-processor/Launch Dictabird Processor.bat`** (or `python gui.py`) → process the `.m4a` → `*.dictabird.json`.
 4. In Dictabird: **More → Import processed transcript** → **Enhance**.
 
 Audio stays on your machines; processing does not use Vercel or cloud STT.

@@ -36,7 +36,25 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Usage
+## GUI (recommended for routine use)
+
+Double-click:
+
+```
+Launch Dictabird Processor.bat
+```
+
+Or:
+
+```powershell
+cd tools\dictabird-processor
+.\.venv\Scripts\activate
+python gui.py
+```
+
+Then: **Browse** → pick your Voice Memo → **Process audio** → open folder / import the `.dictabird.json` in Dictabird.
+
+## CLI
 
 ```powershell
 # Activate venv first

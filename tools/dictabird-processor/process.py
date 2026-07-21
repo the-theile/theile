@@ -36,6 +36,10 @@ class Segment:
     text: str
 
 
+class ProcessError(Exception):
+    """User-facing processing failure."""
+
+
 def die(msg: str, code: int = 1) -> None:
     print(f"error: {msg}", file=sys.stderr)
     sys.exit(code)
@@ -43,13 +47,11 @@ def die(msg: str, code: int = 1) -> None:
 
 def check_ffmpeg() -> None:
     if shutil.which("ffmpeg") is None:
-        die(
+        raise ProcessError(
             "ffmpeg not found on PATH.\n"
-            "  Voice Memos use .m4a — ffmpeg is required to decode them.\n"
-            "  Install options (Windows):\n"
-            "    winget install Gyan.FFmpeg\n"
-            "    choco install ffmpeg\n"
-            "  Then reopen the terminal and retry."
+            "Voice Memos use .m4a — ffmpeg is required to decode them.\n"
+            "Install: winget install Gyan.FFmpeg\n"
+            "Then reopen the terminal / GUI and retry."
         )
 
 
@@ -84,7 +86,7 @@ def ensure_wav(src: Path, work: Path) -> Path:
             text=True,
         )
     except subprocess.CalledProcessError as e:
-        die(f"ffmpeg failed:\n{e.stderr or e.stdout or e}")
+        raise ProcessError(f"ffmpeg failed:\n{e.stderr or e.stdout or e}") from e
     return out
 
 
@@ -106,14 +108,14 @@ def transcribe_faster_whisper(
 ) -> list[Segment]:
     try:
         from faster_whisper import WhisperModel
-    except ImportError:
-        die(
+    except ImportError as e:
+        raise ProcessError(
             "faster-whisper not installed.\n"
             "  cd tools/dictabird-processor\n"
             "  python -m venv .venv\n"
-            "  .venv\\Scripts\\activate   # Windows\n"
+            "  .venv\\Scripts\\activate\n"
             "  pip install -r requirements.txt"
-        )
+        ) from e
 
     print(f"→ loading Whisper model '{model_size}' ({device}, {compute_type})…")
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
@@ -296,6 +298,162 @@ def audio_duration_sec(wav: Path) -> float:
         return 0.0
 
 
+@dataclass
+class ProcessResult:
+    json_path: Path
+    md_path: Path
+    txt_path: Path
+    title: str
+    diarized: bool
+    segment_count: int
+    duration_sec: float
+
+
+def run_job(
+    audio: Path | str,
+    *,
+    out_dir: Path | str | None = None,
+    model: str = "base",
+    device: str = "cpu",
+    compute_type: str | None = None,
+    language: str | None = None,
+    title: str | None = None,
+    diarize: bool = False,
+    hf_token: str | None = None,
+    num_speakers: int | None = None,
+    log: Any = print,
+) -> ProcessResult:
+    """
+    Run the full local pipeline. Raises ProcessError on failure.
+    `log` is a callable like print(msg) for UI progress.
+    """
+    import os
+
+    audio_path = Path(audio).expanduser().resolve()
+    if not audio_path.is_file():
+        raise ProcessError(f"File not found: {audio_path}")
+
+    check_ffmpeg()
+
+    out = Path(out_dir).expanduser().resolve() if out_dir else audio_path.parent
+    out.mkdir(parents=True, exist_ok=True)
+    work = out / ".dictabird-work"
+    work.mkdir(exist_ok=True)
+
+    dev = device
+    if dev == "auto":
+        try:
+            import torch
+
+            dev = "cuda" if torch.cuda.is_available() else "cpu"
+        except ImportError:
+            dev = "cpu"
+
+    ctype = compute_type
+    if not ctype:
+        ctype = "float16" if dev == "cuda" else "int8"
+
+    token = (
+        hf_token
+        or os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    )
+
+    log(f"Dictabird processor")
+    log(f"  input:  {audio_path}")
+    log(f"  output: {out}")
+    log("")
+
+    # Route print() from helpers into the UI/CLI log
+    import contextlib
+    import io
+
+    class _LogWriter(io.TextIOBase):
+        def write(self, s: str) -> int:  # type: ignore[override]
+            if s and s.strip():
+                for line in s.splitlines():
+                    if line.strip():
+                        log(line.rstrip())
+            return len(s)
+
+        def flush(self) -> None:
+            return None
+
+    with contextlib.redirect_stdout(_LogWriter()), contextlib.redirect_stderr(
+        _LogWriter()
+    ):
+        wav = ensure_wav(audio_path, work)
+        dur = audio_duration_sec(wav)
+        if dur:
+            log(f"  duration ≈ {format_ts(dur)}")
+
+        segments = transcribe_faster_whisper(
+            wav,
+            model_size=model,
+            device=dev,
+            compute_type=ctype,
+            language=language or None,
+        )
+        if not segments:
+            raise ProcessError("No speech detected in audio.")
+
+        diarized = False
+        if diarize:
+            labeled = try_diarize(wav, segments, token, num_speakers)
+            diarized = any(s.speaker not in ("SPEAKER", "") for s in labeled)
+            segments = labeled
+
+        meeting_title = title or audio_path.stem.replace("_", " ").replace(
+            "-", " "
+        )
+        stem = audio_path.stem
+
+        payload = to_dictabird_json(
+            segments,
+            title=meeting_title,
+            source=audio_path.name,
+            model=model,
+            diarized=diarized,
+        )
+        md = to_markdown(segments, title=meeting_title, source=audio_path.name)
+        plain = to_plain(segments)
+
+        json_path = out / f"{stem}.dictabird.json"
+        md_path = out / f"{stem}.dictabird.md"
+        txt_path = out / f"{stem}.dictabird.txt"
+
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        md_path.write_text(md, encoding="utf-8")
+        txt_path.write_text(plain + "\n", encoding="utf-8")
+
+        log("")
+        log("✓ done (all processing was local)")
+        log(f"  → {json_path.name}   ← import this in Dictabird")
+        log(f"  → {md_path.name}")
+        log(f"  → {txt_path.name}")
+        if not diarized and diarize:
+            log(
+                "  (diarization requested but speakers not labeled — check pyannote / HF token)"
+            )
+        elif not diarized:
+            log("")
+            log(
+                "tip: enable Diarize in the UI for speaker labels (needs pyannote + HF token)"
+            )
+        log("")
+        log("Next: Dictabird → open meeting → More → Import processed transcript")
+
+    return ProcessResult(
+        json_path=json_path,
+        md_path=md_path,
+        txt_path=txt_path,
+        title=meeting_title,
+        diarized=diarized,
+        segment_count=len(segments),
+        duration_sec=dur,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Local private transcription for Dictabird (Voice Memos → desktop)."
@@ -356,94 +514,22 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    audio: Path = args.audio.expanduser().resolve()
-    if not audio.is_file():
-        die(f"file not found: {audio}")
-
-    check_ffmpeg()
-
-    out_dir: Path = (args.out_dir or audio.parent).expanduser().resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    work = out_dir / ".dictabird-work"
-    work.mkdir(exist_ok=True)
-
-    device = args.device
-    if device == "auto":
-        try:
-            import torch
-
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        except ImportError:
-            device = "cpu"
-
-    compute_type = args.compute_type
-    if not compute_type:
-        compute_type = "float16" if device == "cuda" else "int8"
-
-    import os
-
-    hf_token = args.hf_token or os.environ.get("HF_TOKEN") or os.environ.get(
-        "HUGGING_FACE_HUB_TOKEN"
-    )
-
-    print(f"Dictabird processor")
-    print(f"  input:  {audio}")
-    print(f"  output: {out_dir}")
-    print()
-
-    wav = ensure_wav(audio, work)
-    dur = audio_duration_sec(wav)
-    if dur:
-        print(f"  duration ≈ {format_ts(dur)}")
-
-    segments = transcribe_faster_whisper(
-        wav,
-        model_size=args.model,
-        device=device,
-        compute_type=compute_type,
-        language=args.language,
-    )
-    if not segments:
-        die("no speech detected in audio")
-
-    diarized = False
-    if args.diarize:
-        labeled = try_diarize(wav, segments, hf_token, args.num_speakers)
-        diarized = any(s.speaker not in ("SPEAKER", "") for s in labeled)
-        segments = labeled
-
-    title = args.title or audio.stem.replace("_", " ").replace("-", " ")
-    stem = audio.stem
-
-    payload = to_dictabird_json(
-        segments,
-        title=title,
-        source=audio.name,
-        model=args.model,
-        diarized=diarized,
-    )
-    md = to_markdown(segments, title=title, source=audio.name)
-    plain = to_plain(segments)
-
-    json_path = out_dir / f"{stem}.dictabird.json"
-    md_path = out_dir / f"{stem}.dictabird.md"
-    txt_path = out_dir / f"{stem}.dictabird.txt"
-
-    json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    md_path.write_text(md, encoding="utf-8")
-    txt_path.write_text(plain + "\n", encoding="utf-8")
-
-    print()
-    print("✓ done (all processing was local)")
-    print(f"  → {json_path.name}   ← import this in Dictabird")
-    print(f"  → {md_path.name}")
-    print(f"  → {txt_path.name}")
-    if not diarized:
-        print()
-        print("tip: for speaker labels, install pyannote and re-run with:")
-        print("  python process.py your.m4a --diarize --hf-token hf_xxx --num-speakers 2")
-    print()
-    print("In Dictabird: open a meeting → More → Import processed transcript")
+    try:
+        run_job(
+            args.audio,
+            out_dir=args.out_dir,
+            model=args.model,
+            device=args.device,
+            compute_type=args.compute_type,
+            language=args.language,
+            title=args.title,
+            diarize=args.diarize,
+            hf_token=args.hf_token,
+            num_speakers=args.num_speakers,
+            log=print,
+        )
+    except ProcessError as e:
+        die(str(e))
 
 
 if __name__ == "__main__":
