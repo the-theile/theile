@@ -7,6 +7,7 @@ import {
   useMeetingsContext,
 } from "@/lib/MeetingsContext";
 import { AuthGate, signOutDictabird } from "./AuthGate";
+import { DictabirdMark } from "./DictabirdLogo";
 import { Sidebar } from "./Sidebar";
 
 function ShellInner({ children }: { children: React.ReactNode }) {
@@ -65,8 +66,8 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           onClick={() => router.push("/dictabird")}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-700 text-white">
-            <BirdIcon />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sky-800 shadow-sm">
+            <DictabirdMark className="h-7 w-7" />
           </span>
           <span className="truncate text-sm font-semibold tracking-tight">
             Dictabird
@@ -130,20 +131,4 @@ function MenuIcon() {
   );
 }
 
-function BirdIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M4 14c2-1 4-2 6-1 1.5.7 2.5 2 4 2.5 2 .7 4-.2 6-1.5-1 2.5-3.2 4.5-6 5-2.2.4-4-.3-5.5-1.5C6.5 16 5 15 4 14Z"
-        fill="currentColor"
-        opacity="0.95"
-      />
-      <path
-        d="M14 8c1.5-2 3.5-3.2 6-3.5-.5 2-1.5 3.5-3 4.5L14 8Z"
-        fill="currentColor"
-        opacity="0.7"
-      />
-      <circle cx="9.5" cy="11.5" r="1" fill="currentColor" />
-    </svg>
-  );
-}
+

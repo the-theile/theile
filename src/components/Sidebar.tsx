@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Meeting } from "@/lib/types";
+import { DictabirdMark } from "./DictabirdLogo";
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -59,14 +60,16 @@ export function Sidebar({
           onClick={onClose}
           className="flex min-w-0 flex-1 items-center gap-2.5"
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-700 text-white shadow-sm">
-            <BirdIcon />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sky-800 shadow-sm">
+            <DictabirdMark className="h-8 w-8" />
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold tracking-tight text-stone-900">
               Dictabird
             </div>
-            <div className="text-[11px] text-stone-500">AI notepad · no bots</div>
+            <div className="text-[11px] text-stone-500">
+              Prehistoric notes · no bots
+            </div>
           </div>
         </Link>
         <button
@@ -174,27 +177,4 @@ function PlusIcon() {
   );
 }
 
-function BirdIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M4 14c2-1 4-2 6-1 1.5.7 2.5 2 4 2.5 2 .7 4-.2 6-1.5-1 2.5-3.2 4.5-6 5-2.2.4-4-.3-5.5-1.5C6.5 16 5 15 4 14Z"
-        fill="currentColor"
-        opacity="0.95"
-      />
-      <path
-        d="M14 8c1.5-2 3.5-3.2 6-3.5-.5 2-1.5 3.5-3 4.5L14 8Z"
-        fill="currentColor"
-        opacity="0.7"
-      />
-      <circle cx="9.5" cy="11.5" r="1" fill="currentColor" opacity="0.9" />
-      <path
-        d="M4 14c-.5 1.5-1 3 .5 4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity="0.6"
-      />
-    </svg>
-  );
-}
+

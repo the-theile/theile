@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase";
+import { DictabirdMark } from "./DictabirdLogo";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -67,24 +68,16 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh items-center justify-center bg-[#faf8f5] px-5 py-10">
       <div className="w-full max-w-sm rounded-2xl border border-stone-200/80 bg-white p-7 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-700 text-white">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M4 14c2-1 4-2 6-1 1.5.7 2.5 2 4 2.5 2 .7 4-.2 6-1.5-1 2.5-3.2 4.5-6 5-2.2.4-4-.3-5.5-1.5C6.5 16 5 15 4 14Z"
-                fill="currentColor"
-              />
-              <path
-                d="M14 8c1.5-2 3.5-3.2 6-3.5-.5 2-1.5 3.5-3 4.5L14 8Z"
-                fill="currentColor"
-                opacity="0.7"
-              />
-            </svg>
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-sky-800 shadow-sm">
+            <DictabirdMark className="h-11 w-11" />
           </div>
           <div>
             <h1 className="text-lg font-semibold tracking-tight text-stone-900">
               Dictabird
             </h1>
-            <p className="text-xs text-stone-500">Private · sign in to continue</p>
+            <p className="text-xs text-stone-500">
+              Your prehistoric note-taker · sign in
+            </p>
           </div>
         </div>
 
