@@ -20,7 +20,7 @@ export function Markdown({ content }: { content: string }) {
     nodes.push(
       <ul key={`ul-${key++}`} className="my-2 space-y-1.5 list-disc pl-5">
         {listItems.map((item, i) => (
-          <li key={i} className="text-stone-700 leading-relaxed">
+          <li key={i} className="break-words text-stone-700 leading-relaxed">
             <Inline text={item} />
           </li>
         ))}
@@ -70,7 +70,7 @@ export function Markdown({ content }: { content: string }) {
       continue;
     }
     nodes.push(
-      <p key={key++} className="text-stone-700 leading-relaxed my-1">
+      <p key={key++} className="my-1 break-words leading-relaxed text-stone-700">
         <Inline text={line} />
       </p>
     );

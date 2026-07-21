@@ -12,6 +12,8 @@ function uid() {
   return crypto.randomUUID();
 }
 
+type MobilePanel = "notes" | "transcript" | "chat";
+
 export function MeetingView({ id }: { id: string }) {
   const { getById, updateMeeting, removeMeeting, ready } = useMeetingsContext();
   const meeting = getById(id);
@@ -23,6 +25,8 @@ export function MeetingView({ id }: { id: string }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [actionResult, setActionResult] = useState<string | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("notes");
+  const [moreOpen, setMoreOpen] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const meetingRef = useRef(meeting);
@@ -77,7 +81,6 @@ export function MeetingView({ id }: { id: string }) {
   }, [meeting?.transcript, interim]);
 
   useEffect(() => {
-    // keep status in sync with listening
     const current = meetingRef.current;
     if (!current) return;
     if (listening && current.status !== "recording") {
@@ -98,7 +101,7 @@ export function MeetingView({ id }: { id: string }) {
 
   if (!meeting) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-stone-500">
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-stone-500">
         <p>Meeting not found.</p>
         <button
           type="button"
@@ -139,6 +142,7 @@ export function MeetingView({ id }: { id: string }) {
         viewMode: "enhanced",
         status: "done",
       });
+      setMobilePanel("notes");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Enhance failed");
     } finally {
@@ -150,6 +154,7 @@ export function MeetingView({ id }: { id: string }) {
     setBusy(kind);
     setError(null);
     setActionResult(null);
+    setMoreOpen(false);
     try {
       const res = await fetch("/api/action", {
         method: "POST",
@@ -165,6 +170,7 @@ export function MeetingView({ id }: { id: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Action failed");
       setActionResult(data.result);
+      setMobilePanel("notes");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
     } finally {
@@ -235,96 +241,151 @@ export function MeetingView({ id }: { id: string }) {
         ? meeting.enhancedNotes
         : meeting.notes;
     await navigator.clipboard.writeText(text);
+    setMoreOpen(false);
+  };
+
+  const openChat = () => {
+    setChatOpen(true);
+    setMobilePanel("chat");
+    setMoreOpen(false);
   };
 
   const displayError = error || speechError;
+  const showChatPanel = mobilePanel === "chat" || chatOpen;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
-      <header className="flex flex-wrap items-center gap-3 border-b border-stone-200/80 bg-white/60 px-5 py-3 backdrop-blur">
-        <input
-          value={meeting.title}
-          onChange={(e) => patch({ title: e.target.value })}
-          className="min-w-0 flex-1 bg-transparent text-lg font-semibold tracking-tight text-stone-900 outline-none placeholder:text-stone-400"
-          placeholder="Meeting title"
-        />
-        <select
-          value={meeting.templateId}
-          onChange={(e) =>
-            patch({ templateId: e.target.value as MeetingTemplateId })
-          }
-          className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-700 outline-none focus:border-amber-600/40"
-          title="Note template"
-        >
-          {TEMPLATES.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={toggleRecord}
-          disabled={!supported && !listening}
-          className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-            listening
-              ? "bg-red-50 text-red-700 ring-1 ring-red-200"
-              : "bg-stone-900 text-white hover:bg-stone-800"
-          }`}
-        >
-          {listening ? (
-            <>
-              <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-              Stop
-            </>
-          ) : (
-            <>
-              <MicIcon />
-              Transcribe
-            </>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={enhance}
-          disabled={!!busy}
-          className="rounded-full bg-sky-700 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-sky-800 disabled:opacity-60"
-        >
-          {busy === "enhance" ? "Enhancing…" : "Enhance notes"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setChatOpen((v) => !v)}
-          className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
-        >
-          Ask
-        </button>
-        <button
-          type="button"
-          onClick={copyNotes}
-          className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
-          title="Copy notes"
-        >
-          Copy
-        </button>
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="rounded-full px-2 py-1.5 text-sm text-stone-400 hover:text-red-600"
-          title="Delete meeting"
-        >
-          Delete
-        </button>
+      <header className="shrink-0 border-b border-stone-200/80 bg-white/80 backdrop-blur">
+        <div className="flex items-start gap-2 px-3 py-2.5 sm:px-5 sm:py-3">
+          <input
+            value={meeting.title}
+            onChange={(e) => patch({ title: e.target.value })}
+            className="min-w-0 flex-1 bg-transparent text-base font-semibold tracking-tight text-stone-900 outline-none placeholder:text-stone-400 sm:text-lg"
+            placeholder="Meeting title"
+          />
+          <select
+            value={meeting.templateId}
+            onChange={(e) =>
+              patch({ templateId: e.target.value as MeetingTemplateId })
+            }
+            className="max-w-[7.5rem] shrink-0 rounded-lg border border-stone-200 bg-white px-2 py-2 text-xs text-stone-700 outline-none focus:border-sky-600/40 sm:max-w-none sm:px-2.5"
+            title="Note template"
+          >
+            {TEMPLATES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Primary actions — wrap cleanly, larger touch targets on mobile */}
+        <div className="flex gap-2 overflow-x-auto px-3 pb-2.5 scrollbar-none sm:flex-wrap sm:overflow-visible sm:px-5 sm:pb-3">
+          <button
+            type="button"
+            onClick={toggleRecord}
+            disabled={!supported && !listening}
+            className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition ${
+              listening
+                ? "bg-red-50 text-red-700 ring-1 ring-red-200"
+                : "bg-stone-900 text-white hover:bg-stone-800"
+            }`}
+          >
+            {listening ? (
+              <>
+                <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                Stop
+              </>
+            ) : (
+              <>
+                <MicIcon />
+                Transcribe
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={enhance}
+            disabled={!!busy}
+            className="inline-flex shrink-0 items-center rounded-full bg-sky-700 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-sky-800 disabled:opacity-60"
+          >
+            {busy === "enhance" ? "Enhancing…" : "Enhance"}
+          </button>
+          <button
+            type="button"
+            onClick={openChat}
+            className="inline-flex shrink-0 items-center rounded-full border border-stone-200 bg-white px-3.5 py-2 text-sm text-stone-700 hover:bg-stone-50"
+          >
+            Ask
+          </button>
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              className="inline-flex items-center rounded-full border border-stone-200 bg-white px-3.5 py-2 text-sm text-stone-700 hover:bg-stone-50"
+              aria-expanded={moreOpen}
+            >
+              More
+            </button>
+            {moreOpen && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-10 cursor-default"
+                  aria-label="Close menu"
+                  onClick={() => setMoreOpen(false)}
+                />
+                <div className="absolute right-0 z-20 mt-1 w-48 rounded-xl border border-stone-200 bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => void copyNotes()}
+                    className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+                  >
+                    Copy notes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runAction("actions")}
+                    className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+                  >
+                    List actions
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runAction("follow-up")}
+                    className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+                  >
+                    Follow-up email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runAction("project-plan")}
+                    className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+                  >
+                    Project plan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+                  >
+                    Delete meeting
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </header>
 
       {displayError && (
-        <div className="border-b border-red-100 bg-red-50 px-5 py-2 text-sm text-red-700">
+        <div className="shrink-0 border-b border-red-100 bg-red-50 px-3 py-2 text-sm leading-snug text-red-700 sm:px-5">
           {displayError}
           {displayError.includes("XAI_API_KEY") && (
-            <span className="ml-1">
-              Create <code className="rounded bg-red-100 px-1">.env.local</code>{" "}
-              with your key from{" "}
+            <span className="mt-1 block sm:ml-1 sm:mt-0 sm:inline">
+              Set <code className="rounded bg-red-100 px-1">XAI_API_KEY</code>{" "}
+              in Vercel or{" "}
               <a
                 className="underline"
                 href="https://console.x.ai"
@@ -340,16 +401,22 @@ export function MeetingView({ id }: { id: string }) {
       )}
 
       {!supported && (
-        <div className="border-b border-amber-100 bg-amber-50/80 px-5 py-2 text-xs text-amber-900">
-          Live speech isn&apos;t supported here (use Chrome/Edge). You can still
-          type notes and paste a transcript below.
+        <div className="shrink-0 border-b border-amber-100 bg-amber-50/80 px-3 py-2 text-xs leading-snug text-amber-900 sm:px-5">
+          Live speech may be limited on this browser. You can still type notes
+          and paste a transcript.
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      {/* Body: mobile = single panel; desktop = split */}
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Notepad */}
-        <section className="flex min-w-0 flex-1 flex-col border-r border-stone-200/70">
-          <div className="flex items-center gap-1 border-b border-stone-100 px-5 py-2">
+        <section
+          className={[
+            "min-h-0 min-w-0 flex-1 flex-col border-stone-200/70 md:flex md:border-r",
+            mobilePanel === "notes" ? "flex" : "hidden md:flex",
+          ].join(" ")}
+        >
+          <div className="flex items-center gap-1 border-b border-stone-100 px-3 py-2 sm:px-5">
             <TabButton
               active={meeting.viewMode === "notes"}
               onClick={() => patch({ viewMode: "notes" })}
@@ -364,8 +431,8 @@ export function MeetingView({ id }: { id: string }) {
               Enhanced
             </TabButton>
             {listening && (
-              <span className="ml-auto text-xs text-stone-400">
-                Listening… jot ideas freely
+              <span className="ml-auto hidden text-xs text-stone-400 sm:inline">
+                Listening…
               </span>
             )}
           </div>
@@ -375,17 +442,17 @@ export function MeetingView({ id }: { id: string }) {
               ref={notesRef}
               value={meeting.notes}
               onChange={(e) => patch({ notes: e.target.value })}
-              placeholder="Write as much or as little as you like…&#10;&#10;Dictabird will weave your notes with the transcript when you enhance."
-              className="min-h-0 flex-1 resize-none bg-transparent px-6 py-5 font-[family-name:var(--font-note)] text-[15px] leading-7 text-stone-800 outline-none placeholder:text-stone-400"
+              placeholder="Write as much or as little as you like…"
+              className="min-h-[12rem] flex-1 resize-none bg-transparent px-4 py-4 text-base leading-7 text-stone-800 outline-none placeholder:text-stone-400 sm:min-h-0 sm:px-6 sm:py-5 sm:text-[15px]"
             />
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
               <Markdown content={meeting.enhancedNotes} />
             </div>
           )}
 
-          {/* Post-meeting actions */}
-          <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 px-5 py-3">
+          {/* Post-meeting actions — desktop only row; mobile uses More menu */}
+          <div className="hidden flex-wrap items-center gap-2 border-t border-stone-100 px-5 py-3 md:flex">
             <span className="mr-1 text-xs text-stone-400">After meeting</span>
             <ActionChip
               label={busy === "actions" ? "…" : "List actions"}
@@ -405,7 +472,7 @@ export function MeetingView({ id }: { id: string }) {
           </div>
 
           {actionResult && (
-            <div className="max-h-48 overflow-y-auto border-t border-stone-100 bg-white/70 px-6 py-4">
+            <div className="max-h-40 shrink-0 overflow-y-auto border-t border-stone-100 bg-white/70 px-4 py-3 sm:max-h-48 sm:px-6 sm:py-4">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-medium uppercase tracking-wide text-stone-400">
                   Generated
@@ -423,8 +490,13 @@ export function MeetingView({ id }: { id: string }) {
           )}
         </section>
 
-        {/* Transcript panel */}
-        <aside className="flex w-[340px] shrink-0 flex-col bg-white/40">
+        {/* Transcript */}
+        <aside
+          className={[
+            "min-h-0 flex-col bg-white/40 md:flex md:w-[min(340px,36vw)] md:shrink-0",
+            mobilePanel === "transcript" ? "flex flex-1" : "hidden md:flex",
+          ].join(" ")}
+        >
           <div className="border-b border-stone-100 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-stone-400">
             Transcript
             {listening && (
@@ -433,10 +505,10 @@ export function MeetingView({ id }: { id: string }) {
               </span>
             )}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm leading-relaxed text-stone-600">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 text-[15px] leading-relaxed text-stone-600 sm:text-sm">
             {meeting.transcript || interim ? (
               <>
-                <p className="whitespace-pre-wrap">
+                <p className="whitespace-pre-wrap break-words">
                   {meeting.transcript}
                   {interim && (
                     <span className="text-stone-400"> {interim}</span>
@@ -446,89 +518,146 @@ export function MeetingView({ id }: { id: string }) {
               </>
             ) : (
               <p className="text-stone-400 italic">
-                Press Transcribe to capture audio from your mic, or paste a
-                transcript below.
+                Press Transcribe to capture audio, or paste a transcript below.
               </p>
             )}
           </div>
-          <div className="border-t border-stone-100 p-3">
+          <div className="border-t border-stone-100 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3">
             <label className="mb-1 block text-[11px] text-stone-400">
               Edit / paste transcript
             </label>
             <textarea
               value={meeting.transcript}
               onChange={(e) => patch({ transcript: e.target.value })}
-              rows={4}
-              className="w-full resize-none rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-700 outline-none focus:border-amber-600/40"
+              rows={3}
+              className="w-full resize-none rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-base text-stone-700 outline-none focus:border-sky-600/40 sm:text-xs"
               placeholder="Paste transcript from Zoom, Meet, etc."
             />
           </div>
         </aside>
 
-        {/* Chat drawer */}
-        {chatOpen && (
-          <aside className="flex w-80 shrink-0 flex-col border-l border-stone-200 bg-white">
-            <div className="flex items-center justify-between border-b border-stone-100 px-4 py-2.5">
-              <span className="text-sm font-medium text-stone-800">
-                Ask anything
-              </span>
-              <button
-                type="button"
-                onClick={() => setChatOpen(false)}
-                className="text-stone-400 hover:text-stone-700"
+        {/* Chat — mobile full panel or desktop side drawer */}
+        <aside
+          className={[
+            "min-h-0 flex-col border-stone-200 bg-white md:border-l",
+            showChatPanel ? "flex flex-1" : "hidden",
+            chatOpen ? "md:flex md:w-80 md:shrink-0 md:flex-none" : "md:hidden",
+          ].join(" ")}
+        >
+          <div className="flex items-center justify-between border-b border-stone-100 px-4 py-2.5">
+            <span className="text-sm font-medium text-stone-800">
+              Ask anything
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setChatOpen(false);
+                setMobilePanel("notes");
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+              aria-label="Close chat"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3">
+            {meeting.chat.length === 0 && (
+              <p className="text-xs text-stone-400">
+                e.g. “What decisions were made?” or “Who owns the follow-ups?”
+              </p>
+            )}
+            {meeting.chat.map((m) => (
+              <div
+                key={m.id}
+                className={`rounded-xl px-3 py-2 text-sm break-words ${
+                  m.role === "user"
+                    ? "ml-6 bg-stone-900 text-white"
+                    : "mr-4 bg-stone-100 text-stone-800"
+                }`}
               >
-                ✕
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
-              {meeting.chat.length === 0 && (
-                <p className="text-xs text-stone-400">
-                  e.g. “What decisions were made?” or “Who owns the follow-ups?”
-                </p>
-              )}
-              {meeting.chat.map((m) => (
-                <div
-                  key={m.id}
-                  className={`rounded-xl px-3 py-2 text-sm ${
-                    m.role === "user"
-                      ? "ml-6 bg-stone-900 text-white"
-                      : "mr-4 bg-stone-100 text-stone-800"
-                  }`}
-                >
-                  {m.role === "assistant" ? (
-                    <Markdown content={m.content} />
-                  ) : (
-                    m.content
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 border-t border-stone-100 p-3">
-              <input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void sendChat();
-                  }
-                }}
-                placeholder="Ask about this meeting…"
-                className="min-w-0 flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-amber-600/40"
-              />
-              <button
-                type="button"
-                onClick={() => void sendChat()}
-                disabled={!!busy || !chatInput.trim()}
-                className="rounded-lg bg-stone-900 px-3 py-2 text-sm text-white disabled:opacity-50"
-              >
-                {busy === "chat" ? "…" : "Send"}
-              </button>
-            </div>
-          </aside>
-        )}
+                {m.role === "assistant" ? (
+                  <Markdown content={m.content} />
+                ) : (
+                  m.content
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 border-t border-stone-100 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void sendChat();
+                }
+              }}
+              placeholder="Ask about this meeting…"
+              className="min-w-0 flex-1 rounded-lg border border-stone-200 px-3 py-2.5 text-base outline-none focus:border-sky-600/40 sm:py-2 sm:text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => void sendChat()}
+              disabled={!!busy || !chatInput.trim()}
+              className="rounded-lg bg-stone-900 px-4 py-2.5 text-sm text-white disabled:opacity-50 sm:py-2"
+            >
+              {busy === "chat" ? "…" : "Send"}
+            </button>
+          </div>
+        </aside>
       </div>
+
+      {/* Mobile bottom tabs */}
+      <nav className="flex shrink-0 border-t border-stone-200 bg-white pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden">
+        <MobileTab
+          label="Notes"
+          active={mobilePanel === "notes"}
+          onClick={() => setMobilePanel("notes")}
+        />
+        <MobileTab
+          label="Transcript"
+          active={mobilePanel === "transcript"}
+          onClick={() => setMobilePanel("transcript")}
+          badge={listening ? "live" : undefined}
+        />
+        <MobileTab
+          label="Ask"
+          active={mobilePanel === "chat"}
+          onClick={openChat}
+        />
+      </nav>
     </div>
+  );
+}
+
+function MobileTab({
+  label,
+  active,
+  onClick,
+  badge,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  badge?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-medium ${
+        active ? "text-sky-800" : "text-stone-500"
+      }`}
+    >
+      <span
+        className={`h-1 w-8 rounded-full ${active ? "bg-sky-700" : "bg-transparent"}`}
+      />
+      {label}
+      {badge && (
+        <span className="absolute right-1/4 top-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
+      )}
+    </button>
   );
 }
 
@@ -548,7 +677,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-md px-3 py-1 text-sm transition disabled:opacity-40 ${
+      className={`rounded-md px-3 py-1.5 text-sm transition disabled:opacity-40 ${
         active
           ? "bg-stone-900 text-white"
           : "text-stone-500 hover:bg-stone-100 hover:text-stone-800"

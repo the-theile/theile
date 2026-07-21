@@ -21,11 +21,15 @@ export function Sidebar({
   onNew,
   query,
   onQueryChange,
+  open,
+  onClose,
 }: {
   meetings: Meeting[];
   onNew: () => void;
   query: string;
   onQueryChange: (q: string) => void;
+  open: boolean;
+  onClose: () => void;
 }) {
   const pathname = usePathname();
   const filtered = meetings.filter((m) => {
@@ -40,24 +44,44 @@ export function Sidebar({
   });
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-stone-200/80 bg-[#f7f4ef]">
-      <div className="flex items-center gap-2.5 px-4 pt-5 pb-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-700 text-white shadow-sm">
-          <BirdIcon />
-        </div>
-        <div>
-          <div className="text-sm font-semibold tracking-tight text-stone-900">
-            Dictabird
+    <aside
+      className={[
+        "flex h-full w-[min(18rem,88vw)] shrink-0 flex-col border-r border-stone-200/80 bg-[#f7f4ef]",
+        "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-out md:static md:z-auto md:w-72 md:translate-x-0",
+        open ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0",
+      ].join(" ")}
+    >
+      <div className="flex items-center gap-2.5 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3">
+        <Link
+          href="/dictabird"
+          onClick={onClose}
+          className="flex min-w-0 flex-1 items-center gap-2.5"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-700 text-white shadow-sm">
+            <BirdIcon />
           </div>
-          <div className="text-[11px] text-stone-500">AI notepad · no bots</div>
-        </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold tracking-tight text-stone-900">
+              Dictabird
+            </div>
+            <div className="text-[11px] text-stone-500">AI notepad · no bots</div>
+          </div>
+        </Link>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-stone-500 hover:bg-white/80 md:hidden"
+          aria-label="Close menu"
+        >
+          ✕
+        </button>
       </div>
 
       <div className="px-3 pb-3">
         <button
           type="button"
           onClick={onNew}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800 active:scale-[0.99]"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-3 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800 active:scale-[0.99]"
         >
           <PlusIcon />
           New meeting
@@ -69,11 +93,11 @@ export function Sidebar({
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder="Search notes…"
-          className="w-full rounded-lg border border-stone-200 bg-white/80 px-3 py-2 text-sm text-stone-800 outline-none placeholder:text-stone-400 focus:border-amber-600/40 focus:ring-2 focus:ring-amber-600/10"
+          className="w-full rounded-lg border border-stone-200 bg-white/80 px-3 py-2.5 text-base text-stone-800 outline-none placeholder:text-stone-400 focus:border-sky-600/40 focus:ring-2 focus:ring-sky-600/10 md:text-sm"
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">
         {filtered.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-stone-400">
             {meetings.length === 0
@@ -88,7 +112,8 @@ export function Sidebar({
                 <li key={m.id}>
                   <Link
                     href={`/dictabird/meeting/${m.id}`}
-                    className={`block rounded-lg px-3 py-2.5 transition ${
+                    onClick={onClose}
+                    className={`block rounded-lg px-3 py-3 transition active:bg-white ${
                       active
                         ? "bg-white shadow-sm ring-1 ring-stone-200/80"
                         : "hover:bg-white/60"
@@ -97,7 +122,7 @@ export function Sidebar({
                     <div className="truncate text-sm font-medium text-stone-800">
                       {m.title}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-stone-500">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
                       <span>{relativeTime(m.updatedAt)}</span>
                       {m.status === "recording" && (
                         <span className="inline-flex items-center gap-1 text-red-600">
@@ -106,7 +131,7 @@ export function Sidebar({
                         </span>
                       )}
                       {m.enhancedNotes && (
-                        <span className="text-amber-700/80">enhanced</span>
+                        <span className="text-sky-700/80">enhanced</span>
                       )}
                     </div>
                   </Link>
@@ -117,8 +142,11 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="border-t border-stone-200/80 px-4 py-3 text-[11px] text-stone-400">
-        Private by default · stored in this browser
+      <div className="border-t border-stone-200/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-[11px] text-stone-400">
+        <a href="/" className="block text-stone-500 underline-offset-2 hover:underline">
+          ← Back to Theile
+        </a>
+        <p className="mt-1">Private by default · this browser only</p>
       </div>
     </aside>
   );

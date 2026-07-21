@@ -12,3 +12,29 @@
   scrollbar-width: thin;
   scrollbar-color: #d6d3d1 transparent;
 }
+
+/* iOS: avoid 100vh jump; prefer dynamic viewport where used via Tailwind h-dvh */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbars on horizontal action rows */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Comfortable tap targets + readable form text on iOS (prevents zoom) */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+}
