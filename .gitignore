@@ -41,6 +41,15 @@ build/Release
 node_modules/
 jspm_packages/
 
+# Dictabird desktop processor
+tools/dictabird-processor/.venv/
+tools/dictabird-processor/.dictabird-work/
+tools/dictabird-processor/**/*.dictabird.json
+tools/dictabird-processor/**/*.dictabird.md
+tools/dictabird-processor/**/*.dictabird.txt
+__pycache__/
+*.pyc
+
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 

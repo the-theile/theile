@@ -1,0 +1,5 @@
+# Python 3.10–3.12 recommended (3.13+ may work; 3.14 is very new)
+faster-whisper>=1.1.0
+# Optional diarization (heavier; needs Hugging Face token + model agreement)
+# pyannote.audio>=3.3.0
+# torch  # install matching your CUDA/CPU from pytorch.org if using diarization

@@ -28,6 +28,15 @@ AI notepad: live scratchpad, browser mic transcription (no meeting bots), enhanc
 - **Data**: notes/transcripts stay in `localStorage` on the device; only enhance/chat text is sent to the AI API.
 - **AI env**: `GROQ_API_KEY` / `GEMINI_API_KEY` / `XAI_API_KEY` (see `.env.local.example`).
 
+### Offline Voice Memo path (private, desktop GPU/CPU)
+
+1. Record on iPhone with **Voice Memos** only (typed notes in Dictabird optional).
+2. Transfer `.m4a` to this PC.
+3. Run **`tools/dictabird-processor`** (see its README) → `*.dictabird.json`.
+4. In Dictabird: **More → Import processed transcript** → **Enhance**.
+
+Audio stays on your machines; processing does not use Vercel or cloud STT.
+
 ## Gates
 
 See previous docs: password-protected reference app at `/gates`, backed by Supabase.

@@ -18,6 +18,25 @@ export interface TranscriptSegment {
   text: string;
   timestamp: number;
   isFinal: boolean;
+  speaker?: string;
+  startSec?: number;
+  endSec?: number;
+}
+
+/** Output of tools/dictabird-processor (*.dictabird.json) */
+export interface DictabirdImportFile {
+  schemaVersion?: number;
+  app?: string;
+  title?: string;
+  sourceFile?: string;
+  transcript?: string;
+  diarized?: boolean;
+  segments?: {
+    speaker?: string;
+    start?: number;
+    end?: number;
+    text?: string;
+  }[];
 }
 
 export interface ChatMessage {

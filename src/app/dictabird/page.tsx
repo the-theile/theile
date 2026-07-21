@@ -57,21 +57,24 @@ export default function DictabirdHomePage() {
 
         <ul className="mt-10 grid gap-3 text-left text-sm text-stone-600 sm:mt-12 sm:grid-cols-3">
           <li className="rounded-xl border border-stone-200/80 bg-white/70 p-4">
-            <div className="font-medium text-stone-800">No bots</div>
+            <div className="font-medium text-stone-800">Live (light)</div>
             <p className="mt-1 text-xs leading-relaxed text-stone-500">
-              Captures your microphone in the browser. Works with any call app.
+              Browser mic captions + typed notes. One mic at a time — skip
+              Voice Memos if you use Transcribe.
             </p>
           </li>
           <li className="rounded-xl border border-stone-200/80 bg-white/70 p-4">
-            <div className="font-medium text-stone-800">Human notes first</div>
+            <div className="font-medium text-stone-800">Offline (deep)</div>
             <p className="mt-1 text-xs leading-relaxed text-stone-500">
-              Your scratchpad stays the backbone; AI weaves in transcript detail.
+              Voice Memo on phone → process on desktop (private) → import{" "}
+              <code className="text-[10px]">.dictabird.json</code> here.
             </p>
           </li>
           <li className="rounded-xl border border-stone-200/80 bg-white/70 p-4">
-            <div className="font-medium text-stone-800">After-meeting admin</div>
+            <div className="font-medium text-stone-800">Enhance</div>
             <p className="mt-1 text-xs leading-relaxed text-stone-500">
-              Action lists, follow-up emails, and chat over your memory.
+              AI merges your notes with the transcript into actions and
+              follow-ups.
             </p>
           </li>
         </ul>

@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { useMeetingsContext } from "@/lib/MeetingsContext";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { TEMPLATES } from "@/lib/templates";
+import {
+  applyImportToMeeting,
+  parseImportFile,
+} from "@/lib/importTranscript";
 import type { ChatMessage, Meeting, MeetingTemplateId } from "@/lib/types";
 import { Markdown } from "./Markdown";
 
@@ -32,6 +36,7 @@ export function MeetingView({ id }: { id: string }) {
   );
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const moreBtnRef = useRef<HTMLButtonElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const meetingRef = useRef(meeting);
 
@@ -255,6 +260,24 @@ export function MeetingView({ id }: { id: string }) {
     setMorePos(null);
   };
 
+  const onImportFile = async (file: File | null) => {
+    if (!file || !meetingRef.current) return;
+    setError(null);
+    try {
+      const raw = await file.text();
+      const parsed = parseImportFile(raw, file.name);
+      const next = applyImportToMeeting(meetingRef.current, parsed, {
+        replaceTitle:
+          !meetingRef.current.title ||
+          meetingRef.current.title.startsWith("Meeting —"),
+      });
+      updateMeeting(next);
+      setMobilePanel("transcript");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Import failed");
+    }
+  };
+
   const displayError = error || speechError;
   const showChatPanel = mobilePanel === "chat" || chatOpen;
 
@@ -414,6 +437,17 @@ export function MeetingView({ id }: { id: string }) {
               role="menuitem"
               onClick={() => {
                 closeMore();
+                importRef.current?.click();
+              }}
+              className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+            >
+              Import processed transcript
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMore();
                 handleDelete();
               }}
               className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
@@ -423,6 +457,18 @@ export function MeetingView({ id }: { id: string }) {
           </div>
         </>
       )}
+
+      <input
+        ref={importRef}
+        type="file"
+        accept=".json,.md,.txt,application/json,text/plain,text/markdown"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          void onImportFile(f);
+        }}
+      />
 
       {displayError && (
         <div className="shrink-0 border-b border-red-100 bg-red-50 px-3 py-2 text-sm leading-snug text-red-700 sm:px-5">
@@ -563,7 +609,11 @@ export function MeetingView({ id }: { id: string }) {
               </>
             ) : (
               <p className="text-stone-400 italic">
-                Press Transcribe to capture audio, or paste a transcript below.
+                Press Transcribe for live captions, paste below, or use{" "}
+                <strong className="font-medium text-stone-500">
+                  More → Import processed transcript
+                </strong>{" "}
+                after running the desktop processor on a Voice Memo.
               </p>
             )}
           </div>
