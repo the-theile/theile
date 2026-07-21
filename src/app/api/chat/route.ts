@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_MODEL, getXaiClient } from "@/lib/xai";
+import { formatAiError, getAiClient } from "@/lib/ai";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Question is required." }, { status: 400 });
     }
 
-    const client = getXaiClient();
+    const { client, model } = getAiClient();
 
     const system = `You are Dictabird Chat — answer questions about a single meeting using only the provided notes and transcript.
 Be concise. Quote or paraphrase evidence when useful. If something isn't in the materials, say so.
@@ -50,7 +50,7 @@ ${transcript || "(none)"}`;
     ];
 
     const resp = await client.chat.completions.create({
-      model: DEFAULT_MODEL,
+      model,
       messages,
       temperature: 0.4,
     });
@@ -60,8 +60,9 @@ ${transcript || "(none)"}`;
 
     return NextResponse.json({ answer });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Chat failed";
-    const status = message.includes("XAI_API_KEY") ? 503 : 500;
+    const message = formatAiError(err);
+    const status =
+      message.includes("API key") || message.includes("No AI API") ? 503 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

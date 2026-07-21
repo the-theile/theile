@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_MODEL, getXaiClient } from "@/lib/xai";
+import { formatAiError, getAiClient } from "@/lib/ai";
 
 type ActionKind = "actions" | "follow-up" | "project-plan";
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unknown action kind." }, { status: 400 });
     }
 
-    const client = getXaiClient();
+    const { client, model } = getAiClient();
     const material = `
 Meeting: ${title}
 
@@ -70,7 +70,7 @@ ${transcript || "(none)"}
     }
 
     const resp = await client.chat.completions.create({
-      model: DEFAULT_MODEL,
+      model,
       messages: [
         {
           role: "system",
@@ -86,8 +86,9 @@ ${transcript || "(none)"}
 
     return NextResponse.json({ result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Action failed";
-    const status = message.includes("XAI_API_KEY") ? 503 : 500;
+    const message = formatAiError(err);
+    const status =
+      message.includes("API key") || message.includes("No AI API") ? 503 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

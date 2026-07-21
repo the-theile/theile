@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { formatAiError, getAiClient } from "@/lib/ai";
 import { getTemplate } from "@/lib/templates";
-import { DEFAULT_MODEL, getXaiClient } from "@/lib/xai";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     const template = getTemplate(templateId);
-    const client = getXaiClient();
+    const { client, model } = getAiClient();
 
     const system = `You are Dictabird, an AI notepad that enhances human meeting notes (like Granola).
 
@@ -49,7 +49,7 @@ ${transcript.trim() || "(empty)"}
 Produce enhanced meeting notes now.`;
 
     const resp = await client.chat.completions.create({
-      model: DEFAULT_MODEL,
+      model,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -63,8 +63,9 @@ Produce enhanced meeting notes now.`;
 
     return NextResponse.json({ enhanced });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Enhance failed";
-    const status = message.includes("XAI_API_KEY") ? 503 : 500;
+    const message = formatAiError(err);
+    const status =
+      message.includes("API key") || message.includes("No AI API") ? 503 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }
