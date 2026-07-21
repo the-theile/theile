@@ -52,7 +52,14 @@ cd tools\dictabird-processor
 python gui.py
 ```
 
-Then: **Browse** → pick your Voice Memo → **Process audio** → open folder / import the `.dictabird.json` in Dictabird.
+The app walks you through:
+
+1. **Choose recording** (Voice Memo `.m4a`)
+2. **Name & quality** (Recommended / Faster / Highest + optional speaker labels)
+3. **Create transcript** (runs only on your PC)
+4. **Import** the `.dictabird.json` in Dictabird → **More → Import processed transcript** → Enhance
+
+Tips are built into the window. Expand “Show technical log” only if something fails.
 
 ## CLI
 
