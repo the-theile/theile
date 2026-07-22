@@ -9,6 +9,11 @@ import {
   applyImportToMeeting,
   parseImportFile,
 } from "@/lib/importTranscript";
+import {
+  applySpeakerNames,
+  extractSpeakerIds,
+  normalizeSpeakerId,
+} from "@/lib/speakers";
 import type { ChatMessage, Meeting, MeetingTemplateId } from "@/lib/types";
 import { Markdown } from "./Markdown";
 
@@ -34,6 +39,8 @@ export function MeetingView({ id }: { id: string }) {
   const [morePos, setMorePos] = useState<{ top: number; right: number } | null>(
     null
   );
+  const [speakerEditorOpen, setSpeakerEditorOpen] = useState(false);
+  const [speakerDraft, setSpeakerDraft] = useState<Record<string, string>>({});
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const moreBtnRef = useRef<HTMLButtonElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -273,13 +280,59 @@ export function MeetingView({ id }: { id: string }) {
       });
       updateMeeting(next);
       setMobilePanel("transcript");
+      const ids = extractSpeakerIds(next);
+      if (ids.length > 0) {
+        openSpeakerEditor(next);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Import failed");
     }
   };
 
+  const openSpeakerEditor = (m?: Meeting) => {
+    const target = m || meetingRef.current;
+    if (!target) return;
+    const ids = extractSpeakerIds(target);
+    const draft: Record<string, string> = {};
+    for (const id of ids) {
+      // If already renamed away from SPEAKER_*, seed with current label
+      draft[id] = /^SPEAKER[_\s]?\d+$/i.test(id) ? "" : id;
+    }
+    // Also include any non-SPEAKER labels currently used
+    for (const s of target.segments) {
+      if (s.speaker && !/^SPEAKER/i.test(s.speaker)) {
+        // map from original if we can still find SPEAKER ids only
+      }
+    }
+    setSpeakerDraft(draft);
+    setSpeakerEditorOpen(true);
+    setMoreOpen(false);
+    setMorePos(null);
+  };
+
+  const saveSpeakerNames = () => {
+    const current = meetingRef.current;
+    if (!current) return;
+    const map: Record<string, string> = {};
+    for (const [id, name] of Object.entries(speakerDraft)) {
+      if (name.trim()) map[normalizeSpeakerId(id)] = name.trim();
+    }
+    if (Object.keys(map).length === 0) {
+      setSpeakerEditorOpen(false);
+      return;
+    }
+    const next = applySpeakerNames(current, map);
+    updateMeeting(next);
+    setSpeakerEditorOpen(false);
+    // Prompt re-enhance if they already had enhanced notes with SPEAKER_xx
+    if (current.enhancedNotes && /SPEAKER/i.test(current.enhancedNotes)) {
+      setError(null);
+    }
+  };
+
   const displayError = error || speechError;
   const showChatPanel = mobilePanel === "chat" || chatOpen;
+  const speakerIds = meeting ? extractSpeakerIds(meeting) : [];
 
   const toggleMore = () => {
     if (moreOpen) {
@@ -446,6 +499,14 @@ export function MeetingView({ id }: { id: string }) {
             <button
               type="button"
               role="menuitem"
+              onClick={() => openSpeakerEditor()}
+              className="block w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50"
+            >
+              Rename speakers…
+            </button>
+            <button
+              type="button"
+              role="menuitem"
               onClick={() => {
                 closeMore();
                 handleDelete();
@@ -588,14 +649,38 @@ export function MeetingView({ id }: { id: string }) {
             mobilePanel === "transcript" ? "flex flex-1" : "hidden md:flex",
           ].join(" ")}
         >
-          <div className="border-b border-stone-100 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-stone-400">
-            Transcript
-            {listening && (
-              <span className="ml-2 font-normal normal-case text-red-600">
-                live
-              </span>
+          <div className="flex items-center justify-between gap-2 border-b border-stone-100 px-4 py-2.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-stone-400">
+              Transcript
+              {listening && (
+                <span className="ml-2 font-normal normal-case text-red-600">
+                  live
+                </span>
+              )}
+            </span>
+            {speakerIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => openSpeakerEditor()}
+                className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-100"
+              >
+                Rename speakers
+              </button>
             )}
           </div>
+          {speakerIds.some((id) => /^SPEAKER/i.test(id)) && (
+            <div className="border-b border-amber-100 bg-amber-50/90 px-4 py-2 text-xs leading-snug text-amber-950">
+              Speakers are still labeled SPEAKER_00, SPEAKER_01, …{" "}
+              <button
+                type="button"
+                className="font-semibold underline"
+                onClick={() => openSpeakerEditor()}
+              >
+                Name them
+              </button>{" "}
+              before Enhance for cleaner notes.
+            </div>
+          )}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 text-[15px] leading-relaxed text-stone-600 sm:text-sm">
             {meeting.transcript || interim ? (
               <>
@@ -702,6 +787,89 @@ export function MeetingView({ id }: { id: string }) {
           </div>
         </aside>
       </div>
+
+      {/* Speaker rename modal */}
+      {speakerEditorOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-stone-900/40 p-0 sm:items-center sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            aria-label="Close"
+            onClick={() => setSpeakerEditorOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-labelledby="speaker-rename-title"
+            className="relative z-10 flex max-h-[85dvh] w-full max-w-md flex-col rounded-t-2xl border border-stone-200 bg-white shadow-xl sm:rounded-2xl"
+          >
+            <div className="border-b border-stone-100 px-5 py-4">
+              <h2
+                id="speaker-rename-title"
+                className="text-base font-semibold text-stone-900"
+              >
+                Name the speakers
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-stone-500">
+                Match each label to a real person (e.g. you, client, vendor).
+                Then run <strong className="font-medium">Enhance</strong> again
+                so the summary uses names instead of SPEAKER_00.
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+              {Object.keys(speakerDraft).length === 0 ? (
+                <p className="text-sm text-stone-500">
+                  No SPEAKER_xx labels found. Import a diarized{" "}
+                  <code className="text-xs">.dictabird.json</code> first, or
+                  type names into the transcript manually.
+                </p>
+              ) : (
+                Object.keys(speakerDraft)
+                  .sort()
+                  .map((id) => (
+                    <label key={id} className="block">
+                      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">
+                        {id}
+                      </span>
+                      <input
+                        value={speakerDraft[id] ?? ""}
+                        onChange={(e) =>
+                          setSpeakerDraft((d) => ({
+                            ...d,
+                            [id]: e.target.value,
+                          }))
+                        }
+                        placeholder={
+                          id.endsWith("00")
+                            ? "e.g. Theile (you)"
+                            : id.endsWith("01")
+                              ? "e.g. Client name"
+                              : "Display name"
+                        }
+                        className="w-full rounded-xl border border-stone-200 px-3 py-2.5 text-base text-stone-900 outline-none focus:border-sky-600/50 focus:ring-2 focus:ring-sky-600/10 sm:text-sm"
+                      />
+                    </label>
+                  ))
+              )}
+            </div>
+            <div className="flex gap-2 border-t border-stone-100 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                onClick={() => setSpeakerEditorOpen(false)}
+                className="flex-1 rounded-xl border border-stone-200 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveSpeakerNames}
+                className="flex-1 rounded-xl bg-sky-800 py-2.5 text-sm font-medium text-white hover:bg-sky-900"
+              >
+                Save names
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile bottom tabs */}
       <nav className="flex shrink-0 border-t border-stone-200 bg-white pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden">
