@@ -189,13 +189,16 @@ def try_diarize(
 
         import torch
 
-        # torchcodec noise on Windows is expected; we preload audio instead
-        warnings.filterwarnings(
-            "ignore",
-            message=".*torchcodec is not installed correctly.*",
-            category=UserWarning,
-        )
-        from pyannote.audio import Pipeline
+        # Windows: torchcodec noise is expected; we preload WAV instead.
+        # Also silence harmless pytorch std() warnings from short segments.
+        warnings.filterwarnings("ignore", category=UserWarning, module=r"pyannote\.audio\..*")
+        warnings.filterwarnings("ignore", message=r".*torchcodec.*")
+        warnings.filterwarnings("ignore", message=r".*std\(\).*degrees of freedom.*")
+        warnings.filterwarnings("ignore", message=r".*degrees of freedom is <= 0.*")
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            from pyannote.audio import Pipeline
     except ImportError:
         print(
             "→ diarization skipped (install optional deps):\n"
@@ -204,29 +207,40 @@ def try_diarize(
         )
         return segments
 
-    print("→ running pyannote diarization (local)…")
+    print("→ labeling speakers (local diarization)…")
+    print("  This is the slow step on CPU. ~18 min of audio can take 5–20+ minutes.")
+    print("  Please leave this window open — no ERROR yet means it is still working.")
     try:
-        # Newer pyannote uses token=; older used use_auth_token=
-        try:
-            pipeline = Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-3.1",
-                token=hf_token,
-            )
-        except TypeError:
-            pipeline = Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-3.1",
-                use_auth_token=hf_token,
-            )
-        if torch.cuda.is_available():
-            pipeline.to(torch.device("cuda"))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
 
-        kwargs: dict[str, Any] = {}
-        if num_speakers is not None:
-            kwargs["num_speakers"] = num_speakers
+            # Newer pyannote uses token=; older used use_auth_token=
+            try:
+                pipeline = Pipeline.from_pretrained(
+                    "pyannote/speaker-diarization-3.1",
+                    token=hf_token,
+                )
+            except TypeError:
+                pipeline = Pipeline.from_pretrained(
+                    "pyannote/speaker-diarization-3.1",
+                    use_auth_token=hf_token,
+                )
+            if torch.cuda.is_available():
+                pipeline.to(torch.device("cuda"))
+                print("  using GPU")
+            else:
+                print("  using CPU")
 
-        # Preload WAV — skips broken torchcodec FFmpeg path on Windows
-        audio_in = load_wav_as_pyannote_input(wav)
-        diarization = pipeline(audio_in, **kwargs)
+            kwargs: dict[str, Any] = {}
+            if num_speakers is not None:
+                kwargs["num_speakers"] = num_speakers
+
+            # Preload WAV — skips broken torchcodec FFmpeg path on Windows
+            print("  loading audio into memory…")
+            audio_in = load_wav_as_pyannote_input(wav)
+            print("  analyzing who spoke when (please wait)…")
+            diarization = pipeline(audio_in, **kwargs)
+            print("  aligning speakers to transcript…")
 
         # pyannote 4.x returns DiarizeOutput; older versions return Annotation
         annotation = diarization
