@@ -125,3 +125,5 @@ Without diarization you still get a full transcript—just one continuous speake
 | Slow on first run | Model download; later runs are faster |
 | Python 3.14 install errors | Use 3.11/3.12 venv |
 | Diarization model gated | Accept HF model terms + valid token |
+| `torchcodec is not installed correctly` | **Safe to ignore** if you use our processor — we convert with CLI ffmpeg and preload the WAV for pyannote (no torchcodec). Re-pull latest `process.py` if diarization still fails. |
+| torch scripts “not on PATH” | Harmless for Dictabird; install packages **inside** `.venv` |

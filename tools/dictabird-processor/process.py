@@ -146,6 +146,30 @@ def transcribe_faster_whisper(
     return out
 
 
+def load_wav_as_pyannote_input(wav: Path) -> dict[str, Any]:
+    """
+    Load our ffmpeg-normalized 16 kHz mono WAV into memory.
+
+    pyannote on Windows often fails to decode files via torchcodec/FFmpeg DLLs.
+    Passing a preloaded waveform avoids that path entirely.
+    """
+    import numpy as np
+    import torch
+
+    with wave.open(str(wav), "rb") as w:
+        sample_rate = w.getframerate()
+        n_channels = w.getnchannels()
+        n_frames = w.getnframes()
+        raw = w.readframes(n_frames)
+
+    # ensure_wav writes pcm_s16le
+    audio = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    if n_channels > 1:
+        audio = audio.reshape(-1, n_channels).mean(axis=1)
+    waveform = torch.from_numpy(audio).unsqueeze(0)  # (channel, time)
+    return {"waveform": waveform, "sample_rate": int(sample_rate)}
+
+
 def try_diarize(
     wav: Path,
     segments: list[Segment],
@@ -161,7 +185,16 @@ def try_diarize(
         return segments
 
     try:
+        import warnings
+
         import torch
+
+        # torchcodec noise on Windows is expected; we preload audio instead
+        warnings.filterwarnings(
+            "ignore",
+            message=".*torchcodec is not installed correctly.*",
+            category=UserWarning,
+        )
         from pyannote.audio import Pipeline
     except ImportError:
         print(
@@ -173,10 +206,17 @@ def try_diarize(
 
     print("→ running pyannote diarization (local)…")
     try:
-        pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token=hf_token,
-        )
+        # Newer pyannote uses token=; older used use_auth_token=
+        try:
+            pipeline = Pipeline.from_pretrained(
+                "pyannote/speaker-diarization-3.1",
+                token=hf_token,
+            )
+        except TypeError:
+            pipeline = Pipeline.from_pretrained(
+                "pyannote/speaker-diarization-3.1",
+                use_auth_token=hf_token,
+            )
         if torch.cuda.is_available():
             pipeline.to(torch.device("cuda"))
 
@@ -184,7 +224,9 @@ def try_diarize(
         if num_speakers is not None:
             kwargs["num_speakers"] = num_speakers
 
-        diarization = pipeline(str(wav), **kwargs)
+        # Preload WAV — skips broken torchcodec FFmpeg path on Windows
+        audio_in = load_wav_as_pyannote_input(wav)
+        diarization = pipeline(audio_in, **kwargs)
     except Exception as e:
         print(f"→ diarization failed, keeping unlabeled transcript: {e}")
         return segments
