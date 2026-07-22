@@ -227,46 +227,62 @@ def try_diarize(
         # Preload WAV — skips broken torchcodec FFmpeg path on Windows
         audio_in = load_wav_as_pyannote_input(wav)
         diarization = pipeline(audio_in, **kwargs)
+
+        # pyannote 4.x returns DiarizeOutput; older versions return Annotation
+        annotation = diarization
+        if hasattr(diarization, "exclusive_speaker_diarization"):
+            # Prefer non-overlapping turns for aligning to Whisper segments
+            annotation = (
+                diarization.exclusive_speaker_diarization
+                or diarization.speaker_diarization
+            )
+        elif hasattr(diarization, "speaker_diarization"):
+            annotation = diarization.speaker_diarization
+
+        if not hasattr(annotation, "itertracks"):
+            raise ProcessError(
+                f"Unexpected diarization result type: {type(diarization)!r}"
+            )
+
+        # Build list of (start, end, speaker)
+        turns: list[tuple[float, float, str]] = []
+        for turn, _, speaker in annotation.itertracks(yield_label=True):
+            turns.append((float(turn.start), float(turn.end), str(speaker)))
+
+        if not turns:
+            print("→ diarization produced no turns")
+            return segments
+
+        def speaker_for(start: float, end: float) -> str:
+            mid = (start + end) / 2
+            # Prefer turn covering midpoint; else max overlap
+            for a, b, spk in turns:
+                if a <= mid <= b:
+                    return spk
+            best_spk = "SPEAKER"
+            best_ov = 0.0
+            for a, b, spk in turns:
+                ov = max(0.0, min(end, b) - max(start, a))
+                if ov > best_ov:
+                    best_ov = ov
+                    best_spk = spk
+            return best_spk
+
+        labeled = [
+            Segment(
+                speaker=speaker_for(s.start, s.end),
+                start=s.start,
+                end=s.end,
+                text=s.text,
+            )
+            for s in segments
+        ]
+        speakers = sorted({s.speaker for s in labeled})
+        print(f"  speakers detected: {', '.join(speakers)}")
+        return labeled
     except Exception as e:
         print(f"→ diarization failed, keeping unlabeled transcript: {e}")
         return segments
-
-    # Build list of (start, end, speaker)
-    turns: list[tuple[float, float, str]] = []
-    for turn, _, speaker in diarization.itertracks(yield_label=True):
-        turns.append((float(turn.start), float(turn.end), str(speaker)))
-
-    if not turns:
-        print("→ diarization produced no turns")
-        return segments
-
-    def speaker_for(start: float, end: float) -> str:
-        mid = (start + end) / 2
-        # Prefer turn covering midpoint; else max overlap
-        for a, b, spk in turns:
-            if a <= mid <= b:
-                return spk
-        best_spk = "SPEAKER"
-        best_ov = 0.0
-        for a, b, spk in turns:
-            ov = max(0.0, min(end, b) - max(start, a))
-            if ov > best_ov:
-                best_ov = ov
-                best_spk = spk
-        return best_spk
-
-    labeled = [
-        Segment(
-            speaker=speaker_for(s.start, s.end),
-            start=s.start,
-            end=s.end,
-            text=s.text,
-        )
-        for s in segments
-    ]
-    speakers = sorted({s.speaker for s in labeled})
-    print(f"  speakers detected: {', '.join(speakers)}")
-    return labeled
 
 
 def to_plain(segments: list[Segment]) -> str:
