@@ -1,1 +1,1107 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Tesla Paperboy • Amazon Flex Edition</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background: #0f172a;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      height: 100%;
+      width: 100%;
+      position: fixed;
+    }
+    #gameContainer {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      background: #1e293b;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.94);
+      color: white;
+      z-index: 20;
+      padding: 28px 24px;
+      text-align: center;
+    }
+    .screen.hidden { display: none; }
+    .screen h1 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      background: linear-gradient(90deg, #3b82f6, #22d3ee);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .screen .subtitle {
+      font-size: 1.05rem;
+      font-weight: 600;
+      opacity: 0.9;
+      margin-bottom: 18px;
+    }
+    .screen p {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      opacity: 0.88;
+      max-width: 320px;
+      margin: 0 auto 12px;
+    }
+    .how-list {
+      text-align: left;
+      max-width: 300px;
+      margin: 12px auto 24px;
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+    .how-list div {
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .how-list .icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      width: 26px;
+      text-align: center;
+    }
+    .btn {
+      margin-top: 8px;
+      padding: 14px 36px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn.secondary {
+      background: transparent;
+      border: 2px solid #475569;
+      box-shadow: none;
+      margin-top: 12px;
+      font-size: 0.95rem;
+      padding: 11px 28px;
+    }
+    #hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      padding: 14px 16px env(safe-area-inset-top, 14px);
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 5;
+      color: white;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.55);
+    }
+    #hud .score { font-size: 1.55rem; font-weight: 800; }
+    #hud .label { font-size: 0.68rem; opacity: 0.8; letter-spacing: 0.6px; }
+    #fsdIndicator {
+      position: absolute;
+      top: 74px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, #3b82f6, #06b6d4);
+      color: white;
+      padding: 7px 18px;
+      border-radius: 22px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: none;
+      z-index: 6;
+      box-shadow: 0 0 26px rgba(59, 130, 246, 0.65);
+    }
+    #message {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15, 23, 42, 0.93);
+      color: white;
+      padding: 13px 22px;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 650;
+      text-align: center;
+      max-width: 86%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 7;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    }
+    #message.show { opacity: 1; }
+    #gatePopup {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.88);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 25;
+      flex-direction: column;
+      padding: 20px;
+    }
+    #gatePopup.show { display: flex; }
+    #gatePopup .box {
+      background: #1e293b;
+      border-radius: 18px;
+      padding: 26px 22px;
+      max-width: 310px;
+      text-align: center;
+      color: white;
+      border: 1px solid #334155;
+      box-shadow: 0 22px 44px rgba(0,0,0,0.45);
+    }
+    #gatePopup h2 { margin-bottom: 8px; font-size: 1.35rem; }
+    #gatePopup p { opacity: 0.9; margin-bottom: 18px; font-size: 0.95rem; }
+    #gatePopup .codes { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    #gatePopup button {
+      padding: 13px 18px;
+      border: none;
+      border-radius: 12px;
+      background: #334155;
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #gatePopup button.correct { background: #22c55e; }
+    #gatePopup button:active { transform: scale(0.95); }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="game"></canvas>
+
+    <!-- Title / Start -->
+    <div id="titleScreen" class="screen">
+      <h1>Tesla Paperboy</h1>
+      <div class="subtitle">Amazon Flex Edition</div>
+      <p>Deliver packages the Florida way.<br>Classic Paperboy energy, modern chaos.</p>
+      <button class="btn" id="howBtn">How to Play</button>
+      <button class="btn secondary" id="quickStartBtn">Quick Start</button>
+    </div>
+
+    <!-- How to Play -->
+    <div id="howScreen" class="screen hidden">
+      <h1 style="font-size:1.6rem;margin-bottom:14px">How to Play</h1>
+      <div class="how-list">
+        <div><span class="icon">👆</span><span><strong>Steer</strong> — Drag on the bottom half of the screen to move your Tesla left & right</span></div>
+        <div><span class="icon">📦</span><span><strong>Throw</strong> — Tap the upper half of the screen to toss a package toward that spot</span></div>
+        <div><span class="icon">🏠</span><span><strong>Deliver</strong> — Hit the glowing porches for points. Watch for pools, Ring cameras & porch pirates</span></div>
+        <div><span class="icon">⚡</span><span><strong>FSD</strong> — After several good deliveries, Autopilot engages so you can focus on throwing</span></div>
+        <div><span class="icon">🚪</span><span><strong>Gates</strong> — Sometimes you’ll need a gate code. Guess wrong and the HOA gets involved</span></div>
+      </div>
+      <button class="btn" id="startBtn">Start Route</button>
+      <button class="btn secondary" id="backBtn">Back</button>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" style="display:none">
+      <div>
+        <div class="score" id="scoreDisplay">0</div>
+        <div class="label">SCORE</div>
+      </div>
+      <div style="text-align:right">
+        <div class="score" id="timeDisplay">1:30</div>
+        <div class="label">TIME</div>
+      </div>
+    </div>
+    <div id="fsdIndicator">⚡ FSD ENGAGED</div>
+    <div id="message"></div>
+    <div id="gatePopup">
+      <div class="box">
+        <h2>🚪 Gated Community</h2>
+        <p id="gateText">Wrong code = HOA delay + damage</p>
+        <div class="codes" id="gateCodes"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // TESLA PAPERBOY v3 + Improved Tesla
+    // Classic Paperboy perspective + Detailed cartoon Florida art
+    // ============================================================
+
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('gameContainer');
+    const titleScreen = document.getElementById('titleScreen');
+    const howScreen = document.getElementById('howScreen');
+    const hud = document.getElementById('hud');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const fsdIndicator = document.getElementById('fsdIndicator');
+    const messageEl = document.getElementById('message');
+    const gatePopup = document.getElementById('gatePopup');
+    const gateCodesEl = document.getElementById('gateCodes');
+    const gateText = document.getElementById('gateText');
+
+    let W, H;
+    function resize() {
+      const rect = container.getBoundingClientRect();
+      W = Math.floor(rect.width);
+      H = Math.floor(rect.height);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 160));
+    resize();
+
+    let state = 'title';
+    let score = 0, deliveries = 0, timeLeft = 90;
+    let lastTime = 0, scrollSpeed = 2.35, baseScroll = 2.35;
+    let fsdActive = false, fsdTimer = 0, fsdCooldown = 0, nextFsdAt = 5;
+    let messageTimer = 0, damage = 0, frame = 0;
+
+    const player = { x: 0, y: 0, w: 54, h: 88, targetX: 0 };
+
+    let packages = [], targets = [], obstacles = [], particles = [];
+    let houses = [], palms = [], roadMarks = [], floatingTexts = [];
+    let isDragging = false;
+
+    function rand(a,b){ return Math.random()*(b-a)+a; }
+    function randInt(a,b){ return Math.floor(rand(a,b+1)); }
+    function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+
+    function showMessage(text, dur=1.55){
+      messageEl.textContent = text;
+      messageEl.classList.add('show');
+      messageTimer = dur;
+    }
+    function addFloating(x,y,text,color='#fff'){
+      floatingTexts.push({x,y,text,color,life:1.3,vy:-1.55});
+    }
+    function spawnParticles(x,y,color,n=10){
+      for(let i=0;i<n;i++){
+        particles.push({
+          x,y, vx:rand(-3.2,3.2), vy:rand(-4.8,1.2),
+          life:rand(0.35,0.95), color, size:rand(2.2,5.2)
+        });
+      }
+    }
+
+    document.getElementById('howBtn').onclick = () => {
+      titleScreen.classList.add('hidden');
+      howScreen.classList.remove('hidden');
+    };
+    document.getElementById('backBtn').onclick = () => {
+      howScreen.classList.add('hidden');
+      titleScreen.classList.remove('hidden');
+    };
+    document.getElementById('quickStartBtn').onclick = startGame;
+    document.getElementById('startBtn').onclick = startGame;
+
+    ['howBtn','backBtn','quickStartBtn','startBtn'].forEach(id=>{
+      const el = document.getElementById(id);
+      el.addEventListener('touchend', e => { e.preventDefault(); el.click(); }, {passive:false});
+    });
+
+    function startGame(){
+      titleScreen.classList.add('hidden');
+      howScreen.classList.add('hidden');
+      hud.style.display = 'flex';
+      resetGame();
+      state = 'playing';
+      lastTime = performance.now();
+      requestAnimationFrame(loop);
+    }
+
+    function resetGame(){
+      score=0; deliveries=0; timeLeft=90;
+      scrollSpeed=baseScroll; fsdActive=false; fsdTimer=0; fsdCooldown=0; nextFsdAt=5;
+      damage=0; packages=[]; targets=[]; obstacles=[]; particles=[]; floatingTexts=[];
+      houses=[]; palms=[]; roadMarks=[]; frame=0;
+
+      player.x = W/2;
+      player.y = H * 0.79;
+      player.targetX = player.x;
+
+      for(let i=0;i<11;i++) spawnHouseRow(-i*148 - 50);
+      for(let i=0;i<20;i++) roadMarks.push({y: i*52 - 90});
+      updateHUD();
+    }
+
+    function spawnHouseRow(y){
+      const colors = ['#fef3c7','#ecfdf5','#fce7f3','#e0f2fe','#fef9c3','#f3e8ff'];
+      const left = {
+        side:'left', x: 6, y, w: 96, h: 122,
+        hasTarget: Math.random()<0.57,
+        hasPool: Math.random()<0.23,
+        hasRing: Math.random()<0.4,
+        number: randInt(110,980),
+        snack: Math.random()<0.14,
+        color: colors[randInt(0,5)]
+      };
+      const right = {
+        side:'right', x: W-102, y: y+rand(-16,16), w: 96, h: 122,
+        hasTarget: Math.random()<0.57,
+        hasPool: Math.random()<0.23,
+        hasRing: Math.random()<0.4,
+        number: randInt(110,980),
+        snack: Math.random()<0.14,
+        color: colors[randInt(0,5)]
+      };
+      houses.push(left, right);
+
+      if(Math.random()<0.75) palms.push({x: left.x + left.w + 8, y: left.y + 48});
+      if(Math.random()<0.75) palms.push({x: right.x - 20, y: right.y + 48});
+
+      if(left.hasTarget){
+        targets.push({ x: left.x + 60, y: left.y + 82, house: left, hit:false, pulse:rand(0,6.28) });
+      }
+      if(right.hasTarget){
+        targets.push({ x: right.x + 36, y: right.y + 82, house: right, hit:false, pulse:rand(0,6.28) });
+      }
+    }
+
+    function spawnObstacle(){
+      const r = Math.random();
+      let type, x, w, h;
+      if(r<0.25){ type='cone'; x=rand(W*0.31,W*0.69); w=20; h=26; }
+      else if(r<0.44){ type='scooter'; x=rand(W*0.29,W*0.71); w=32; h=44; }
+      else if(r<0.61){ type='car'; x=rand(W*0.33,W*0.67); w=48; h=78; }
+      else if(r<0.77){ type='pedestrian'; x=Math.random()<0.5?rand(20,75):rand(W-75,W-20); w=22; h=42; }
+      else if(r<0.90){ type='dog'; x=Math.random()<0.5?rand(26,82):rand(W-82,W-26); w=32; h=24; }
+      else { type='pirate'; x=Math.random()<0.5?rand(38,92):rand(W-92,W-38); w=28; h=40; }
+
+      obstacles.push({
+        type, x, y: -95, w, h,
+        vx: (type==='scooter'||type==='pedestrian') ? (Math.random()<0.5?-0.65:0.65) : 0,
+        hit:false
+      });
+    }
+
+    function getPos(e){
+      const rect = canvas.getBoundingClientRect();
+      const t = e.touches ? e.touches[0] : e;
+      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    }
+    function onStart(e){
+      e.preventDefault();
+      if(state !== 'playing') return;
+      const pos = getPos(e);
+      if(pos.y > H * 0.58){
+        isDragging = true;
+        player.targetX = clamp(pos.x, 46, W-46);
+      } else {
+        throwPackage(pos.x, pos.y);
+      }
+    }
+    function onMove(e){
+      e.preventDefault();
+      if(!isDragging || state!=='playing') return;
+      const pos = getPos(e);
+      player.targetX = clamp(pos.x, 46, W-46);
+    }
+    function onEnd(){ isDragging = false; }
+
+    canvas.addEventListener('touchstart', onStart, {passive:false});
+    canvas.addEventListener('touchmove', onMove, {passive:false});
+    canvas.addEventListener('touchend', onEnd);
+    canvas.addEventListener('touchcancel', onEnd);
+    canvas.addEventListener('mousedown', onStart);
+    canvas.addEventListener('mousemove', e => { if(isDragging) onMove(e); });
+    canvas.addEventListener('mouseup', onEnd);
+    canvas.addEventListener('mouseleave', onEnd);
+
+    const keys = {};
+    window.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if(e.key===' ' && state==='playing') throwPackage(player.x+rand(-35,35), player.y-210);
+    });
+    window.addEventListener('keyup', e => keys[e.key]=false);
+
+    function throwPackage(tx, ty){
+      if(packages.length > 7) return;
+      const dx = tx - player.x;
+      const dy = ty - (player.y - 32);
+      const dist = Math.hypot(dx,dy) || 1;
+      const speed = clamp(dist * 0.047, 7.2, 15.5);
+      packages.push({
+        x: player.x, y: player.y - 30,
+        vx: (dx/dist)*speed, vy: (dy/dist)*speed - 1.9,
+        rot:0, rotSpeed:rand(-0.26,0.26), life:2.9, trail:[]
+      });
+    }
+
+    function activateFSD(){
+      if(fsdActive || fsdCooldown>0) return;
+      fsdActive = true; fsdTimer = 7.9;
+      fsdIndicator.style.display = 'block';
+      showMessage('⚡ FSD ENGAGED — Hands free!', 1.7);
+      nextFsdAt = deliveries + 5 + randInt(0,2);
+    }
+    function updateFSD(dt){
+      if(fsdActive){
+        fsdTimer -= dt;
+        if(fsdTimer<=0){
+          fsdActive=false; fsdCooldown=2.3;
+          fsdIndicator.style.display='none';
+          showMessage('FSD disengaged — back to manual', 1.4);
+        }
+      }
+      if(fsdCooldown>0) fsdCooldown -= dt;
+    }
+
+    function triggerGate(){
+      if(state!=='playing') return;
+      state = 'gate';
+      const correct = String(randInt(1000,9999));
+      const opts = [correct];
+      while(opts.length<3){
+        const f = String(randInt(1000,9999));
+        if(!opts.includes(f)) opts.push(f);
+      }
+      for(let i=opts.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [opts[i],opts[j]]=[opts[j],opts[i]];
+      }
+      gateText.textContent = 'Wrong code = HOA delay + damage';
+      gateCodesEl.innerHTML = '';
+      opts.forEach(code=>{
+        const btn = document.createElement('button');
+        btn.textContent = code;
+        if(code===correct) btn.classList.add('correct');
+        btn.onclick = ()=>{
+          gatePopup.classList.remove('show');
+          state = 'playing';
+          if(code===correct){
+            score += 90;
+            showMessage('✅ Code accepted. Nice.', 1.3);
+            addFloating(W/2, H*0.36, '+90', '#22c55e');
+          } else {
+            damage += 15;
+            timeLeft = Math.max(0, timeLeft-5);
+            showMessage('❌ Wrong code! HOA incoming...', 1.7);
+            addFloating(W/2, H*0.36, 'DELAY', '#ef4444');
+          }
+          updateHUD();
+        };
+        gateCodesEl.appendChild(btn);
+      });
+      gatePopup.classList.add('show');
+    }
+
+    function update(dt){
+      if(state!=='playing') return;
+      frame++;
+
+      timeLeft -= dt;
+      if(timeLeft<=0){ timeLeft=0; endGame(); return; }
+
+      if(keys['ArrowLeft']||keys['a']) player.targetX -= 9.5;
+      if(keys['ArrowRight']||keys['d']) player.targetX += 9.5;
+      player.targetX = clamp(player.targetX, 48, W-48);
+      player.x += (player.targetX - player.x) * 0.21;
+
+      const speed = fsdActive ? scrollSpeed * 1.17 : scrollSpeed;
+      houses.forEach(h => h.y += speed);
+      palms.forEach(p => p.y += speed);
+      targets.forEach(t => t.y += speed);
+      obstacles.forEach(o => { o.y += speed; o.x += o.vx; });
+      roadMarks.forEach(m => m.y += speed);
+
+      packages.forEach(p=>{
+        p.trail.push({x:p.x,y:p.y});
+        if(p.trail.length>8) p.trail.shift();
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.195; p.rot += p.rotSpeed; p.life -= dt;
+      });
+      packages = packages.filter(p => p.life>0 && p.y < H+55);
+
+      particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.125; p.life-=dt; });
+      particles = particles.filter(p=>p.life>0);
+      floatingTexts.forEach(t=>{ t.y+=t.vy; t.life-=dt; });
+      floatingTexts = floatingTexts.filter(t=>t.life>0);
+
+      houses = houses.filter(h => h.y < H+150);
+      palms = palms.filter(p => p.y < H+110);
+      targets = targets.filter(t => t.y < H+70 && !t.hit);
+      obstacles = obstacles.filter(o => o.y < H+100 && !o.hit);
+
+      const topY = houses.length ? Math.min(...houses.map(h=>h.y)) : 0;
+      if(topY > -35) spawnHouseRow(topY - 155 - rand(0,28));
+
+      if(frame % 50 === 0 && Math.random()<0.74) spawnObstacle();
+      if(frame % 390 === 0 && Math.random()<0.58 && timeLeft>20) triggerGate();
+
+      packages.forEach(p=>{
+        targets.forEach(t=>{
+          if(t.hit) return;
+          if(Math.hypot(p.x-t.x, p.y-t.y) < 36){
+            t.hit = true;
+            deliveries++; score += 100;
+            spawnParticles(t.x, t.y, '#22c55e', 15);
+            addFloating(t.x, t.y-20, '+100', '#22c55e');
+            if(t.house.snack){
+              score += 60;
+              showMessage('🥤 Customer left cold drinks! +60', 1.55);
+              addFloating(t.x, t.y-46, 'SNACK!', '#f59e0b');
+            } else {
+              const msgs = ['Package delivered ✓','Perfect toss!','Porch secured','Another one down'];
+              showMessage(msgs[randInt(0,3)], 1.05);
+            }
+            if(deliveries >= nextFsdAt) activateFSD();
+          }
+        });
+      });
+
+      packages.forEach(p=>{
+        houses.forEach(h=>{
+          if(p.x>h.x && p.x<h.x+h.w && p.y>h.y+42 && p.y<h.y+h.h){
+            if(h.hasPool && Math.random()<0.44){
+              p.life=0; spawnParticles(p.x,p.y,'#38bdf8',17);
+              showMessage('💦 Package is swimming!', 1.6);
+              score = Math.max(0,score-25);
+              addFloating(p.x,p.y,'SPLASH','#38bdf8');
+            } else if(h.hasRing && Math.random()<0.4){
+              p.life=0; spawnParticles(p.x,p.y,'#f87171',13);
+              showMessage('📹 Caught on Ring camera!', 1.55);
+              damage += 8;
+              addFloating(p.x,p.y,'RINGED','#f87171');
+            }
+          }
+        });
+      });
+
+      obstacles.forEach(o=>{
+        if(o.hit) return;
+        const px = player.x - player.w/2, py = player.y - player.h/2;
+        if(o.x < px+player.w && o.x+o.w > px && o.y < py+player.h && o.y+o.h > py){
+          if(fsdActive && ['cone','scooter','car'].includes(o.type)){
+            o.hit=true;
+            spawnParticles(o.x+o.w/2, o.y+o.h/2, '#3b82f6', 10);
+            addFloating(o.x, o.y, 'FSD DODGE', '#3b82f6');
+            return;
+          }
+          o.hit=true;
+          let dmg=9, msg='';
+          if(o.type==='cone'){ dmg=6; msg='⚠️ Hit a cone'; }
+          else if(o.type==='scooter'){ dmg=12; msg='🛴 Scooter collision'; }
+          else if(o.type==='car'){ dmg=21; msg='🚗 Sideswiped!'; }
+          else if(o.type==='pedestrian'){ dmg=8; msg='📱 Distracted walker'; }
+          else if(o.type==='dog'){ dmg=14; msg='🐕 Dog vs bumper'; }
+          else if(o.type==='pirate'){ dmg=11; msg='🏴‍☠️ Porch pirate!'; }
+          damage += dmg;
+          spawnParticles(player.x, player.y, '#ef4444', 13);
+          showMessage(msg, 1.4);
+          addFloating(player.x, player.y-48, `-${dmg}`, '#ef4444');
+          if(damage>=100) endGame(true);
+        }
+      });
+
+      packages.forEach(p=>{
+        obstacles.forEach(o=>{
+          if(o.hit || o.type==='cone' || o.type==='car') return;
+          if(Math.hypot(p.x-(o.x+o.w/2), p.y-(o.y+o.h/2)) < 32){
+            if(o.type==='pirate'){
+              o.hit=true; p.life=0; score+=75;
+              spawnParticles(o.x,o.y,'#a855f7',15);
+              showMessage('🎯 Nailed the porch pirate!', 1.55);
+              addFloating(o.x,o.y,'+75','#a855f7');
+            } else if(o.type==='dog'){
+              o.hit=true; p.life=0;
+              showMessage('🐕 Package got chewed...', 1.4);
+              score = Math.max(0,score-20);
+            }
+          }
+        });
+      });
+
+      scrollSpeed = baseScroll + (90-timeLeft)*0.0125;
+      updateFSD(dt);
+      updateHUD();
+      if(messageTimer>0){ messageTimer-=dt; if(messageTimer<=0) messageEl.classList.remove('show'); }
+    }
+
+    function updateHUD(){
+      scoreDisplay.textContent = score;
+      const m = Math.floor(timeLeft/60);
+      const s = Math.floor(timeLeft%60).toString().padStart(2,'0');
+      timeDisplay.textContent = `${m}:${s}`;
+    }
+
+    function endGame(crashed=false){
+      state='gameover';
+      fsdIndicator.style.display='none';
+      hud.style.display='none';
+      const title = crashed ? 'Route Failed' : 'Route Complete!';
+      let summary = deliveries>=12 ? 'Elite Flex driver status.' :
+                   deliveries>=8 ? 'Solid route. Amazon noticed.' :
+                   deliveries>=4 ? 'A few made it to the porch.' : 'Rough block today.';
+      
+      titleScreen.innerHTML = `
+        <h1>${title}</h1>
+        <div style="margin:18px 0;font-size:1.2rem;line-height:1.7">
+          <div>Score: <strong>${score}</strong></div>
+          <div>Deliveries: <strong>${deliveries}</strong></div>
+          <div>Damage: <strong>${Math.min(100,Math.round(damage))}%</strong></div>
+        </div>
+        <p>${summary}</p>
+        <p style="font-size:0.85rem;opacity:0.7;margin-top:8px">${crashed?'Tesla needs a minute...':'Ready for another block?'}</p>
+        <button class="btn" id="againBtn">Drive Again</button>
+      `;
+      titleScreen.classList.remove('hidden');
+      document.getElementById('againBtn').onclick = ()=>{
+        location.reload();
+      };
+      document.getElementById('againBtn').addEventListener('touchend', e=>{e.preventDefault();location.reload();},{passive:false});
+    }
+
+    function draw(){
+      const sky = ctx.createLinearGradient(0,0,0,H);
+      sky.addColorStop(0, '#0ea5e9');
+      sky.addColorStop(0.4, '#7dd3fc');
+      sky.addColorStop(1, '#e0f2fe');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0,0,W,H);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.32)';
+      ctx.beginPath(); ctx.ellipse(W*0.18, 48, 48, 16, 0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(W*0.72, 68, 60, 18, 0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(W*0.45, 38, 36, 12, 0,0,Math.PI*2); ctx.fill();
+
+      const roadL = W*0.235, roadR = W*0.765;
+      ctx.fillStyle = '#4b5563';
+      ctx.fillRect(roadL, 0, roadR-roadL, H);
+
+      ctx.fillStyle = '#374151';
+      ctx.fillRect(roadL-11, 0, 11, H);
+      ctx.fillRect(roadR, 0, 11, H);
+
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 4.5;
+      ctx.setLineDash([22, 17]);
+      ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#9ca3af';
+      ctx.fillRect(roadL-30, 0, 19, H);
+      ctx.fillRect(roadR+11, 0, 19, H);
+
+      roadMarks.forEach(m=>{
+        if(m.y>-8 && m.y<H){
+          ctx.fillStyle = 'rgba(255,255,255,0.06)';
+          ctx.fillRect(roadL+14, m.y, roadR-roadL-28, 5);
+        }
+      });
+
+      palms.forEach(p=>{
+        if(p.y<-50 || p.y>H+70) return;
+        drawPalm(p.x, p.y);
+      });
+
+      houses.forEach(h=>{
+        if(h.y<-140 || h.y>H+40) return;
+        drawHouse(h);
+      });
+
+      targets.forEach(t=>{
+        if(t.hit || t.y<-40 || t.y>H) return;
+        t.pulse += 0.09;
+        const g = 0.52 + Math.sin(t.pulse)*0.28;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 26, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(34,197,94,${g*0.38})`;
+        ctx.fill();
+        ctx.fillStyle = '#b45309';
+        ctx.fillRect(t.x-13, t.y-11, 26, 22);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(t.x-13, t.y-11, 26, 7);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y+4, 8, 0.2, Math.PI-0.2);
+        ctx.stroke();
+      });
+
+      obstacles.forEach(o=>{
+        if(o.y<-60 || o.y>H+30) return;
+        drawObstacle(o);
+      });
+
+      packages.forEach(p=>{
+        p.trail.forEach((pt,i)=>{
+          ctx.globalAlpha = (i/p.trail.length)*0.4;
+          ctx.fillStyle = '#d97706';
+          ctx.fillRect(pt.x-5, pt.y-4, 10, 8);
+        });
+        ctx.globalAlpha = 1;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = '#b45309';
+        ctx.fillRect(-12, -10, 24, 20);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(-12, -10, 24, 6);
+        ctx.restore();
+      });
+
+      particles.forEach(p=>{
+        ctx.globalAlpha = clamp(p.life,0,1);
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+      floatingTexts.forEach(t=>{
+        ctx.globalAlpha = clamp(t.life,0,1);
+        ctx.fillStyle = t.color;
+        ctx.font = 'bold 16px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(t.text, t.x, t.y);
+      });
+      ctx.globalAlpha = 1;
+
+      drawTesla(player.x, player.y, fsdActive);
+
+      if(damage > 0){
+        const bw=136, bx=W/2-bw/2, by=H-28;
+        ctx.fillStyle='rgba(0,0,0,0.4)';
+        ctx.fillRect(bx-3,by-3,bw+6,14);
+        ctx.fillStyle='#1e293b';
+        ctx.fillRect(bx,by,bw,8);
+        const pct=clamp(damage/100,0,1);
+        ctx.fillStyle = pct>0.7?'#ef4444':pct>0.4?'#f59e0b':'#22c55e';
+        ctx.fillRect(bx,by,bw*pct,8);
+      }
+    }
+
+    function drawPalm(x, y){
+      ctx.fillStyle = '#78350f';
+      ctx.beginPath();
+      ctx.moveTo(x-4, y+42);
+      ctx.lineTo(x-2, y);
+      ctx.lineTo(x+3, y);
+      ctx.lineTo(x+5, y+42);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#15803d';
+      for(let i=0;i<5;i++){
+        const ang = -0.9 + i*0.45;
+        ctx.save();
+        ctx.translate(x, y-2);
+        ctx.rotate(ang);
+        ctx.beginPath();
+        ctx.ellipse(0, -6, 26, 9, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillStyle = '#92400e';
+      ctx.beginPath(); ctx.arc(x-5, y+6, 4, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+6, y+4, 3.5, 0, Math.PI*2); ctx.fill();
+    }
+
+    function drawHouse(h){
+      ctx.fillStyle = 'rgba(0,0,0,0.1)';
+      ctx.fillRect(h.x+8, h.y+h.h-6, h.w-4, 12);
+
+      ctx.fillStyle = h.color;
+      ctx.fillRect(h.x, h.y+18, h.w, h.h-18);
+
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.moveTo(h.x-10, h.y+24);
+      ctx.lineTo(h.x + h.w/2, h.y-14);
+      ctx.lineTo(h.x + h.w + 10, h.y+24);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(h.x+8, h.y+58, h.w-16, 6);
+
+      ctx.fillStyle = '#57534e';
+      const doorX = h.side==='left' ? h.x+38 : h.x+32;
+      ctx.fillRect(doorX, h.y+66, 26, 44);
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath(); ctx.arc(doorX+21, h.y+90, 2.8, 0, Math.PI*2); ctx.fill();
+
+      ctx.fillStyle = '#bae6fd';
+      ctx.fillRect(h.x+11, h.y+30, 24, 22);
+      ctx.fillRect(h.x+h.w-35, h.y+30, 24, 22);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.6;
+      ctx.strokeRect(h.x+11, h.y+30, 24, 22);
+      ctx.strokeRect(h.x+h.w-35, h.y+30, 24, 22);
+      ctx.beginPath();
+      ctx.moveTo(h.x+23, h.y+30); ctx.lineTo(h.x+23, h.y+52);
+      ctx.moveTo(h.x+11, h.y+41); ctx.lineTo(h.x+35, h.y+41);
+      ctx.moveTo(h.x+h.w-23, h.y+30); ctx.lineTo(h.x+h.w-23, h.y+52);
+      ctx.moveTo(h.x+h.w-35, h.y+41); ctx.lineTo(h.x+h.w-11, h.y+41);
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 13px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(h.number, doorX+13, h.y+94);
+
+      if(h.hasPool){
+        const px = h.side==='left' ? h.x+7 : h.x+h.w-39;
+        ctx.fillStyle = '#0ea5e9';
+        ctx.fillRect(px, h.y+h.h-28, 34, 18);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fillRect(px+4, h.y+h.h-24, 15, 6);
+      }
+
+      if(h.hasRing){
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath(); ctx.arc(doorX+13, h.y+58, 6, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(doorX+13, h.y+58, 2.4, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    function drawObstacle(o){
+      if(o.type==='cone'){
+        ctx.fillStyle='#f97316';
+        ctx.beginPath();
+        ctx.moveTo(o.x+o.w/2, o.y);
+        ctx.lineTo(o.x+o.w+2, o.y+o.h);
+        ctx.lineTo(o.x-2, o.y+o.h);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#fff';
+        ctx.fillRect(o.x+5, o.y+10, o.w-10, 5);
+      } else if(o.type==='scooter'){
+        ctx.fillStyle='#1e293b';
+        ctx.fillRect(o.x+9, o.y+12, 8, 30);
+        ctx.fillRect(o.x, o.y+36, 32, 8);
+        ctx.beginPath();
+        ctx.arc(o.x+8, o.y+42, 7.5, 0, Math.PI*2);
+        ctx.arc(o.x+24, o.y+42, 7.5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle='#94a3b8';
+        ctx.fillRect(o.x+6, o.y, 20, 14);
+      } else if(o.type==='car'){
+        ctx.fillStyle='#3b82f6';
+        ctx.beginPath();
+        ctx.roundRect(o.x, o.y+14, o.w, o.h-18, 9);
+        ctx.fill();
+        ctx.fillStyle='#0f172a';
+        ctx.fillRect(o.x+6, o.y+18, o.w-12, 22);
+        ctx.fillStyle='#64748b';
+        ctx.beginPath();
+        ctx.arc(o.x+12, o.y+o.h-7, 8, 0, Math.PI*2);
+        ctx.arc(o.x+o.w-12, o.y+o.h-7, 8, 0, Math.PI*2);
+        ctx.fill();
+      } else if(o.type==='pedestrian'){
+        ctx.fillStyle='#fcd34d';
+        ctx.beginPath(); ctx.arc(o.x+11, o.y+10, 8.5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#6366f1';
+        ctx.fillRect(o.x+4, o.y+19, 16, 22);
+        ctx.fillStyle='#1e293b';
+        ctx.fillRect(o.x+18, o.y+22, 8, 12);
+      } else if(o.type==='dog'){
+        ctx.fillStyle='#a16207';
+        ctx.fillRect(o.x, o.y+8, 26, 14);
+        ctx.beginPath(); ctx.arc(o.x+26, o.y+10, 8.5, 0, Math.PI*2); ctx.fill();
+        ctx.fillRect(o.x+3, o.y+20, 6, 8);
+        ctx.fillRect(o.x+16, o.y+20, 6, 8);
+      } else if(o.type==='pirate'){
+        ctx.fillStyle='#1e293b';
+        ctx.fillRect(o.x+5, o.y+16, 18, 24);
+        ctx.fillStyle='#fcd34d';
+        ctx.beginPath(); ctx.arc(o.x+14, o.y+10, 8.5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#7c3aed';
+        ctx.fillRect(o.x+3, o.y+18, 22, 10);
+      }
+    }
+
+    function drawTesla(x, y, fsd){
+      ctx.save();
+      ctx.translate(x, y);
+
+      if(fsd){
+        ctx.beginPath();
+        ctx.arc(0, 2, 62, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(59,130,246,0.22)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 2, 48, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(59,130,246,0.18)';
+        ctx.fill();
+      }
+
+      // Body - more recognizable Tesla silhouette
+      ctx.fillStyle = fsd ? '#e0f2fe' : '#f1f5f9';
+      ctx.beginPath();
+      ctx.moveTo(-24, -40);
+      ctx.lineTo(24, -40);
+      ctx.quadraticCurveTo(29, -38, 30, -30);
+      ctx.lineTo(28, 36);
+      ctx.quadraticCurveTo(26, 43, 18, 44);
+      ctx.lineTo(-18, 44);
+      ctx.quadraticCurveTo(-26, 43, -28, 36);
+      ctx.lineTo(-30, -30);
+      ctx.quadraticCurveTo(-29, -38, -24, -40);
+      ctx.closePath();
+      ctx.fill();
+
+      // Body highlight
+      ctx.fillStyle = fsd ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.moveTo(-18, -36);
+      ctx.lineTo(18, -36);
+      ctx.lineTo(16, -8);
+      ctx.lineTo(-16, -8);
+      ctx.closePath();
+      ctx.fill();
+
+      // Dark glass
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.moveTo(-19, -32);
+      ctx.lineTo(19, -32);
+      ctx.quadraticCurveTo(22, -30, 21, -10);
+      ctx.lineTo(-21, -10);
+      ctx.quadraticCurveTo(-22, -30, -19, -32);
+      ctx.closePath();
+      ctx.fill();
+
+      // Glass reflection
+      ctx.fillStyle = 'rgba(148,163,184,0.35)';
+      ctx.fillRect(-14, -28, 8, 16);
+
+      // Side mirrors
+      ctx.fillStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.roundRect(-36, -12, 10, 8, 2);
+      ctx.fill();
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(-34, -10, 5, 4);
+      ctx.fillStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.roundRect(26, -12, 10, 8, 2);
+      ctx.fill();
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(29, -10, 5, 4);
+
+      // Wheels
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.arc(-18, 30, 11, 0, Math.PI*2);
+      ctx.arc(18, 30, 11, 0, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(-18, -28, 10, 0, Math.PI*2);
+      ctx.arc(18, -28, 10, 0, Math.PI*2);
+      ctx.fill();
+
+      // Rims
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.arc(-18, 30, 5.5, 0, Math.PI*2);
+      ctx.arc(18, 30, 5.5, 0, Math.PI*2);
+      ctx.arc(-18, -28, 5, 0, Math.PI*2);
+      ctx.arc(18, -28, 5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.arc(-18, 30, 2.2, 0, Math.PI*2);
+      ctx.arc(18, 30, 2.2, 0, Math.PI*2);
+      ctx.fill();
+
+      // Headlight bar
+      ctx.fillStyle = fsd ? '#93c5fd' : '#fef08a';
+      ctx.beginPath();
+      ctx.roundRect(-22, -41, 44, 5, 2);
+      ctx.fill();
+      ctx.fillStyle = fsd ? '#e0f2fe' : '#fef9c3';
+      ctx.fillRect(-16, -40, 32, 3);
+
+      // Front bumper
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-16, 40);
+      ctx.lineTo(16, 40);
+      ctx.stroke();
+
+      // Tesla T logo
+      ctx.fillStyle = fsd ? '#3b82f6' : '#475569';
+      ctx.beginPath();
+      ctx.moveTo(-2.5, -6);
+      ctx.lineTo(2.5, -6);
+      ctx.lineTo(2.5, 8);
+      ctx.lineTo(-2.5, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-9, -6);
+      ctx.lineTo(9, -6);
+      ctx.lineTo(7, -1);
+      ctx.lineTo(-7, -1);
+      ctx.closePath();
+      ctx.fill();
+
+      // Label
+      if(!fsd){
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 6px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('TESLA', 0, 16);
+      } else {
+        ctx.fillStyle = '#3b82f6';
+        ctx.font = 'bold 7px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('FSD', 0, 16);
+      }
+
+      ctx.restore();
+    }
+
+    if(!CanvasRenderingContext2D.prototype.roundRect){
+      CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
+        this.moveTo(x+r,y);
+        this.arcTo(x+w,y,x+w,y+h,r);
+        this.arcTo(x+w,y+h,x,y+h,r);
+        this.arcTo(x,y+h,x,y,r);
+        this.arcTo(x,y,x+w,y,r);
+      };
+    }
+
+    function loop(now){
+      if(state==='playing' || state==='gate'){
+        const dt = Math.min((now-lastTime)/1000, 0.05);
+        lastTime = now;
+        if(state==='playing') update(dt);
+        draw();
+        requestAnimationFrame(loop);
+      }
+    }
+
+    resize();
+    ctx.fillStyle = '#0ea5e9';
+    ctx.fillRect(0,0,W,H);
+  </script>
+</body>
+</html>
