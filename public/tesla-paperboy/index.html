@@ -2125,12 +2125,11 @@ function drawHouse(h) {
   ctx.fill();
   clearShadow();
 
-  // Tiny mailbox — almost silhouette, no flag noise
-  if (h.hasMailbox && Math.random() < 0) { /* disabled for calm sides */ }
+  // Quiet mailbox silhouette
   if (h.hasMailbox) {
     const mx = facingRight ? ROAD_L - 16 : ROAD_R + 9;
     const my = L.porchCy + 12;
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = 0.5;
     ctx.fillStyle = "#90A4AE";
     ctx.fillRect(mx + 3, my, 1.5, 8);
     roundRect(mx, my - 5, 7, 5, 1);
