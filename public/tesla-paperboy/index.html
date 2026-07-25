@@ -3031,22 +3031,19 @@ function drawHowTo() {
   ctx.fillStyle = "#FF9900"; ctx.font = "bold 22px system-ui"; ctx.textAlign = "center";
   ctx.fillText("How to Play", W / 2, 65);
   const lines = [
-    ["STEER", "Drag bottom half (or A/D). Tesla has weight."],
-    ["THROW", "Hold top half to aim (ghost arc). Release to throw."],
-    ["DROP", "Only orange DROP pads. Cyan X = best target. LOCK snaps."],
-    ["PACKAGES", "Standard / Heavy (+score) / Envelope (fast) / Weird bonuses."],
-    ["COMBO", "Streak multiplies score. Perfect center shots sparkle."],
-    ["HEARTS", "Crashes cost hearts. Soft misses are oops — not instant death."],
-    ["FSD", "Every 3 deliveries: Autopilot ~10s. Focus on packages."],
-    ["WEATHER", "Golden hour +score. Rain makes throws a bit floatier."],
-    ["RADIO", "Tune House / DnB / Riddim / Techno (keys 1–4)."],
+    ["STEER", "Drag bottom half (or A/D)."],
+    ["THROW", "Hold top half to aim; release to throw."],
+    ["DROP", "Glowing porch pads. Soft cyan = best target."],
+    ["FSD", "Every 3 deliveries: Autopilot helps you dodge."],
+    ["HEARTS", "Crashes cost hearts — misses are soft oops."],
+    ["RADIO", "House / DnB / Riddim / Techno / Silent (1–4, 0)."],
   ];
-  let y = 90;
+  let y = 100;
   ctx.textAlign = "left";
   for (const [t, b] of lines) {
-    ctx.fillStyle = "#00B0FF"; ctx.font = "bold 12px system-ui"; ctx.fillText(t, 36, y);
-    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui";
-    wrap(b, 36, y + 16, W - 72, 15); y += 52;
+    ctx.fillStyle = "#00B0FF"; ctx.font = "bold 13px system-ui"; ctx.fillText(t, 40, y);
+    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "13px system-ui";
+    wrap(b, 40, y + 18, W - 80, 16); y += 58;
   }
   UI.buttons = [];
   btn("play", W / 2 - 110, H - 90, 220, 46, "Start Route", "primary");
