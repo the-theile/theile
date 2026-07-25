@@ -1087,6 +1087,7 @@ function spawnAngryLady(h) {
     shake: 0,
     wave: 0,
     yellT: 0,
+    yellText: "I'M FILMING!",
   });
 
   floatTxt(startX, startY - 20, "I'M FILMING!!!", "#F8BBD0", 16);
@@ -1114,7 +1115,8 @@ function updateLady(o, dt, scrollAmt) {
       o.phase = "chase";
       o.x = o.roadX;
       if (o.yellT <= 0) {
-        floatTxt(o.x, o.y - 24, pick(["I'M FILMING!", "HOA CHAT!", "SLOW DOWN!", "GOT YOUR PLATE!"]), "#FF80AB", 13);
+        o.yellText = pick(["I'M FILMING!", "HOA CHAT!", "SLOW DOWN!", "GOT YOUR PLATE!"]);
+        floatTxt(o.x, o.y - 24, o.yellText, "#FF80AB", 13);
         o.yellT = 1.1;
         SFX.lady();
       }
@@ -1128,7 +1130,8 @@ function updateLady(o, dt, scrollAmt) {
     // Run toward player (down screen) faster than scroll so she can catch up
     o.y += 95 * dt;
     if (o.yellT <= 0 && Math.random() < 0.02) {
-      floatTxt(o.x, o.y - 22, pick(["SENDING TO HOA!", "I SAW THAT!", "TESLA HOOLIGAN!"]), "#F48FB1", 12);
+      o.yellText = pick(["SENDING TO HOA!", "I SAW THAT!", "TESLA HOOLIGAN!"]);
+      floatTxt(o.x, o.y - 22, o.yellText, "#F48FB1", 12);
       o.yellT = 1.4;
     }
   }
@@ -2324,7 +2327,7 @@ function drawAngryLady(o) {
     ctx.fillStyle = "#AD1457";
     ctx.font = "bold 7px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(pick(["I'M FILMING!", "HOA VIDEO!", "SLOW!!"]), 0, -39);
+    ctx.fillText(o.yellText || "I'M FILMING!", 0, -39);
   }
 
   ctx.restore();
