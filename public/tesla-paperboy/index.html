@@ -184,10 +184,11 @@ let sfxBus = null, musicBus = null;
 
 /** Radio stations — procedural EDM, no external files */
 const RADIO = {
-  house:  { id: "house",  name: "House",  bpm: 124, tag: "4/4 Flex cruise",     color: "#FF6D00" },
-  dnb:    { id: "dnb",    name: "DnB",    bpm: 174, tag: "Neuro package rush",  color: "#00E5FF" },
-  riddim: { id: "riddim", name: "Riddim", bpm: 140, tag: "Half-time HOA bass",  color: "#E040FB" },
-  techno: { id: "techno", name: "Techno", bpm: 132, tag: "Warehouse night run", color: "#69F0AE" },
+  house:  { id: "house",  name: "House",  bpm: 124, tag: "4/4 Flex cruise",     color: "#FF6D00", silent: false },
+  dnb:    { id: "dnb",    name: "DnB",    bpm: 174, tag: "Neuro package rush",  color: "#00E5FF", silent: false },
+  riddim: { id: "riddim", name: "Riddim", bpm: 140, tag: "Half-time HOA bass",  color: "#E040FB", silent: false },
+  techno: { id: "techno", name: "Techno", bpm: 132, tag: "Warehouse night run", color: "#69F0AE", silent: false },
+  silent: { id: "silent", name: "Silent", bpm: 0,   tag: "Quiet Flex ride",      color: "#90A4AE", silent: true },
 };
 let station = (META.station && RADIO[META.station]) ? META.station : "house";
 
@@ -375,9 +376,9 @@ function scheduleStep(step, t) {
 }
 
 function musicSchedulerTick() {
-  if (!music.running || !audioCtx) return;
+  if (!music.running || !audioCtx || RADIO[station]?.silent) return;
   const ac = audioCtx;
-  const bpm = RADIO[station].bpm;
+  const bpm = RADIO[station].bpm || 120;
   const stepDur = (60 / bpm) / 4; // 16th
   const horizon = 0.12;
   while (music.nextT < ac.currentTime + horizon) {
@@ -392,14 +393,18 @@ function startRadio() {
   const ac = ensureAudio();
   if (!ac || muted) return;
   stopRadio();
+  // Silent ride: no procedural music, SFX only
+  if (RADIO[station]?.silent) {
+    if (musicBus) musicBus.gain.setValueAtTime(0, ac.currentTime);
+    return;
+  }
   music.running = true;
   music.step = 0;
   music.nextT = ac.currentTime + 0.05;
-  // gentle fade-in
   if (musicBus) {
     musicBus.gain.cancelScheduledValues(ac.currentTime);
     musicBus.gain.setValueAtTime(0.001, ac.currentTime);
-    musicBus.gain.linearRampToValueAtTime(0.22, ac.currentTime + 0.6);
+    musicBus.gain.linearRampToValueAtTime(0.2, ac.currentTime + 0.6);
   }
   musicSchedulerTick();
 }
@@ -412,7 +417,7 @@ function setStation(id) {
   station = id;
   META.station = id;
   saveMeta(META);
-  if (music.running && !muted) startRadio(); // restart groove on new station
+  if (!muted) startRadio();
   SFX.click();
 }
 
@@ -538,8 +543,10 @@ function hitStop(t = 0.04) { G.hitStop = Math.max(G.hitStop, t); }
 function msg(text, life = 2.2) {
   G.messages.push({ text, life, max: life });
 }
-function floatT(x, y, text, color = "#fff", size = 16) {
-  G.floatText.push({ x, y, text, color, size, life: 1.15, vy: -46 });
+function floatT(x, y, text, color = "#fff", size = 15, life = 0.85) {
+  // Cap concurrent floats so the screen stays calm
+  if (G.floatText.length > 5) G.floatText.shift();
+  G.floatText.push({ x, y, text, color, size, life, vy: -36 });
 }
 function burst(x, y, color, n = 12, speed = 140) {
   for (let i = 0; i < n; i++) {
@@ -613,12 +620,11 @@ function resetGame() {
   }
   for (let i = 0; i < 3; i++) G.birds.push({ x: rand(0, W), y: rand(40, 100), s: rand(18, 36), flap: rand(0, 8) });
   if (weather === "rain") {
-    for (let i = 0; i < 50; i++) G.rain.push({ x: rand(0, W), y: rand(0, H), z: rand(0.6, 1.4) });
+    for (let i = 0; i < 28; i++) G.rain.push({ x: rand(0, W), y: rand(0, H), z: rand(0.5, 1.1) });
   }
   for (let i = 0; i < 4; i++) spawnHouse(-i * 220 - 70);
   pickNextPackage();
-  msg(wi.name + " — " + wi.note, 3);
-  msg("Easy stretch · hit DROP pads · 3 hearts", 2.6);
+  msg(wi.name, 2);
   startBgHum();
   SFX.weather();
 }
@@ -931,12 +937,13 @@ addEventListener("keydown", e => {
     else if (state === ST.PLAY || state === ST.PAUSE) startRadio();
     msg(muted ? "Sound off" : "Tuned to " + RADIO[station].name, 1.4);
   }
-  // Quick station switch: 1 House · 2 DnB · 3 Riddim · 4 Techno (not during gate)
+  // Station switch: 1 House · 2 DnB · 3 Riddim · 4 Techno · 0 Silent
   if ((state === ST.PLAY || state === ST.PAUSE || state === ST.TITLE) && state !== ST.GATE && !e.repeat) {
-    if (e.code === "Digit1" || e.code === "Numpad1") { setStation("house"); if (state !== ST.TITLE) msg("📻 House", 1.2); }
-    if (e.code === "Digit2" || e.code === "Numpad2") { setStation("dnb"); if (state !== ST.TITLE) msg("📻 DnB", 1.2); }
-    if (e.code === "Digit3" || e.code === "Numpad3") { setStation("riddim"); if (state !== ST.TITLE) msg("📻 Riddim", 1.2); }
-    if (e.code === "Digit4" || e.code === "Numpad4") { setStation("techno"); if (state !== ST.TITLE) msg("📻 Techno", 1.2); }
+    if (e.code === "Digit1" || e.code === "Numpad1") { setStation("house"); if (state !== ST.TITLE) msg("House", 1); }
+    if (e.code === "Digit2" || e.code === "Numpad2") { setStation("dnb"); if (state !== ST.TITLE) msg("DnB", 1); }
+    if (e.code === "Digit3" || e.code === "Numpad3") { setStation("riddim"); if (state !== ST.TITLE) msg("Riddim", 1); }
+    if (e.code === "Digit4" || e.code === "Numpad4") { setStation("techno"); if (state !== ST.TITLE) msg("Techno", 1); }
+    if (e.code === "Digit0" || e.code === "Numpad0") { setStation("silent"); if (state !== ST.TITLE) msg("Silent ride", 1); }
   }
   if (e.code === "KeyP" || e.code === "Escape") {
     if (state === ST.PLAY) { state = ST.PAUSE; SFX.click(); }
@@ -1080,10 +1087,9 @@ function tryFSD() {
     G.fsdReady = 0;
     G.fsd = FSD_DUR;
     G.fsdTriggers++;
-    msg("⚡ FSD ENGAGED — pure package focus!", 2.8);
-    burst(G.carX, CAR_Y, "#00B0FF", 24, 180);
+    burst(G.carX, CAR_Y, "#00B0FF", 20, 160);
     ringBurst(G.carX, CAR_Y, "#00E5FF");
-    flash(0.4); shake(6); SFX.fsd();
+    flash(0.3); shake(5); SFX.fsd();
     if (G.fsdTriggers >= 2) unlockAch("fsdSavant");
   }
 }
@@ -1091,7 +1097,8 @@ function tryFSD() {
 function addScore(base, x, y, label) {
   const pts = Math.round(base * G.weatherMult * (1 + G.streak * 0.04));
   G.score += pts;
-  if (label) floatT(x, y, label.replace("{n}", String(pts)), "#69F0AE", 15);
+  // Compact score pops only for meaningful deliveries
+  if (label) floatT(x, y, "+" + pts, "#A5D6A7", 14, 0.75);
   return pts;
 }
 
@@ -1140,9 +1147,8 @@ function spawnLady(h) {
     roadX: h.side === 0 ? ROAD_L + rand(36, 70) : ROAD_R - rand(36, 70),
     age: 0, wave: 0, yellT: 0, yellText: "I'M FILMING!", anim: 0,
   });
-  floatT(p.cx, h.y, "I'M FILMING!!!", "#F8BBD0", 15);
-  msg("😱 Lawn lady inbound — you were speeding!", 2.4);
-  SFX.lady(); burst(p.cx, h.y + 18, "#F8BBD0", 12);
+  floatT(p.cx, h.y, "!", "#F8BBD0", 18, 0.7);
+  SFX.lady(); burst(p.cx, h.y + 18, "#F8BBD0", 10);
 }
 
 function updateLady(o, dt) {
@@ -1211,8 +1217,7 @@ function hitEntity(pk, o) {
     G.bestStreak = Math.max(G.bestStreak, G.streak);
     o.dead = true; o.hit = true;
     confetti(o.x, o.y); shake(7); hitStop(0.05);
-    floatT(o.x, o.y - 14, "BEANED! +" + bonus, "#69F0AE", 15);
-    msg(o.type === "lady" ? "Filmed THAT, Karen?" : "Paperboy special!", 1.6);
+    floatT(o.x, o.y - 14, "+" + bonus, "#A5D6A7", 13, 0.7);
     SFX.dismiss();
     if (o.type === "dog") SFX.bark();
     return true;
@@ -1261,8 +1266,8 @@ function resolveLand(pk) {
     const perfect = isActive(h) && dist(pk.x, pk.y, porch.cx, porch.cy) < 16;
 
     if (on || near) {
-      if (!h.needsDelivery) { floatT(porch.cx, porch.cy, "no delivery", "#B0BEC5", 12); oops(); return; }
-      if (h.delivered) { floatT(porch.cx, porch.cy, "already done", "#B0BEC5", 12); return; }
+      if (!h.needsDelivery) { oops(); return; }
+      if (h.delivered) return;
 
       if (h.hasPirate && !h.pirateHit) {
         h.pirateHit = h.delivered = true;
@@ -1283,17 +1288,16 @@ function resolveLand(pk) {
       if (h.special === "prime") base *= 1.5;
       if (perfect) { base *= 1.35; G.perfects++; }
 
-      let note = perfect ? "PERFECT +{n}" : (h.special === "fresh" ? "FRESH 2× +{n}" : "DELIVERED +{n}");
       if (h.hasSnack && !h.snackTaken) {
-        h.snackTaken = true; G.snacks++; base += 40; note = "SNACKS! +{n}";
+        h.snackTaken = true; G.snacks++; base += 40;
         confetti(porch.cx, porch.cy); SFX.perfect();
       } else if (perfect) {
         confetti(porch.cx, porch.cy); ringBurst(porch.cx, porch.cy, "#FFD54F"); SFX.perfect();
       } else {
-        burst(porch.cx, porch.cy, "#FF9900", 16); SFX.deliver();
+        burst(porch.cx, porch.cy, "#FF9900", 14); SFX.deliver();
       }
 
-      addScore(base, porch.cx, porch.cy - 10, note);
+      addScore(base, porch.cx, porch.cy - 8, "+");
       shake(perfect ? 10 : 5); hitStop(0.035); tryFSD();
       return;
     }
@@ -1326,19 +1330,15 @@ function resolveLand(pk) {
     const dw = Math.min(L.hw + 8, 58);
     const dx = h.side === 0 ? L.hx + 4 : L.hx + L.hw - dw - 4;
     if (pk.x > dx && pk.x < dx + dw && pk.y > top && pk.y < top + 52) {
-      // Don't count as driveway if it's on the parked car (already handled)
       if (h.parkedCar && hitsParked(pk, h)) continue;
-      floatT(pk.x, pk.y, "driveway skid", "#B0BEC5", 12);
-      burst(pk.x, pk.y, "#9E9E9E", 8); G.streak = 0; SFX.land(); return;
+      burst(pk.x, pk.y, "#9E9E9E", 6); G.streak = 0; SFX.land(); return;
     }
   }
 
   if (pk.x > ROAD_L && pk.x < ROAD_R) {
-    floatT(pk.x, pk.y, "road pizza", "#BDBDBD", 12);
-    burst(pk.x, pk.y, "#546E7A", 8); G.streak = 0; SFX.miss();
+    burst(pk.x, pk.y, "#546E7A", 6); G.streak = 0; SFX.miss();
   } else {
-    floatT(pk.x, pk.y, "lawn splat", "#AED581", 12);
-    burst(pk.x, pk.y, "#7CB342", 8); G.streak = 0; SFX.miss();
+    burst(pk.x, pk.y, "#7CB342", 6); G.streak = 0; SFX.miss();
   }
 }
 
@@ -1358,7 +1358,8 @@ function update(dt) {
     if (b.x > W + 30) { b.x = -20; b.y = rand(40, 110); }
   }
   for (const r of G.rain) {
-    r.y += 380 * r.z * dt; r.x += 40 * dt;
+    r.y += 220 * r.z * dt;
+    r.x += 18 * dt;
     if (r.y > H) { r.y = -10; r.x = rand(-20, W); }
   }
 
@@ -1395,22 +1396,23 @@ function update(dt) {
   if (G.ladyCD > 0) G.ladyCD -= dt;
 
   const e = elapsed();
-  if (G.coachPhase === 0 && e > 0.6) { G.coachPhase = 1; msg("Drag bottom to steer · Hold top to aim, release to throw", 3.2); }
-  else if (G.coachPhase === 1 && e > 6 && G.deliveries === 0) { G.coachPhase = 2; msg("Cyan X = best DROP · LOCK when near", 3); }
-  else if (G.coachPhase === 2 && e > EASY_SECS) { G.coachPhase = 3; msg("Traffic heating up — stay sharp!", 2.4); }
+  // One short tip early, then stay quiet
+  if (G.coachPhase === 0 && e > 0.8) {
+    G.coachPhase = 1;
+    msg("Bottom = steer · Top = throw", 2.4);
+  } else if (G.coachPhase === 1 && e > 4) {
+    G.coachPhase = 2;
+  }
 
-  // Special events
+  // Special events (banner only — no long toast spam)
   if (!G.event && e > 20 && Math.random() < 0.0025) {
     G.event = pick(["fresh_boost", "construction", "dog_zone"]);
     G.eventT = 12;
-    if (G.event === "fresh_boost") msg("🛒 Amazon Fresh window — double points on drops!", 2.8);
-    if (G.event === "construction") msg("🚧 Construction zone — cones ahead!", 2.5);
-    if (G.event === "dog_zone") msg("🐕 Dog zone — watch the yards!", 2.5);
   }
 
   if (G.fsd > 0) {
     G.fsd -= dt;
-    if (G.fsd <= 0) { G.fsd = 0; msg("Autopilot off.", 1.6); }
+    if (G.fsd <= 0) G.fsd = 0;
   }
 
   const diff = difficulty();
@@ -1821,10 +1823,15 @@ function drawProps() {
       ctx.fillRect(p.x - 3, p.y + 3, 14, 4);
     }
     if (p.type === "sign") {
-      ctx.fillStyle = "#8D6E63"; ctx.fillRect(p.x - 1.5, p.y, 3, 22);
-      ctx.fillStyle = "#FFECB3"; roundRect(p.x - 16, p.y - 16, 32, 16, 2); ctx.fill();
-      ctx.fillStyle = "#E65100"; ctx.font = "bold 8px system-ui"; ctx.textAlign = "center";
-      ctx.fillText(p.label, p.x, p.y - 5);
+      ctx.fillStyle = "#A1887F";
+      ctx.fillRect(p.x - 1, p.y, 2, 18);
+      ctx.fillStyle = "rgba(255,248,225,0.85)";
+      roundRect(p.x - 12, p.y - 12, 24, 12, 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(141,110,99,0.85)";
+      ctx.font = "bold 7px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(p.label, p.x, p.y - 4);
     }
   }
 }
@@ -2047,14 +2054,11 @@ function drawHouse(h) {
   ctx.lineTo(hx + hw + 3, hy + 10);
   ctx.stroke();
 
+  // Subtle special house accent (no loud billboard text)
   if (h.special && !h.delivered && h.needsDelivery) {
-    ctx.fillStyle = h.special === "fresh" ? "#00C853" : "#FF9900";
-    roundRect(hx + 6, hy - 4, hw - 12, 12, 3);
+    ctx.fillStyle = h.special === "fresh" ? "rgba(0,200,83,0.55)" : "rgba(255,153,0,0.5)";
+    roundRect(hx + hw / 2 - 8, hy - 2, 16, 4, 2);
     ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 8px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText(h.special === "fresh" ? "FRESH 2×" : "PRIME", hx + hw / 2, hy + 5);
   }
 
   // Garage on yard side (away from road)
@@ -2131,19 +2135,17 @@ function drawHouse(h) {
   ctx.fill();
   clearShadow();
 
-  // Tiny mailbox near curb
+  // Quiet mailbox near curb
   if (h.hasMailbox) {
-    const mx = facingRight ? ROAD_L - 20 : ROAD_R + 12;
-    const my = L.porchCy + 8;
-    softShadow(4, 0.12);
-    ctx.fillStyle = "#78909C";
-    ctx.fillRect(mx + 4, my, 2.5, 12);
-    ctx.fillStyle = "#546E7A";
-    roundRect(mx, my - 9, 12, 9, 2);
+    const mx = facingRight ? ROAD_L - 18 : ROAD_R + 10;
+    const my = L.porchCy + 10;
+    ctx.fillStyle = "#8D9A9E";
+    ctx.fillRect(mx + 4, my, 2, 10);
+    ctx.fillStyle = "#6D7A80";
+    roundRect(mx + 1, my - 7, 9, 7, 1.5);
     ctx.fill();
-    clearShadow();
-    ctx.fillStyle = isActive(h) ? "#FF9900" : "#90A4AE";
-    ctx.fillRect(mx + 9, my - 5, 4, 2);
+    ctx.fillStyle = isActive(h) ? "rgba(255,183,77,0.85)" : "rgba(176,190,197,0.7)";
+    ctx.fillRect(mx + 7, my - 4, 3, 1.5);
   }
 
   if (isActive(h)) drawDrop(h, L);
@@ -2185,60 +2187,48 @@ function drawHouse(h) {
 function drawDrop(h, L) {
   L = L || layoutHouse(h);
   const gx = L.porchCx, gy = L.porchCy;
-  const pulse = 0.55 + Math.sin(now() / 200 + h.number) * 0.45;
+  const pulse = 0.55 + Math.sin(now() / 240 + h.number) * 0.45;
   const best = bestStop();
   const isBest = best && best.house === h;
-  const col = isBest ? "#00E5FF" : "#FF9900";
+  // Soft language: amber = delivery pad, cyan = recommended target (no text spam)
+  const col = isBest ? "#4DD0E1" : "#FFB74D";
   ctx.save();
-  // Soft pulse ring
-  ctx.globalAlpha = 0.3 + pulse * 0.35;
-  ctx.strokeStyle = col;
-  ctx.lineWidth = isBest ? 2.8 : 2.2;
-  ctx.beginPath();
-  ctx.ellipse(gx, gy + 2, 13 + pulse * 2.5, 9 + pulse * 1.5, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.globalAlpha = 0.18 + pulse * 0.15;
+  // Gentle pad glow
+  ctx.globalAlpha = 0.22 + pulse * 0.2;
   ctx.fillStyle = col;
   ctx.beginPath();
-  ctx.ellipse(gx, gy + 2, 10, 6.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(gx, gy + 1, 11 + pulse * 1.5, 7 + pulse, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Package icon
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 0.4 + pulse * 0.25;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = isBest ? 2.4 : 1.6;
+  ctx.beginPath();
+  ctx.ellipse(gx, gy + 1, 12 + pulse * 2, 8 + pulse, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // Package only — no DROP / AIM HERE labels
+  ctx.globalAlpha = 0.95;
   ctx.shadowColor = col;
-  ctx.shadowBlur = 10 + pulse * 4;
-  drawBox(gx, gy - 1 - pulse, 0.9, PKG.standard);
+  ctx.shadowBlur = isBest ? 12 : 6;
+  drawBox(gx, gy - pulse * 0.8, isBest ? 0.95 : 0.82, PKG.standard);
   clearShadow();
-  // Designed pill label
-  const lab = isBest ? "AIM HERE" : "DROP";
-  ctx.font = "bold 8px system-ui";
-  const tw = ctx.measureText(lab).width + 12;
-  const ly = gy + L.porchH * 0.42 + 2;
-  ctx.fillStyle = "rgba(10,22,40,0.75)";
-  roundRect(gx - tw / 2, ly - 10, tw, 14, 7);
-  ctx.fill();
-  ctx.strokeStyle = col;
-  ctx.lineWidth = 1.2;
-  roundRect(gx - tw / 2, ly - 10, tw, 14, 7);
-  ctx.stroke();
-  ctx.fillStyle = col;
-  ctx.textAlign = "center";
-  ctx.fillText(lab, gx, ly);
-  // Soft road-side chevron
-  const edgeX = h.side === 0 ? ROAD_L - 3 : ROAD_R + 3;
-  ctx.globalAlpha = 0.45 + pulse * 0.25;
-  ctx.fillStyle = col;
-  ctx.beginPath();
-  if (h.side === 0) {
-    ctx.moveTo(edgeX, gy);
-    ctx.lineTo(edgeX - 8, gy - 5);
-    ctx.lineTo(edgeX - 8, gy + 5);
-  } else {
-    ctx.moveTo(edgeX, gy);
-    ctx.lineTo(edgeX + 8, gy - 5);
-    ctx.lineTo(edgeX + 8, gy + 5);
+  // Tiny curb hint for best target only (no chevron pile-up)
+  if (isBest) {
+    const edgeX = h.side === 0 ? ROAD_L - 2 : ROAD_R + 2;
+    ctx.globalAlpha = 0.35 + pulse * 0.2;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    if (h.side === 0) {
+      ctx.moveTo(edgeX, gy);
+      ctx.lineTo(edgeX - 6, gy - 4);
+      ctx.lineTo(edgeX - 6, gy + 4);
+    } else {
+      ctx.moveTo(edgeX, gy);
+      ctx.lineTo(edgeX + 6, gy - 4);
+      ctx.lineTo(edgeX + 6, gy + 4);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
-  ctx.closePath();
-  ctx.fill();
   ctx.restore();
 }
 
@@ -2448,65 +2438,49 @@ function drawBox(x, y, s, def) {
 
 function drawAim() {
   if (state !== ST.PLAY && state !== ST.PAUSE) return;
+  // Quiet ambient: only a soft ring on the recommended pad (no crosshair / guide spam)
   const best = bestStop();
-  if (best) {
+  if (best && !G.aimPreview) {
     const p = best.porch;
-    const pulse = 0.5 + Math.sin(now() / 200) * 0.5;
+    const pulse = 0.5 + Math.sin(now() / 280) * 0.5;
     ctx.save();
-    // Soft guide line
-    ctx.globalAlpha = 0.22 + pulse * 0.18;
-    ctx.strokeStyle = "#00E5FF";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 8]);
-    ctx.lineDashOffset = -now() / 40;
+    ctx.globalAlpha = 0.2 + pulse * 0.15;
+    ctx.strokeStyle = "#4DD0E1";
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.moveTo(G.carX, CAR_Y - 22);
-    ctx.lineTo(p.cx, p.cy);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    // Landing reticle
-    ctx.globalAlpha = 0.45 + pulse * 0.3;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(p.cx, p.cy + 2, 16, 10, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(p.cx - 7, p.cy); ctx.lineTo(p.cx + 7, p.cy);
-    ctx.moveTo(p.cx, p.cy - 7); ctx.lineTo(p.cx, p.cy + 7);
+    ctx.ellipse(p.cx, p.cy + 2, 14 + pulse, 9 + pulse * 0.5, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
   if (!G.aimPreview) return;
   const { x, y, sx, sy, snap, assisted } = G.aimPreview;
-  const col = snap ? "#69F0AE" : assisted ? "#4FC3F7" : "#FFB74D";
+  // Soft arc only — green when locked, cyan when assisted, warm when free
+  const col = snap ? "#81C784" : assisted ? "#4DD0E1" : "#FFCC80";
   ctx.save();
-  for (let i = 1; i <= 12; i++) {
-    const u = i / 13;
+  for (let i = 1; i <= 10; i++) {
+    const u = i / 11;
     const px = lerp(sx, x, smooth(u));
     const py = lerp(sy, y, smooth(u)) - Math.sin(u * Math.PI) * 32;
-    ctx.globalAlpha = 0.12 + u * 0.55;
+    ctx.globalAlpha = 0.1 + u * 0.4;
     ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.arc(px, py, 2.8 - u * 0.5, 0, Math.PI * 2);
+    ctx.arc(px, py, 2.4 - u * 0.4, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.globalAlpha = 0.85;
+  // Landing ellipse — no LOCKED/AIM text
+  ctx.globalAlpha = snap ? 0.75 : 0.5;
   ctx.strokeStyle = col;
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = snap ? 2.4 : 1.8;
   ctx.beginPath();
-  ctx.ellipse(x, y + 3, 15, 9, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y + 3, 13, 8, 0, 0, Math.PI * 2);
   ctx.stroke();
-  // Soft label pill
-  const lab = snap ? "LOCKED" : "AIM";
-  ctx.font = "bold 10px system-ui";
-  const tw = ctx.measureText(lab).width + 14;
-  ctx.globalAlpha = 0.9;
-  ctx.fillStyle = "rgba(10,22,40,0.7)";
-  roundRect(x - tw / 2, y - 26, tw, 16, 8);
-  ctx.fill();
-  ctx.fillStyle = col;
-  ctx.textAlign = "center";
-  ctx.fillText(lab, x, y - 15);
+  if (snap) {
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 3, 8, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -2797,14 +2771,24 @@ function drawFloats() {
 
 function drawWeatherOverlay() {
   if (G.weather === "rain") {
-    ctx.strokeStyle = "rgba(180,210,230,0.35)"; ctx.lineWidth = 1.2;
+    // Soft atmospheric rain — short translucent streaks, low opacity
+    ctx.lineCap = "round";
     for (const r of G.rain) {
-      ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x + 3 * r.z, r.y + 12 * r.z); ctx.stroke();
+      ctx.strokeStyle = `rgba(200,220,235,${0.08 + r.z * 0.08})`;
+      ctx.lineWidth = 0.8 + r.z * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(r.x, r.y);
+      ctx.lineTo(r.x + 1.2 * r.z, r.y + 7 * r.z);
+      ctx.stroke();
     }
-    ctx.fillStyle = "rgba(80,100,120,0.08)"; ctx.fillRect(0, 0, W, H);
+    ctx.lineCap = "butt";
+    // Cool wash over scene (not fighting lane paint)
+    ctx.fillStyle = "rgba(90,110,130,0.06)";
+    ctx.fillRect(0, 0, W, H);
   }
   if (G.weather === "golden") {
-    ctx.fillStyle = "rgba(255,160,60,0.06)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(255,170,80,0.05)";
+    ctx.fillRect(0, 0, W, H);
   }
 }
 
@@ -2912,22 +2896,23 @@ function drawHUD() {
   ctx.textAlign = "center";
   ctx.fillText(weatherInfo(G.weather).name, W - 56, 87);
 
-  // Zone banners — designed pills
+  // Subtle zone cue (small, not a billboard)
   if (elapsed() < EASY_SECS) {
-    drawPill(W / 2 - 56, 100, 112, 20, "rgba(67,160,71,0.9)", "rgba(255,255,255,0.2)");
+    ctx.globalAlpha = 0.75;
+    drawPill(W / 2 - 36, 100, 72, 16, "rgba(67,160,71,0.75)", null);
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 10px system-ui";
+    ctx.font = "bold 9px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("EASY STRETCH", W / 2, 114);
+    ctx.fillText("EASY", W / 2, 111);
+    ctx.globalAlpha = 1;
   }
   if (G.event) {
-    const label = G.event.replace("_", " ").toUpperCase();
-    const tw = Math.max(120, ctx.measureText(label).width + 28);
-    drawPill(W / 2 - tw / 2, 124, tw, 20, "rgba(255,152,0,0.92)", "rgba(255,255,255,0.25)");
+    const short = G.event === "fresh_boost" ? "2×" : G.event === "dog_zone" ? "DOGS" : "CONES";
+    drawPill(W / 2 - 28, 120, 56, 16, "rgba(255,152,0,0.8)", null);
     ctx.fillStyle = "#1A1A1A";
-    ctx.font = "bold 10px system-ui";
+    ctx.font = "bold 9px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(label, W / 2, 138);
+    ctx.fillText(short, W / 2, 131);
   }
 
   // Bottom meta
@@ -2996,32 +2981,32 @@ function drawTitle() {
   ctx.fillText("What are we flexing to?", W / 2, 258);
 
   UI.buttons = [];
-  const stations = ["house", "dnb", "riddim", "techno"];
-  const bw = 78, gap = 6;
+  const stations = ["house", "dnb", "riddim", "techno", "silent"];
+  const bw = 62, gap = 5;
   const totalW = stations.length * bw + (stations.length - 1) * gap;
   let bx = (W - totalW) / 2;
-  const by = 270;
+  const by = 268;
   for (const id of stations) {
     const r = RADIO[id];
     const sel = station === id;
     ctx.fillStyle = sel ? r.color : "rgba(255,255,255,0.1)";
-    roundRect(bx, by, bw, 48, 10); ctx.fill();
+    roundRect(bx, by, bw, 46, 10); ctx.fill();
     if (sel) {
-      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
-      roundRect(bx, by, bw, 48, 10); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 1.5;
+      roundRect(bx, by, bw, 46, 10); ctx.stroke();
     }
-    ctx.fillStyle = sel ? "#1A1A1A" : "#ECEFF1";
-    ctx.font = "bold 12px system-ui"; ctx.textAlign = "center";
+    ctx.fillStyle = sel ? (r.silent ? "#ECEFF1" : "#1A1A1A") : "#ECEFF1";
+    ctx.font = "bold 11px system-ui"; ctx.textAlign = "center";
     ctx.fillText(r.name, bx + bw / 2, by + 20);
-    ctx.font = "8px system-ui";
-    ctx.globalAlpha = sel ? 0.85 : 0.55;
-    ctx.fillText(r.bpm + " BPM", bx + bw / 2, by + 36);
+    ctx.font = "7px system-ui";
+    ctx.globalAlpha = 0.65;
+    ctx.fillText(r.silent ? "SFX only" : r.bpm + " BPM", bx + bw / 2, by + 34);
     ctx.globalAlpha = 1;
-    btn("radio_" + id, bx, by, bw, 48, "", "secondary");
+    btn("radio_" + id, bx, by, bw, 46, "", "secondary");
     bx += bw + gap;
   }
   ctx.fillStyle = RADIO[station].color; ctx.font = "11px system-ui"; ctx.textAlign = "center";
-  ctx.fillText("♪ " + RADIO[station].tag, W / 2, 338);
+  ctx.fillText((RADIO[station].silent ? "🔇 " : "♪ ") + RADIO[station].tag, W / 2, 334);
 
   const chips = ["❤️ 3 hearts", "⚡ FSD", "🌦️ Weather", "📦 Packages"];
   let cx = 36;
@@ -3037,7 +3022,7 @@ function drawTitle() {
     if (b.label) drawBtn(b); // radio chips already drawn
   }
   ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.font = "10px system-ui"; ctx.textAlign = "center";
-  ctx.fillText("Keys 1–4 station · M mute · P pause", W / 2, H - 24);
+  ctx.fillText("1–4 music · 0 silent · M mute · P pause", W / 2, H - 24);
 }
 
 function drawHowTo() {
@@ -3107,16 +3092,16 @@ function drawPause() {
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "bold 12px system-ui";
   ctx.fillText("Radio", W / 2, 252);
   UI.buttons = [];
-  const stations = ["house", "dnb", "riddim", "techno"];
-  const bw = 72, gap = 6;
+  const stations = ["house", "dnb", "riddim", "techno", "silent"];
+  const bw = 58, gap = 5;
   let bx = (W - (stations.length * bw + (stations.length - 1) * gap)) / 2;
   for (const id of stations) {
     const r = RADIO[id];
     const sel = station === id;
     ctx.fillStyle = sel ? r.color : "rgba(255,255,255,0.12)";
     roundRect(bx, 265, bw, 40, 8); ctx.fill();
-    ctx.fillStyle = sel ? "#1A1A1A" : "#ECEFF1";
-    ctx.font = "bold 11px system-ui";
+    ctx.fillStyle = sel && !r.silent ? "#1A1A1A" : "#ECEFF1";
+    ctx.font = "bold 10px system-ui";
     ctx.fillText(r.name, bx + bw / 2, 290);
     btn("radio_" + id, bx, 265, bw, 40, "", "secondary");
     bx += bw + gap;
