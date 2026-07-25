@@ -205,6 +205,13 @@ const SFX = {
     tone({ freq: 700, dur: 0.07, type: "sine", gain: 0.05 });
     tone({ freq: 900, dur: 0.1, type: "sine", gain: 0.04, delay: 0.06 });
   },
+  /** Classic Paperboy shriek — angry old lady */
+  lady() {
+    tone({ freq: 720, dur: 0.12, type: "sawtooth", gain: 0.045, slide: 280 });
+    tone({ freq: 980, dur: 0.16, type: "square", gain: 0.035, delay: 0.08, slide: -120 });
+    tone({ freq: 640, dur: 0.2, type: "sawtooth", gain: 0.03, delay: 0.18, slide: 200 });
+    noiseBurst(0.12, 0.035, 2200);
+  },
 };
 
 // ─── Game State ─────────────────────────────────────────────
@@ -222,6 +229,8 @@ const G = {
   gateTimer: 0, invuln: 0, shake: 0, combo: 0, bestCombo: 0,
   aimPreview: null, // {x,y,assisted} while finger in throw zone
   coachPhase: 0, wrecked: false,
+  ladyCD: 0,       // cooldown before next angry lady
+  ladyHits: 0,     // end-screen stat
 };
 
 const keys = {};
@@ -242,6 +251,7 @@ function resetGame() {
     gateActive: false, gateOptions: [], gateCorrect: 0, gateTimer: 0,
     invuln: 0, shake: 0, combo: 0, bestCombo: 0, aimPreview: null,
     coachPhase: 0, wrecked: false, birds: [],
+    ladyCD: 6, ladyHits: 0,
   });
   G.clouds = [];
   for (let i = 0; i < 7; i++) {
@@ -334,6 +344,7 @@ function spawnHouse(y) {
     windowLit: Math.random() < 0.4,
     garage: Math.random() < 0.45,
     shutters: Math.random() < 0.55,
+    ladySpawned: false, // scary old lady already released from this house
   };
   G.houses.push(house);
 
@@ -839,7 +850,7 @@ function update(dt) {
     spawnMessage("Only DROP / AIM HERE pads need packages!", 3.2);
   } else if (G.coachPhase === 2 && e > EASY_SECS) {
     G.coachPhase = 3;
-    spawnMessage("Traffic picking up — stay sharp!", 2.4);
+    spawnMessage("Traffic picking up — and watch for angry lawn ladies!", 2.6);
   }
 
   if (G.fsd > 0) {
@@ -893,11 +904,19 @@ function update(dt) {
   for (const o of G.obstacles) {
     o.y += scrollAmt;
     if (o.type === "car") o.y += (o.vy || 0) * dt;
-    o.x += (o.vx || 0) * dt;
-    if (o.type === "scooter" || o.type === "ped" || o.type === "dog") {
-      if (o.x < ROAD_L + 14 || o.x > ROAD_R - 14) o.vx *= -1;
+    if (o.type === "lady") {
+      updateLady(o, dt, scrollAmt);
+    } else {
+      o.x += (o.vx || 0) * dt;
+      if (o.type === "scooter" || o.type === "ped" || o.type === "dog") {
+        if (o.x < ROAD_L + 14 || o.x > ROAD_R - 14) o.vx *= -1;
+      }
     }
   }
+
+  // Classic Paperboy: speed too high → scary old lady bursts from a house
+  if (G.ladyCD > 0) G.ladyCD -= dt;
+  trySpawnAngryLady(e, diff);
 
   // Houses — roomy spacing so throws stay readable
   G.nextHouseDist -= scrollAmt;
@@ -980,6 +999,20 @@ function handleObstacleHit(o) {
     burst(o.x, o.y, "#00B0FF", 8);
     return;
   }
+  if (o.type === "lady") {
+    G.ladyHits++;
+    damagePlayer(16, pick([
+      "SLOW DOWN!! Get off my lawn!",
+      "I'm calling the HOA AND your mother!",
+      "Kids these days and their silent Teslas!",
+      "You almost hit Mr. Fluffernutter!",
+    ]));
+    burst(o.x, o.y, "#CE93D8", 16);
+    floatTxt(o.x, o.y - 16, "BROOM SMACK!", "#E1BEE7", 15);
+    SFX.lady();
+    SFX.hit();
+    return;
+  }
   const table = {
     cone: { dmg: 7, msg: "Traffic cone! Watch the shoulder." },
     scooter: { dmg: 11, msg: "Lime scooter — classic Florida hazard." },
@@ -992,6 +1025,118 @@ function handleObstacleHit(o) {
   burst(o.x, o.y, "#FF7043", 12);
   floatTxt(o.x, o.y - 10, "ouch", "#FF5252", 13);
   SFX.hit();
+}
+
+// ─── Scary old lady (Paperboy classic) ──────────────────────
+const SPEED_LIMIT = 118; // above this cruise = "too fast"
+
+function isSpeeding() {
+  // FSD counts as speeding too — she hates autopilot
+  return G.speed >= SPEED_LIMIT || (G.fsd > 0 && G.baseSpeed >= SPEED_LIMIT - 8);
+}
+
+function trySpawnAngryLady(elapsedSec, diff) {
+  if (state !== STATE.PLAY) return;
+  if (G.ladyCD > 0) return;
+  if (elapsedSec < 14) return; // give the block a moment
+  if (!isSpeeding()) return;
+  // Only one lady on screen at a time
+  if (G.obstacles.some(o => o.type === "lady" && !o.dead)) return;
+
+  // Find a house she's "at" — mid-ahead of the car
+  const candidates = G.houses.filter(h =>
+    !h.ladySpawned &&
+    h.y > 120 && h.y < CAR_Y - 140
+  );
+  if (!candidates.length) return;
+
+  // Chance ramps with how much over the limit + route difficulty
+  const over = clamp((G.speed - SPEED_LIMIT) / 40, 0, 1);
+  const chance = 0.012 + over * 0.035 + diff * 0.02; // per frame ~60fps → ~0.7–3/s windowed by CD
+  // Called every frame — use low chance, then long CD
+  if (Math.random() > chance) return;
+
+  const h = pick(candidates);
+  spawnAngryLady(h);
+}
+
+function spawnAngryLady(h) {
+  h.ladySpawned = true;
+  G.ladyCD = rand(9, 16); // don't spam grannies
+  const porch = getPorchRect(h);
+  const startX = porch.cx;
+  const startY = h.y + 20;
+  const roadTargetX = h.side === 0
+    ? ROAD_L + rand(36, 70)
+    : ROAD_R - rand(36, 70);
+
+  G.obstacles.push({
+    type: "lady",
+    x: startX,
+    y: startY,
+    w: 22,
+    h: 36,
+    vx: 0,
+    vy: 0,
+    dead: false,
+    hit: false,
+    phase: "exit", // exit yard → chase car
+    roadX: roadTargetX,
+    side: h.side,
+    age: 0,
+    shake: 0,
+    broom: 0,
+    yellT: 0,
+  });
+
+  floatTxt(startX, startY - 20, "HEY YOU!!!", "#F8BBD0", 16);
+  spawnMessage(pick([
+    "😱 Old lady incoming — you were speeding!",
+    "Classic Paperboy energy: angry neighbor activated!",
+    "She's got a broom and a bone to pick!",
+  ]), 2.6);
+  SFX.lady();
+  burst(startX, startY, "#F8BBD0", 10);
+}
+
+function updateLady(o, dt, scrollAmt) {
+  o.age += dt;
+  o.broom += dt * 14;
+  o.yellT -= dt;
+
+  if (o.phase === "exit") {
+    // Burst from porch onto the road
+    const dx = o.roadX - o.x;
+    const dy = 8; // slight down-road motion
+    o.x += Math.sign(dx) * Math.min(Math.abs(dx), 140 * dt);
+    o.y += 55 * dt;
+    if (Math.abs(o.x - o.roadX) < 6) {
+      o.phase = "chase";
+      o.x = o.roadX;
+      if (o.yellT <= 0) {
+        floatTxt(o.x, o.y - 24, pick(["SLOW DOWN!", "MY LAWN!", "HOA!!!", "RASCAL!"]), "#FF80AB", 13);
+        o.yellT = 1.1;
+        SFX.lady();
+      }
+    }
+  } else {
+    // Chase the Tesla — home in on car X, close the Y gap
+    const ax = (G.carX - o.x) * 3.2;
+    o.vx = lerp(o.vx || 0, clamp(ax, -160, 160), 1 - Math.pow(0.02, dt));
+    o.x += o.vx * dt;
+    o.x = clamp(o.x, ROAD_L + 16, ROAD_R - 16);
+    // Run toward player (down screen) faster than scroll so she can catch up
+    o.y += 95 * dt;
+    if (o.yellT <= 0 && Math.random() < 0.02) {
+      floatTxt(o.x, o.y - 22, pick(["GET BACK HERE!", "I SAW THAT!", "TESLA HOOLIGAN!"]), "#F48FB1", 12);
+      o.yellT = 1.4;
+    }
+  }
+
+  // Despawn if she falls too far behind/past
+  if (o.y > CAR_Y + 80 || o.age > 8) {
+    o.dead = true;
+  }
 }
 
 function resolvePackageLanding(pk) {
@@ -2037,7 +2182,145 @@ function drawObstacles() {
     else if (o.type === "car") drawOtherCar(o);
     else if (o.type === "ped") drawPed(o.x, o.y);
     else if (o.type === "dog") drawDog(o.x, o.y, o.vx >= 0 ? 1 : -1);
+    else if (o.type === "lady") drawAngryLady(o);
   }
+}
+
+/** Classic Paperboy scary old lady — curlers, robe, broom of justice */
+function drawAngryLady(o) {
+  const x = o.x, y = o.y;
+  const dir = (o.vx || 0) >= 0 ? 1 : -1;
+  const run = Math.sin(o.broom) * 4;
+  const broomA = Math.sin(o.broom * 1.3) * 0.55;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.beginPath();
+  ctx.ellipse(0, 20, 12, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // rage aura when chasing
+  if (o.phase === "chase") {
+    ctx.globalAlpha = 0.25 + Math.sin(now() / 80) * 0.1;
+    ctx.fillStyle = "#F48FB1";
+    ctx.beginPath();
+    ctx.arc(0, -4, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // legs (running)
+  ctx.fillStyle = "#F5F5F5";
+  ctx.fillRect(-6, 8 + run * 0.3, 5, 12);
+  ctx.fillRect(1, 8 - run * 0.3, 5, 12);
+  // slippers
+  ctx.fillStyle = "#EC407A";
+  ctx.fillRect(-7, 18 + run * 0.3, 7, 3);
+  ctx.fillRect(1, 18 - run * 0.3, 7, 3);
+
+  // robe body
+  const robe = ctx.createLinearGradient(-12, -10, 12, 14);
+  robe.addColorStop(0, "#CE93D8");
+  robe.addColorStop(1, "#8E24AA");
+  ctx.fillStyle = robe;
+  roundRect(-11, -8, 22, 22, 6);
+  ctx.fill();
+  // robe sash
+  ctx.fillStyle = "#6A1B9A";
+  ctx.fillRect(-11, 2, 22, 3);
+
+  // arms
+  ctx.fillStyle = "#FFCC80";
+  ctx.fillRect(-13, -2, 5, 10);
+  ctx.fillRect(8, -4 + run, 5, 10);
+
+  // broom (weapon)
+  ctx.save();
+  ctx.translate(12 * dir, -2);
+  ctx.rotate(broomA * dir);
+  ctx.strokeStyle = "#6D4C41";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -28);
+  ctx.stroke();
+  // bristles
+  ctx.fillStyle = "#A1887F";
+  ctx.beginPath();
+  ctx.moveTo(-7, -28);
+  ctx.lineTo(7, -28);
+  ctx.lineTo(5, -18);
+  ctx.lineTo(-5, -18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // head
+  ctx.fillStyle = "#FFCC80";
+  ctx.beginPath();
+  ctx.arc(0, -16, 9, 0, Math.PI * 2);
+  ctx.fill();
+
+  // curlers
+  ctx.fillStyle = "#F8BBD0";
+  for (const [cx, cy] of [[-6, -22], [0, -24], [6, -22], [-3, -18], [4, -19]]) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#EC407A";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3.2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // angry face
+  ctx.strokeStyle = "#4A148C";
+  ctx.lineWidth = 1.5;
+  // brows
+  ctx.beginPath();
+  ctx.moveTo(-5, -19); ctx.lineTo(-1, -17);
+  ctx.moveTo(5, -19); ctx.lineTo(1, -17);
+  ctx.stroke();
+  // eyes
+  ctx.fillStyle = "#212121";
+  ctx.beginPath();
+  ctx.arc(-3, -15, 1.4, 0, Math.PI * 2);
+  ctx.arc(3, -15, 1.4, 0, Math.PI * 2);
+  ctx.fill();
+  // scowl
+  ctx.strokeStyle = "#6A1B9A";
+  ctx.beginPath();
+  ctx.arc(0, -11, 3.5, 0.15 * Math.PI, 0.85 * Math.PI, true);
+  ctx.stroke();
+
+  // motion lines when chasing
+  if (o.phase === "chase") {
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-16 - i * 4, -6 + i * 5);
+      ctx.lineTo(-22 - i * 4, -6 + i * 5);
+      ctx.stroke();
+    }
+  }
+
+  // yell bubble occasionally
+  if (o.yellT > 0.7) {
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    roundRect(-18, -48, 36, 14, 6);
+    ctx.fill();
+    ctx.fillStyle = "#AD1457";
+    ctx.font = "bold 8px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("SLOW!!", 0, -38);
+  }
+
+  ctx.restore();
 }
 
 function drawCone(x, y) {
@@ -2612,7 +2895,7 @@ function drawTitle() {
   ctx.fillText("Florida suburbs · 90-second routes", W / 2, 260);
   ctx.fillText("DROP pads only · Aim lock · SFX · FSD every 3", W / 2, 280);
 
-  const chips = ["📦 Orange DROP pads", "🎯 Snap aim assist", "⚡ FSD every 3 drops", "🔊 Built-in sounds"];
+  const chips = ["📦 Orange DROP pads", "👵 Angry lawn lady", "⚡ FSD every 3 drops", "🔊 Built-in sounds"];
   let cy = 312;
   ctx.font = "12px system-ui";
   for (const c of chips) {
@@ -2651,6 +2934,7 @@ function drawHowTo() {
     ["ASSIST", "Aim near a pad to snap/lock. Bigger pads early. Flatter throws."],
     ["RAMP", "First ~35s is Easy Stretch — sparse traffic, then it ramps gently."],
     ["FSD", "Every 3 deliveries: Autopilot ~10s so you can focus on throws."],
+    ["LADY", "Drive too fast and a scary old lady runs out with a broom. Classic!"],
     ["SOUND", "SFX on by default. Press M to mute. Works after first tap."],
   ];
   let y = 100;
@@ -2749,6 +3033,7 @@ function drawEnd() {
     ["Pirate justice", String(G.pirateBonus)],
     ["Snacks claimed", String(G.snacks)],
     ["Failed drops", String(G.fails)],
+    ["Broom assaults", String(G.ladyHits || 0)],
     ["Vehicle damage", Math.round(G.damage) + "%"],
   ];
   let y = 215;
