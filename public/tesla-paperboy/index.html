@@ -82,35 +82,34 @@ function roundRect(x, y, w, h, r) {
 
 // ─── Constants ──────────────────────────────────────────────
 const ROUTE_TIME = 90;
-const EASY_SECS = 25;          // gentle ramp window
+const EASY_SECS = 35;          // longer calm opening
 const ROAD_L = 78, ROAD_R = 312;
 const ROAD_CX = (ROAD_L + ROAD_R) / 2;
 const ROAD_W = ROAD_R - ROAD_L;
 const CAR_Y = 560;
 const MAX_DAMAGE = 100;
-const FSD_DELIVERIES = 5;
-const FSD_DURATION = 8;
+const FSD_DELIVERIES = 3;      // easier first Autopilot unlock
+const FSD_DURATION = 10;
+const MAX_DIFF = 0.72;         // never reaches old "full chaos"
 
 // ─── Difficulty curve ───────────────────────────────────────
-// elapsed: seconds into route (0 → ROUTE_TIME)
 function elapsed() { return ROUTE_TIME - G.time; }
 
-/** 0 = brand new, 1 = full difficulty (after easy window + ramp) */
+/** 0 = brand new → MAX_DIFF late route (softer ceiling) */
 function difficulty() {
   const e = elapsed();
-  if (e <= EASY_SECS) return e / EASY_SECS * 0.28; // max 0.28 in first 25s
-  // ramp from 0.28 → 1.0 over next ~40s
-  return clamp(0.28 + (e - EASY_SECS) / 40 * 0.72, 0, 1);
+  if (e <= EASY_SECS) return (e / EASY_SECS) * 0.14; // very gentle open
+  // slow ramp after easy window; caps below old max
+  return clamp(0.14 + (e - EASY_SECS) / 55 * (MAX_DIFF - 0.14), 0, MAX_DIFF);
 }
 
 function aimAssistStrength() {
-  // Strong early, soft later
-  return lerp(0.72, 0.28, difficulty());
+  // Stay helpful for most of the route
+  return lerp(0.82, 0.42, difficulty() / MAX_DIFF);
 }
 
 function porchPad() {
-  // Extra hitbox padding early (pixels)
-  return lerp(22, 8, difficulty());
+  return lerp(26, 12, difficulty() / MAX_DIFF);
 }
 
 // ─── Game State ─────────────────────────────────────────────
@@ -143,8 +142,8 @@ function resetGame() {
     fsd: 0, fsdReady: 0, carX: ROAD_CX, carVX: 0, steerTarget: null,
     throwCD: 0, packages: [], obstacles: [], houses: [], props: [],
     particles: [], floatText: [], messages: [], roadLines: 0,
-    spawnT: 3.5, // grace period before first obstacle
-    houseSide: 0, nextHouseDist: 30, nextGateIn: rand(42, 55),
+    spawnT: 8, // long calm before first obstacle
+    houseSide: 0, nextHouseDist: 30, nextGateIn: rand(50, 65),
     gateActive: false, gateOptions: [], gateCorrect: 0, gateTimer: 0,
     invuln: 0, shake: 0, combo: 0, bestCombo: 0, aimPreview: null,
     coachPhase: 0, wrecked: false, birds: [],
@@ -201,11 +200,11 @@ function spawnHouse(y) {
   const early = state === STATE.PLAY && elapsed() < EASY_SECS;
 
   // Early route: calm yards, bigger clearer targets
-  const hasPool = !early && Math.random() < 0.12 + diff * 0.25;
-  const hasRing = Math.random() < (early ? 0.15 : 0.35 + diff * 0.2);
-  const hasSnack = Math.random() < 0.1 + (early ? 0.08 : 0);
-  const hasPirate = !early && Math.random() < 0.08 + diff * 0.18;
-  const hasDog = !early && Math.random() < 0.1 + diff * 0.15;
+  const hasPool = !early && Math.random() < 0.08 + diff * 0.18;
+  const hasRing = Math.random() < (early ? 0.1 : 0.25 + diff * 0.15);
+  const hasSnack = Math.random() < 0.12 + (early ? 0.1 : 0);
+  const hasPirate = !early && Math.random() < 0.05 + diff * 0.12;
+  const hasDog = !early && Math.random() < 0.06 + diff * 0.1;
   const hasMailbox = Math.random() < 0.85;
   const hasDriveway = Math.random() < 0.7;
   const hasBush = Math.random() < 0.75;
@@ -245,7 +244,7 @@ function spawnHouse(y) {
   if (hasPool) {
     G.props.push({ type: "pool", x: house.poolX, y: y + 8, house });
   }
-  if (Math.random() < 0.3) {
+  if (Math.random() < 0.28) {
     G.props.push({
       type: "sign",
       x: side === 0 ? ROAD_L - 22 : ROAD_R + 22,
@@ -253,44 +252,70 @@ function spawnHouse(y) {
       label: pick(["SLOW", "KIDS", "HOA", "FLEX"]),
     });
   }
+  if (Math.random() < 0.4) {
+    G.props.push({
+      type: "pole",
+      x: side === 0 ? rand(10, 28) : rand(W - 28, W - 10),
+      y: y - 50,
+    });
+  }
+  if (Math.random() < 0.22) {
+    G.props.push({
+      type: "firehydrant",
+      x: side === 0 ? ROAD_L - 24 : ROAD_R + 18,
+      y: y + 55,
+    });
+  }
 }
 
 function spawnObstacle() {
   const diff = difficulty();
-  if (G.fsd > 0 && Math.random() < 0.6) return;
-  // Early: only gentle cones, rarely a scooter
+  // Skip many spawn attempts — keeps the road breathing room
+  if (Math.random() < lerp(0.45, 0.15, diff / MAX_DIFF)) return;
+  if (G.fsd > 0 && Math.random() < 0.75) return;
+  // Cap concurrent hazards
+  if (G.obstacles.length >= (diff < 0.25 ? 1 : diff < 0.45 ? 2 : 3)) return;
+
   let type;
-  if (diff < 0.25) {
-    type = Math.random() < 0.75 ? "cone" : "scooter";
-  } else if (diff < 0.5) {
+  if (diff < 0.2) {
+    type = Math.random() < 0.85 ? "cone" : "scooter";
+  } else if (diff < 0.4) {
+    type = pick(["cone", "cone", "cone", "scooter"]);
+  } else if (diff < 0.55) {
     type = pick(["cone", "cone", "scooter", "ped"]);
-  } else if (diff < 0.75) {
-    type = pick(["cone", "scooter", "ped", "dog", "car"]);
   } else {
-    type = pick(["cone", "scooter", "car", "ped", "dog", "car"]);
+    // cars & dogs rare even late
+    type = pick(["cone", "cone", "scooter", "scooter", "ped", "dog", "car"]);
   }
 
   let x = rand(ROAD_L + 30, ROAD_R - 30);
-  // Early: keep obstacles more to the sides so center is safer
-  if (diff < 0.35) {
+  // Prefer shoulders most of the time so the middle lane stays deliverable
+  const shoulderBias = diff < 0.35 ? 0.92 : 0.7;
+  if (Math.random() < shoulderBias) {
     x = Math.random() < 0.5
-      ? rand(ROAD_L + 28, ROAD_L + 70)
-      : rand(ROAD_R - 70, ROAD_R - 28);
-  } else if (Math.abs(x - G.carX) < 36 && Math.random() < 0.55) {
-    x = G.carX < ROAD_CX ? rand(ROAD_CX + 10, ROAD_R - 30) : rand(ROAD_L + 30, ROAD_CX - 10);
+      ? rand(ROAD_L + 26, ROAD_L + 58)
+      : rand(ROAD_R - 58, ROAD_R - 26);
+  } else if (Math.abs(x - G.carX) < 48 && Math.random() < 0.7) {
+    x = G.carX < ROAD_CX ? rand(ROAD_CX + 20, ROAD_R - 30) : rand(ROAD_L + 30, ROAD_CX - 20);
   }
 
-  const o = { type, x, y: -60, w: 28, h: 28, vx: 0, dead: false, hit: false };
+  const o = { type, x, y: -70, w: 28, h: 28, vx: 0, dead: false, hit: false };
   if (type === "cone") { o.w = 18; o.h = 22; }
-  if (type === "scooter") { o.w = 16; o.h = 36; o.vx = pick([-18, 18]) * (0.6 + diff); }
+  if (type === "scooter") { o.w = 16; o.h = 36; o.vx = pick([-12, 12]) * (0.5 + diff * 0.5); }
   if (type === "car") {
     o.w = 44; o.h = 72;
-    o.x = clamp(o.x, ROAD_L + 32, ROAD_R - 32);
-    o.color = pick(["#E53935", "#1E88E5", "#43A047", "#FB8C00", "#5E35B1", "#37474F", "#ECEFF1"]);
-    o.vy = rand(25, 55 + diff * 40);
+    o.x = clamp(o.x, ROAD_L + 34, ROAD_R - 34);
+    // park-ish on a shoulder so player can slip by
+    if (Math.random() < 0.65) {
+      o.x = Math.random() < 0.5 ? ROAD_L + 38 : ROAD_R - 38;
+      o.vy = rand(10, 28);
+    } else {
+      o.vy = rand(18, 40 + diff * 25);
+    }
+    o.color = pick(["#E53935", "#1E88E5", "#43A047", "#FB8C00", "#5E35B1", "#37474F", "#ECEFF1", "#FAFAFA"]);
   }
-  if (type === "ped") { o.w = 18; o.h = 30; o.vx = pick([-22, 22]) * (0.7 + diff * 0.5); }
-  if (type === "dog") { o.w = 26; o.h = 16; o.vx = pick([-35, 35]) * (0.7 + diff * 0.4); }
+  if (type === "ped") { o.w = 18; o.h = 30; o.vx = pick([-14, 14]) * (0.5 + diff * 0.4); }
+  if (type === "dog") { o.w = 26; o.h = 16; o.vx = pick([-22, 22]) * (0.5 + diff * 0.35); }
   G.obstacles.push(o);
 }
 
@@ -596,10 +621,10 @@ function rectsOverlap(a, b) {
 function damagePlayer(amt, reason) {
   if (G.invuln > 0 || G.fsd > 0) return false;
   // Early route: softer damage
-  const scaled = amt * lerp(0.55, 1, difficulty());
+  const scaled = amt * lerp(0.4, 0.85, difficulty() / MAX_DIFF);
   G.damage = clamp(G.damage + scaled, 0, MAX_DAMAGE);
-  G.invuln = lerp(1.4, 1.0, difficulty());
-  G.shake = 8;
+  G.invuln = lerp(1.6, 1.15, difficulty() / MAX_DIFF);
+  G.shake = 7;
   G.combo = 0;
   if (reason) spawnMessage(reason, 2);
   if (G.damage >= MAX_DAMAGE) endRoute(true);
@@ -672,10 +697,10 @@ function update(dt) {
     }
   }
 
-  // Speed: slow start → moderate mid → spicy late
+  // Speed: calm cruise → moderate late (not frantic)
   const diff = difficulty();
-  G.baseSpeed = lerp(100, 195, easeOut(diff));
-  G.speed = G.baseSpeed * (G.fsd > 0 ? 1.08 : 1);
+  G.baseSpeed = lerp(92, 155, easeOut(diff / MAX_DIFF));
+  G.speed = G.baseSpeed * (G.fsd > 0 ? 1.05 : 1);
 
   const scrollAmt = G.speed * dt;
   G.scroll += scrollAmt;
@@ -721,22 +746,23 @@ function update(dt) {
     }
   }
 
-  // Houses — more spacing early
+  // Houses — roomy spacing so throws stay readable
   G.nextHouseDist -= scrollAmt;
   if (G.nextHouseDist <= 0) {
     spawnHouse(-90);
-    G.nextHouseDist = lerp(195, 135, diff);
+    G.nextHouseDist = lerp(210, 155, diff / MAX_DIFF);
   }
 
-  // Obstacles — long calm start
+  // Obstacles — sparse overall (was far too dense)
   G.spawnT -= dt;
   if (G.spawnT <= 0) {
-    if (diff > 0.08) spawnObstacle();
-    G.spawnT = lerp(2.4, 0.55, easeOut(diff));
+    if (e > 6) spawnObstacle();
+    // ~4.8s early → ~2.0s late between attempts (many attempts still skip)
+    G.spawnT = lerp(4.8, 2.0, easeOut(diff / MAX_DIFF));
   }
 
-  // Gates only after easy window
-  if (e > EASY_SECS + 8) {
+  // Gates only well after first FSD window
+  if (e > EASY_SECS + 12) {
     G.nextGateIn -= dt;
     if (G.nextGateIn <= 0 && !G.gateActive) startGate();
   }
@@ -941,143 +967,233 @@ function draw() {
 }
 
 function drawSky() {
-  const g = ctx.createLinearGradient(0, 0, 0, H * 0.42);
-  g.addColorStop(0, "#4A90D9");
-  g.addColorStop(0.45, "#7EC8E8");
-  g.addColorStop(1, "#B8DFF0");
+  // Florida midday sky — deeper blue aloft, hazy near horizon
+  const g = ctx.createLinearGradient(0, 0, 0, H * 0.5);
+  g.addColorStop(0, "#3B7DD6");
+  g.addColorStop(0.35, "#6BB3E0");
+  g.addColorStop(0.7, "#A8D8F0");
+  g.addColorStop(1, "#D4EBF5");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
-  // sun + glow
-  const sx = W - 52, sy = 48;
-  const sg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 50);
-  sg.addColorStop(0, "rgba(255,245,157,0.9)");
-  sg.addColorStop(0.4, "rgba(255,224,130,0.45)");
-  sg.addColorStop(1, "rgba(255,200,100,0)");
+  // heat haze band near horizon
+  const haze = ctx.createLinearGradient(0, H * 0.28, 0, H * 0.5);
+  haze.addColorStop(0, "rgba(255,240,200,0)");
+  haze.addColorStop(0.6, "rgba(255,230,180,0.12)");
+  haze.addColorStop(1, "rgba(255,220,160,0.08)");
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, H * 0.28, W, H * 0.22);
+
+  // sun + atmospheric bloom
+  const sx = W - 48, sy = 44;
+  const sg = ctx.createRadialGradient(sx, sy, 2, sx, sy, 70);
+  sg.addColorStop(0, "rgba(255,252,220,1)");
+  sg.addColorStop(0.15, "rgba(255,240,150,0.85)");
+  sg.addColorStop(0.4, "rgba(255,210,100,0.28)");
+  sg.addColorStop(1, "rgba(255,180,80,0)");
   ctx.fillStyle = sg;
   ctx.beginPath();
-  ctx.arc(sx, sy, 50, 0, Math.PI * 2);
+  ctx.arc(sx, sy, 70, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#FFF59D";
+  ctx.fillStyle = "#FFFDE7";
   ctx.beginPath();
-  ctx.arc(sx, sy, 20, 0, Math.PI * 2);
+  ctx.arc(sx, sy, 18, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = "#FFE082";
   ctx.beginPath();
-  ctx.arc(sx, sy, 14, 0, Math.PI * 2);
+  ctx.arc(sx, sy, 12, 0, Math.PI * 2);
   ctx.fill();
 
-  for (const c of G.clouds) drawCloud(c.x, c.y, c.w, 0.75 + c.layer * 0.2);
+  // far distant treeline silhouette (Florida suburb horizon)
+  ctx.fillStyle = "rgba(70,110,50,0.18)";
+  ctx.beginPath();
+  ctx.moveTo(0, H * 0.38);
+  for (let i = 0; i <= 12; i++) {
+    const tx = (i / 12) * W;
+    const th = 10 + Math.sin(i * 1.7 + G.scroll * 0.002) * 6 + (i % 3) * 4;
+    ctx.lineTo(tx, H * 0.38 - th);
+  }
+  ctx.lineTo(W, H * 0.4);
+  ctx.lineTo(0, H * 0.4);
+  ctx.fill();
+
+  for (const c of G.clouds) drawCloud(c.x, c.y, c.w, 0.7 + c.layer * 0.25);
   for (const b of G.birds) drawBird(b);
 }
 
 function drawCloud(x, y, w, a) {
+  // soft multi-lobe cumulus with slight underside shade
   ctx.fillStyle = `rgba(255,255,255,${a})`;
   ctx.beginPath();
-  ctx.ellipse(x, y, w * 0.5, w * 0.2, 0, 0, Math.PI * 2);
-  ctx.ellipse(x - w * 0.28, y + 3, w * 0.28, w * 0.15, 0, 0, Math.PI * 2);
-  ctx.ellipse(x + w * 0.25, y + 2, w * 0.32, w * 0.17, 0, 0, Math.PI * 2);
-  ctx.ellipse(x + w * 0.05, y - 8, w * 0.22, w * 0.14, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y, w * 0.52, w * 0.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(x - w * 0.3, y + 4, w * 0.3, w * 0.16, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.28, y + 3, w * 0.34, w * 0.18, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.02, y - 10, w * 0.24, w * 0.16, 0, 0, Math.PI * 2);
+  ctx.ellipse(x - w * 0.12, y - 6, w * 0.2, w * 0.12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `rgba(200,210,220,${a * 0.25})`;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 6, w * 0.4, w * 0.1, 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
 function drawBird(b) {
-  const flap = Math.sin(b.flap) * 4;
-  ctx.strokeStyle = "rgba(40,40,50,0.45)";
-  ctx.lineWidth = 1.5;
+  const flap = Math.sin(b.flap) * 5;
+  ctx.strokeStyle = "rgba(45,50,60,0.5)";
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(b.x - 6, b.y + flap);
-  ctx.quadraticCurveTo(b.x, b.y - 3, b.x + 6, b.y + flap);
+  ctx.moveTo(b.x - 7, b.y + flap);
+  ctx.quadraticCurveTo(b.x - 1, b.y - 4, b.x, b.y);
+  ctx.quadraticCurveTo(b.x + 1, b.y - 4, b.x + 7, b.y + flap);
   ctx.stroke();
+  ctx.lineCap = "butt";
 }
 
 function drawGround() {
-  // deep Florida grass
+  // Florida lawn — warmer green near curb, deeper in yards
   const lg = ctx.createLinearGradient(0, 0, ROAD_L, 0);
-  lg.addColorStop(0, "#5B8C2A");
-  lg.addColorStop(1, "#7CB342");
+  lg.addColorStop(0, "#4E7A28");
+  lg.addColorStop(0.55, "#6BA335");
+  lg.addColorStop(1, "#8BC34A");
   ctx.fillStyle = lg;
   ctx.fillRect(0, 0, ROAD_L, H);
   const rg = ctx.createLinearGradient(ROAD_R, 0, W, 0);
-  rg.addColorStop(0, "#7CB342");
-  rg.addColorStop(1, "#5B8C2A");
+  rg.addColorStop(0, "#8BC34A");
+  rg.addColorStop(0.45, "#6BA335");
+  rg.addColorStop(1, "#4E7A28");
   ctx.fillStyle = rg;
   ctx.fillRect(ROAD_R, 0, W - ROAD_R, H);
 
-  // grass texture stripes (scroll)
-  ctx.fillStyle = "rgba(255,255,255,0.04)";
-  for (let i = 0; i < 14; i++) {
-    const yy = ((i * 55 + G.scroll * 0.25) % (H + 55)) - 30;
-    ctx.fillRect(0, yy, ROAD_L - 8, 18);
-    ctx.fillRect(ROAD_R + 8, yy, W - ROAD_R - 8, 18);
+  // mower stripes + lawn variation
+  for (let i = 0; i < 18; i++) {
+    const yy = ((i * 48 + G.scroll * 0.22) % (H + 48)) - 24;
+    ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.03)";
+    ctx.fillRect(0, yy, ROAD_L - 10, 22);
+    ctx.fillRect(ROAD_R + 10, yy, W - ROAD_R - 10, 22);
   }
 
-  // sidewalks
-  ctx.fillStyle = "#C5C0B5";
-  ctx.fillRect(ROAD_L - 16, 0, 12, H);
-  ctx.fillRect(ROAD_R + 4, 0, 12, H);
-  ctx.strokeStyle = "rgba(0,0,0,0.08)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 20; i++) {
-    const yy = ((i * 48 - G.scroll * 0.9) % (H + 48));
+  // sandy Florida soil patches
+  ctx.fillStyle = "rgba(210,180,120,0.18)";
+  for (let i = 0; i < 5; i++) {
+    const yy = ((i * 160 + G.scroll * 0.3) % (H + 160)) - 40;
     ctx.beginPath();
-    ctx.moveTo(ROAD_L - 16, yy); ctx.lineTo(ROAD_L - 4, yy);
-    ctx.moveTo(ROAD_R + 4, yy); ctx.lineTo(ROAD_R + 16, yy);
-    ctx.stroke();
-  }
-
-  // sandy curb
-  ctx.fillStyle = "#D2B48C";
-  ctx.fillRect(ROAD_L - 5, 0, 5, H);
-  ctx.fillRect(ROAD_R, 0, 5, H);
-}
-
-function drawRoad() {
-  // asphalt base
-  const ag = ctx.createLinearGradient(ROAD_L, 0, ROAD_R, 0);
-  ag.addColorStop(0, "#4A5C66");
-  ag.addColorStop(0.5, "#546E7A");
-  ag.addColorStop(1, "#4A5C66");
-  ctx.fillStyle = ag;
-  ctx.fillRect(ROAD_L, 0, ROAD_W, H);
-
-  // worn center + subtle patches
-  ctx.fillStyle = "rgba(0,0,0,0.06)";
-  for (let i = 0; i < 6; i++) {
-    const yy = ((i * 130 + G.scroll * 0.4) % (H + 130)) - 40;
-    ctx.beginPath();
-    ctx.ellipse(ROAD_CX + Math.sin(i * 2) * 20, yy, 40, 18, 0, 0, Math.PI * 2);
+    ctx.ellipse(20 + (i % 3) * 12, yy, 18, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(W - 24 - (i % 2) * 10, yy + 40, 16, 7, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // lane dashes
-  ctx.strokeStyle = "#F5E96A";
+  // concrete sidewalks with expansion joints
+  ctx.fillStyle = "#C8C2B6";
+  ctx.fillRect(ROAD_L - 17, 0, 13, H);
+  ctx.fillRect(ROAD_R + 4, 0, 13, H);
+  // sidewalk edge shadow
+  ctx.fillStyle = "rgba(0,0,0,0.08)";
+  ctx.fillRect(ROAD_L - 5, 0, 2, H);
+  ctx.fillRect(ROAD_R + 4, 0, 2, H);
+  ctx.strokeStyle = "rgba(0,0,0,0.1)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 22; i++) {
+    const yy = ((i * 46 - G.scroll * 0.92) % (H + 46));
+    ctx.beginPath();
+    ctx.moveTo(ROAD_L - 17, yy); ctx.lineTo(ROAD_L - 4, yy);
+    ctx.moveTo(ROAD_R + 4, yy); ctx.lineTo(ROAD_R + 17, yy);
+    ctx.stroke();
+  }
+
+  // sandy / painted curb
+  const curb = ctx.createLinearGradient(0, 0, 0, 8);
+  ctx.fillStyle = "#D4B896";
+  ctx.fillRect(ROAD_L - 5, 0, 5, H);
+  ctx.fillRect(ROAD_R, 0, 5, H);
+  // curb highlight
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(ROAD_L - 5, 0, 1.5, H);
+  ctx.fillRect(ROAD_R + 3.5, 0, 1.5, H);
+}
+
+function drawRoad() {
+  // sun-bleached Florida asphalt
+  const ag = ctx.createLinearGradient(ROAD_L, 0, ROAD_R, 0);
+  ag.addColorStop(0, "#3E4E56");
+  ag.addColorStop(0.15, "#4A5C64");
+  ag.addColorStop(0.5, "#566B75");
+  ag.addColorStop(0.85, "#4A5C64");
+  ag.addColorStop(1, "#3E4E56");
+  ctx.fillStyle = ag;
+  ctx.fillRect(ROAD_L, 0, ROAD_W, H);
+
+  // asphalt grain / tar seams
+  ctx.strokeStyle = "rgba(0,0,0,0.07)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 10; i++) {
+    const yy = ((i * 95 + G.scroll * 0.5) % (H + 95)) - 30;
+    ctx.beginPath();
+    ctx.moveTo(ROAD_L + 8, yy);
+    ctx.quadraticCurveTo(ROAD_CX, yy + 8 + (i % 3) * 4, ROAD_R - 8, yy - 2);
+    ctx.stroke();
+  }
+
+  // oil stains / wear patches
+  ctx.fillStyle = "rgba(0,0,0,0.07)";
+  for (let i = 0; i < 7; i++) {
+    const yy = ((i * 118 + G.scroll * 0.38) % (H + 118)) - 40;
+    ctx.beginPath();
+    ctx.ellipse(ROAD_CX + Math.sin(i * 2.3) * 28, yy, 36 + (i % 3) * 8, 14, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // faded center lane dashes
+  ctx.strokeStyle = "#E8D96A";
   ctx.lineWidth = 4;
-  ctx.lineCap = "butt";
-  ctx.setLineDash([22, 20]);
+  ctx.globalAlpha = 0.9;
+  ctx.setLineDash([24, 18]);
   ctx.lineDashOffset = -G.roadLines * 0.95;
   ctx.beginPath();
   ctx.moveTo(ROAD_CX, 0);
   ctx.lineTo(ROAD_CX, H);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
 
-  // edge lines
-  ctx.strokeStyle = "#ECEFF1";
-  ctx.lineWidth = 3;
+  // double-feel edge lines (white)
+  ctx.strokeStyle = "#F5F5F5";
+  ctx.lineWidth = 3.5;
   ctx.beginPath();
-  ctx.moveTo(ROAD_L + 4, 0); ctx.lineTo(ROAD_L + 4, H);
-  ctx.moveTo(ROAD_R - 4, 0); ctx.lineTo(ROAD_R - 4, H);
+  ctx.moveTo(ROAD_L + 5, 0); ctx.lineTo(ROAD_L + 5, H);
+  ctx.moveTo(ROAD_R - 5, 0); ctx.lineTo(ROAD_R - 5, H);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(ROAD_L + 9, 0); ctx.lineTo(ROAD_L + 9, H);
+  ctx.moveTo(ROAD_R - 9, 0); ctx.lineTo(ROAD_R - 9, H);
   ctx.stroke();
 
-  // manhole
-  const mhY = ((G.scroll * 0.9) % (H + 200)) - 40;
+  // manhole cover
+  const mhY = ((G.scroll * 0.9) % (H + 280)) - 40;
   ctx.fillStyle = "#455A64";
   ctx.beginPath();
-  ctx.ellipse(ROAD_CX + 48, mhY, 12, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(ROAD_CX + 52, mhY, 13, 9, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "#37474F";
   ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.ellipse(ROAD_CX + 52, mhY, 8, 5, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // occasional cracked asphalt patch
+  const crY = ((G.scroll * 0.7 + 140) % (H + 320)) - 50;
+  ctx.strokeStyle = "rgba(30,30,30,0.2)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(ROAD_CX - 40, crY);
+  ctx.lineTo(ROAD_CX - 28, crY + 18);
+  ctx.lineTo(ROAD_CX - 35, crY + 40);
+  ctx.moveTo(ROAD_CX - 28, crY + 18);
+  ctx.lineTo(ROAD_CX - 12, crY + 22);
   ctx.stroke();
 }
 
@@ -1090,7 +1206,53 @@ function drawProps() {
     if (p.type === "pool") drawPool(p.x, p.y);
     if (p.type === "bush") drawBush(p.x, p.y);
     if (p.type === "sign") drawYardSign(p.x, p.y, p.label);
+    if (p.type === "pole") drawUtilityPole(p.x, p.y);
+    if (p.type === "firehydrant") drawHydrant(p.x, p.y);
   }
+}
+
+function drawUtilityPole(x, y) {
+  ctx.fillStyle = "rgba(0,0,0,0.1)";
+  ctx.beginPath();
+  ctx.ellipse(x + 2, y + 48, 6, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#6D4C41";
+  ctx.fillRect(x - 2.5, y - 20, 5, 70);
+  ctx.fillStyle = "#5D4037";
+  ctx.fillRect(x - 12, y - 18, 24, 3.5);
+  ctx.fillRect(x - 10, y - 8, 20, 2.5);
+  // insulator nubs
+  ctx.fillStyle = "#90A4AE";
+  ctx.fillRect(x - 11, y - 16, 3, 4);
+  ctx.fillRect(x + 8, y - 16, 3, 4);
+  // wire hint
+  ctx.strokeStyle = "rgba(40,40,40,0.25)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x - 12, y - 16);
+  ctx.quadraticCurveTo(x - 40, y + 10, x - 70, y + 30);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + 12, y - 16);
+  ctx.quadraticCurveTo(x + 40, y + 10, x + 70, y + 30);
+  ctx.stroke();
+}
+
+function drawHydrant(x, y) {
+  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  ctx.beginPath();
+  ctx.ellipse(x + 4, y + 12, 7, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#E53935";
+  roundRect(x, y, 8, 12, 2);
+  ctx.fill();
+  ctx.fillStyle = "#C62828";
+  ctx.fillRect(x - 3, y + 3, 14, 4);
+  ctx.beginPath();
+  ctx.arc(x + 4, y, 4, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = "#FFCDD2";
+  ctx.fillRect(x + 2, y + 5, 4, 2);
 }
 
 function drawPalm(x, y, sc) {
@@ -1249,7 +1411,7 @@ function drawHouse(h) {
   roundRect(hx, hy, hw, hh, 3);
   ctx.stroke();
 
-  // roof
+  // roof with shingle bands
   ctx.fillStyle = h.roof;
   ctx.beginPath();
   ctx.moveTo(hx - 6, hy + 10);
@@ -1257,13 +1419,40 @@ function drawHouse(h) {
   ctx.lineTo(hx + hw + 6, hy + 10);
   ctx.closePath();
   ctx.fill();
-  // roof highlight
-  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const t = 0.2 + i * 0.18;
+    const y1 = lerp(hy - 26, hy + 10, t);
+    const half = lerp(0, hw / 2 + 6, t);
+    ctx.beginPath();
+    ctx.moveTo(hx + hw / 2 - half, y1);
+    ctx.lineTo(hx + hw / 2 + half, y1);
+    ctx.stroke();
+  }
+  // roof highlight edge
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(hx + 4, hy + 6);
   ctx.lineTo(hx + hw / 2, hy - 20);
   ctx.stroke();
+  // gutter
+  ctx.strokeStyle = h.trim;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(hx - 4, hy + 10);
+  ctx.lineTo(hx + hw + 4, hy + 10);
+  ctx.stroke();
+  // wall AC unit (Florida classic)
+  if (h.side === 0 || Math.random() < 0) {
+    const acx = facingRight ? hx + 4 : hx + hw - 16;
+    ctx.fillStyle = "#90A4AE";
+    roundRect(acx, hy + hh - 22, 14, 10, 1);
+    ctx.fill();
+    ctx.fillStyle = "#78909C";
+    for (let i = 0; i < 3; i++) ctx.fillRect(acx + 2, hy + hh - 20 + i * 3, 10, 1.5);
+  }
 
   // garage
   if (h.garage) {
@@ -1662,130 +1851,210 @@ function drawTesla() {
   if (G.fsd > 0) {
     const pulse = 0.5 + Math.sin(now() / 120) * 0.5;
     ctx.shadowColor = "#00B0FF";
-    ctx.shadowBlur = 20 + pulse * 10;
-    ctx.fillStyle = `rgba(0,176,255,${0.12 + pulse * 0.1})`;
+    ctx.shadowBlur = 22 + pulse * 12;
+    ctx.fillStyle = `rgba(0,176,255,${0.14 + pulse * 0.12})`;
     ctx.beginPath();
-    ctx.ellipse(0, 4, 38, 54, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 4, 40, 56, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
   }
 
-  // ground shadow
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  // soft ground contact shadow
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
   ctx.beginPath();
-  ctx.ellipse(1, 44, 26, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(2, 46, 28, 9, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // wheels + arches
   const flash = G.invuln > 0 && Math.floor(now() / 70) % 2;
-  const body = flash ? "rgba(245,245,245,0.45)" : "#F5F5F5";
 
-  // tire rubber
-  ctx.fillStyle = "#1A1A1A";
-  roundRect(-26, -30, 11, 20, 3);
-  roundRect(15, -30, 11, 20, 3);
-  roundRect(-26, 16, 11, 20, 3);
-  roundRect(15, 16, 11, 20, 3);
-  // rims
-  ctx.fillStyle = "#B0BEC5";
-  for (const [wx, wy] of [[-20.5, -20], [20.5, -20], [-20.5, 26], [20.5, 26]]) {
+  // tires (wider, more Model 3 stance)
+  ctx.fillStyle = "#111";
+  roundRect(-27, -32, 12, 22, 3.5);
+  roundRect(15, -32, 12, 22, 3.5);
+  roundRect(-27, 14, 12, 22, 3.5);
+  roundRect(15, 14, 12, 22, 3.5);
+  // aero wheel covers / multi-spoke rims
+  for (const [wx, wy] of [[-21, -21], [21, -21], [-21, 25], [21, 25]]) {
+    ctx.fillStyle = "#CFD8DC";
     ctx.beginPath();
-    ctx.arc(wx, wy, 4.5, 0, Math.PI * 2);
+    ctx.arc(wx, wy, 5.2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#78909C";
+    ctx.fillStyle = "#90A4AE";
     ctx.beginPath();
-    ctx.arc(wx, wy, 2, 0, Math.PI * 2);
+    ctx.arc(wx, wy, 3.2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#B0BEC5";
+    ctx.fillStyle = "#546E7A";
+    ctx.beginPath();
+    ctx.arc(wx, wy, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    // spoke ticks
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1;
+    for (let s = 0; s < 5; s++) {
+      const a = (s / 5) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(wx + Math.cos(a) * 1.6, wy + Math.sin(a) * 1.6);
+      ctx.lineTo(wx + Math.cos(a) * 4.5, wy + Math.sin(a) * 4.5);
+      ctx.stroke();
+    }
   }
 
-  // main body
-  ctx.fillStyle = body;
-  roundRect(-23, -44, 46, 88, 13);
-  ctx.fill();
-  // side sculpt
-  ctx.fillStyle = "rgba(0,0,0,0.05)";
-  roundRect(-23, -44, 9, 88, 13);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  roundRect(8, -40, 10, 70, 6);
+  // body shell — pearl white with curvature shading
+  const bodyGrad = ctx.createLinearGradient(-24, -46, 24, 46);
+  if (flash) {
+    ctx.fillStyle = "rgba(250,250,250,0.4)";
+  } else {
+    bodyGrad.addColorStop(0, "#E8E8E8");
+    bodyGrad.addColorStop(0.35, "#FAFAFA");
+    bodyGrad.addColorStop(0.65, "#F0F0F0");
+    bodyGrad.addColorStop(1, "#DCDCDC");
+    ctx.fillStyle = bodyGrad;
+  }
+  roundRect(-24, -46, 48, 92, 14);
   ctx.fill();
 
-  // dark glass canopy (Model 3 continuous roof)
-  const glass = ctx.createLinearGradient(-16, -30, 16, 20);
-  glass.addColorStop(0, "#1A237E");
-  glass.addColorStop(0.35, "#263238");
-  glass.addColorStop(0.7, "#37474F");
-  glass.addColorStop(1, "#455A64");
+  // door character line
+  ctx.strokeStyle = "rgba(0,0,0,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-22, -8);
+  ctx.lineTo(22, -8);
+  ctx.moveTo(-22, 14);
+  ctx.lineTo(22, 14);
+  ctx.stroke();
+
+  // side skirts / rocker
+  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  roundRect(-24, 30, 48, 6, 2);
+  ctx.fill();
+
+  // glass canopy (flush glasshouse look)
+  const glass = ctx.createLinearGradient(-18, -32, 18, 18);
+  glass.addColorStop(0, "#0D1B2A");
+  glass.addColorStop(0.3, "#1B2838");
+  glass.addColorStop(0.55, "#2C3E50");
+  glass.addColorStop(0.8, "#3D5A73");
+  glass.addColorStop(1, "#4A6741");
   ctx.fillStyle = glass;
-  roundRect(-17, -30, 34, 46, 9);
+  roundRect(-17.5, -32, 35, 48, 10);
   ctx.fill();
-  // canopy reflection
-  ctx.fillStyle = "rgba(144,202,249,0.22)";
-  roundRect(-14, -27, 11, 38, 6);
+  // A-pillar edges
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1.5;
+  roundRect(-17.5, -32, 35, 48, 10);
+  ctx.stroke();
+  // sky reflection streak
+  ctx.fillStyle = "rgba(160,210,255,0.28)";
+  roundRect(-14, -28, 10, 36, 5);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  roundRect(2, -26, 10, 20, 4);
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  roundRect(4, -28, 8, 18, 3);
   ctx.fill();
 
-  // rear deck
-  ctx.fillStyle = "#EEEEEE";
-  roundRect(-15, 16, 30, 22, 5);
+  // rear trunk deck
+  const deck = ctx.createLinearGradient(0, 16, 0, 40);
+  deck.addColorStop(0, "#F5F5F5");
+  deck.addColorStop(1, "#E0E0E0");
+  ctx.fillStyle = deck;
+  roundRect(-16, 16, 32, 24, 5);
   ctx.fill();
 
-  // front continuous light bar
+  // front hood panel seam
+  ctx.strokeStyle = "rgba(0,0,0,0.06)";
+  ctx.beginPath();
+  ctx.moveTo(-14, -38);
+  ctx.lineTo(14, -38);
+  ctx.stroke();
+
+  // front continuous light bar (Model 3 / Highland vibe)
   if (G.fsd > 0) {
     ctx.fillStyle = "#00E5FF";
     ctx.shadowColor = "#00E5FF";
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 14;
   } else {
-    const lg = ctx.createLinearGradient(-17, 0, 17, 0);
-    lg.addColorStop(0, "#E3F2FD");
-    lg.addColorStop(0.5, "#FFFFFF");
-    lg.addColorStop(1, "#E3F2FD");
+    const lg = ctx.createLinearGradient(-18, 0, 18, 0);
+    lg.addColorStop(0, "#BBDEFB");
+    lg.addColorStop(0.2, "#FFFFFF");
+    lg.addColorStop(0.5, "#E3F2FD");
+    lg.addColorStop(0.8, "#FFFFFF");
+    lg.addColorStop(1, "#BBDEFB");
     ctx.fillStyle = lg;
   }
-  roundRect(-17, -42, 34, 5, 2);
+  roundRect(-18, -44, 36, 5.5, 2.5);
   ctx.fill();
   ctx.shadowBlur = 0;
+  // amber marker hints at corners
+  if (G.fsd <= 0) {
+    ctx.fillStyle = "#FFB74D";
+    ctx.fillRect(-18, -43, 4, 3.5);
+    ctx.fillRect(14, -43, 4, 3.5);
+  }
 
-  // rear red light bar (Model 3 signature)
-  const rl = ctx.createLinearGradient(-15, 0, 15, 0);
-  rl.addColorStop(0, "#C62828");
-  rl.addColorStop(0.5, "#FF1744");
-  rl.addColorStop(1, "#C62828");
+  // rear continuous red light bar
+  const rl = ctx.createLinearGradient(-16, 0, 16, 0);
+  rl.addColorStop(0, "#B71C1C");
+  rl.addColorStop(0.35, "#FF1744");
+  rl.addColorStop(0.65, "#FF1744");
+  rl.addColorStop(1, "#B71C1C");
   ctx.fillStyle = rl;
-  roundRect(-15, 36, 30, 4.5, 2);
+  roundRect(-16, 38, 32, 5, 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fillRect(-4, 39, 8, 1.5);
+
+  // side mirrors (body-colored + black glass)
+  ctx.fillStyle = "#F5F5F5";
+  roundRect(-32, -12, 10, 7, 2.5);
+  roundRect(22, -12, 10, 7, 2.5);
+  ctx.fillStyle = "#263238";
+  roundRect(-30, -10, 6, 3.5, 1);
+  roundRect(24, -10, 6, 3.5, 1);
+  // mirror stalks
+  ctx.strokeStyle = "#BDBDBD";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-22, -8); ctx.lineTo(-24, -8);
+  ctx.moveTo(22, -8); ctx.lineTo(24, -8);
+  ctx.stroke();
+
+  // camera / badge cluster on front
+  ctx.fillStyle = "#B0BEC5";
+  ctx.beginPath();
+  ctx.arc(0, -40, 2, 0, Math.PI * 2);
   ctx.fill();
 
-  // side mirrors
-  ctx.fillStyle = "#FAFAFA";
-  roundRect(-30, -10, 9, 6, 2);
-  roundRect(21, -10, 9, 6, 2);
-  ctx.fillStyle = "#37474F";
-  ctx.fillRect(-28, -8.5, 5, 3);
-  ctx.fillRect(23, -8.5, 5, 3);
-
-  // Tesla T logo on hood
-  ctx.fillStyle = "#90A4AE";
-  ctx.font = "bold 12px system-ui";
+  // Tesla wordmark-style T
+  ctx.fillStyle = "#78909C";
+  ctx.font = "bold 13px system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("T", 0, -36);
   ctx.textBaseline = "alphabetic";
 
-  // Amazon Flex door badge
+  // Amazon Flex magnetic sign
   ctx.fillStyle = "#232F3E";
-  roundRect(-13, 22, 26, 11, 2);
+  roundRect(-14, 22, 28, 12, 2.5);
   ctx.fill();
+  ctx.strokeStyle = "#FF9900";
+  ctx.lineWidth = 1;
+  roundRect(-14, 22, 28, 12, 2.5);
+  ctx.stroke();
   ctx.fillStyle = "#FF9900";
   ctx.font = "bold 8px system-ui";
-  ctx.fillText("FLEX", 0, 30);
+  ctx.fillText("FLEX", 0, 30.5);
 
-  // front plate highlight
-  ctx.strokeStyle = "rgba(0,0,0,0.08)";
+  // subtle body outline
+  ctx.strokeStyle = "rgba(0,0,0,0.1)";
+  ctx.lineWidth = 1.2;
+  roundRect(-24, -46, 48, 92, 14);
+  ctx.stroke();
+
+  // windshield wiper parking hint
+  ctx.strokeStyle = "rgba(0,0,0,0.2)";
   ctx.lineWidth = 1;
-  roundRect(-23, -44, 46, 88, 13);
+  ctx.beginPath();
+  ctx.moveTo(-6, 12);
+  ctx.quadraticCurveTo(0, 8, 8, 12);
   ctx.stroke();
 
   ctx.restore();
@@ -1794,7 +2063,7 @@ function drawTesla() {
     ctx.fillStyle = "rgba(0,176,255,0.95)";
     ctx.font = "bold 12px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("FSD " + G.fsd.toFixed(1) + "s", G.carX, CAR_Y + 58);
+    ctx.fillText("FSD " + G.fsd.toFixed(1) + "s", G.carX, CAR_Y + 60);
   }
 }
 
@@ -1981,9 +2250,9 @@ function drawTitle() {
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.font = "13px system-ui";
   ctx.fillText("Florida suburbs · 90-second routes", W / 2, 260);
-  ctx.fillText("Gentle start · Soft aim assist · FSD boosts", W / 2, 280);
+  ctx.fillText("Calm start · Soft aim assist · FSD every 3 drops", W / 2, 280);
 
-  const chips = ["📦 Glowing porches", "⚡ FSD every 5 drops", "🚪 Gate codes later", "🍪 Snack bonuses"];
+  const chips = ["📦 Glowing porches", "⚡ FSD every 3 drops", "🚪 Gate codes later", "🍪 Snack bonuses"];
   let cy = 312;
   ctx.font = "12px system-ui";
   for (const c of chips) {
@@ -2020,7 +2289,7 @@ function drawHowTo() {
     ["THROW", "Press on the top half to aim (ghost arc). Release to throw. Space auto-aims nearest porch."],
     ["ASSIST", "Early route: soft magnet + bigger porches. Aim a little short of the glow."],
     ["RAMP", "First ~25s is an Easy Stretch — slower, calmer, then traffic ramps up."],
-    ["FSD", "Every 5 deliveries: Autopilot ~8s — car dodges so you can focus on throws."],
+    ["FSD", "Every 3 deliveries: Autopilot ~10s — car dodges so you can focus on throws."],
     ["GATES", "Later in the route, pick the correct 4-digit gate code."],
     ["BONUS", "Snacks, pirate beanings. Avoid pools, dogs, and Ring cams."],
   ];
