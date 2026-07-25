@@ -125,9 +125,9 @@ function loadMeta() {
   try {
     return Object.assign({
       highScore: 0, bestStreak: 0, games: 0, totalDrops: 0,
-      achievements: {},
+      achievements: {}, station: "house",
     }, JSON.parse(localStorage.getItem(LS_KEY) || "{}"));
-  } catch { return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {} }; }
+  } catch { return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "house" }; }
 }
 function saveMeta(m) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(m)); } catch {}
@@ -145,15 +145,39 @@ const ACHIEVEMENTS = {
 };
 
 // ═══════════════════════════════════════════════════════════
-// AUDIO (Web Audio procedural)
+// AUDIO (Web Audio — SFX + procedural rave radio)
 // ═══════════════════════════════════════════════════════════
-let audioCtx = null, muted = false, bgNode = null;
+let audioCtx = null, muted = false;
+let sfxBus = null, musicBus = null;
+
+/** Radio stations — procedural EDM, no external files */
+const RADIO = {
+  house:  { id: "house",  name: "House",  bpm: 124, tag: "4/4 Flex cruise",    color: "#FF6D00" },
+  dnb:    { id: "dnb",    name: "DnB",    bpm: 174, tag: "Neuro package rush", color: "#00E5FF" },
+  riddim: { id: "riddim", name: "Riddim", bpm: 140, tag: "Half-time HOA bass", color: "#E040FB" },
+};
+let station = (META.station && RADIO[META.station]) ? META.station : "house";
+
+// Music scheduler state
+const music = {
+  running: false,
+  nextT: 0,
+  step: 0,
+  timer: null,
+  master: null,
+};
 
 function ensureAudio() {
   if (muted) return null;
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
-  if (!audioCtx) audioCtx = new AC();
+  if (!audioCtx) {
+    audioCtx = new AC();
+    sfxBus = audioCtx.createGain(); sfxBus.gain.value = 0.9;
+    musicBus = audioCtx.createGain(); musicBus.gain.value = 0.22;
+    sfxBus.connect(audioCtx.destination);
+    musicBus.connect(audioCtx.destination);
+  }
   if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
@@ -168,7 +192,7 @@ function tone({ freq = 440, dur = 0.12, type = "sine", gain = 0.07, slide = 0, d
   g.gain.setValueAtTime(0.0001, t0);
   g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  o.connect(g); g.connect(ac.destination);
+  o.connect(g); g.connect(sfxBus || ac.destination);
   o.start(t0); o.stop(t0 + dur + 0.03);
 }
 
@@ -181,8 +205,179 @@ function noise(dur = 0.08, gain = 0.04, freq = 1200) {
   const src = ac.createBufferSource(); src.buffer = buf;
   const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = freq;
   const g = ac.createGain(); g.gain.value = gain;
-  src.connect(f); f.connect(g); g.connect(ac.destination); src.start();
+  src.connect(f); f.connect(g); g.connect(sfxBus || ac.destination); src.start();
 }
+
+// ── Music synth voices (route through musicBus) ──
+function mKick(t, g = 0.55) {
+  const ac = audioCtx; if (!ac || !musicBus) return;
+  const o = ac.createOscillator(), gn = ac.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  gn.gain.setValueAtTime(g, t);
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+  o.connect(gn); gn.connect(musicBus);
+  o.start(t); o.stop(t + 0.3);
+}
+function mHat(t, open = false, g = 0.06) {
+  const ac = audioCtx; if (!ac || !musicBus) return;
+  const n = (ac.sampleRate * (open ? 0.12 : 0.04)) | 0;
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = "highpass"; f.frequency.value = open ? 7000 : 9000;
+  const gn = ac.createGain();
+  gn.gain.setValueAtTime(g, t);
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + (open ? 0.12 : 0.04));
+  src.connect(f); f.connect(gn); gn.connect(musicBus);
+  src.start(t);
+}
+function mSnare(t, g = 0.2) {
+  const ac = audioCtx; if (!ac || !musicBus) return;
+  const n = (ac.sampleRate * 0.12) | 0;
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1800; f.Q.value = 0.7;
+  const gn = ac.createGain();
+  gn.gain.setValueAtTime(g, t);
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  src.connect(f); f.connect(gn); gn.connect(musicBus);
+  src.start(t);
+  // body
+  const o = ac.createOscillator(), g2 = ac.createGain();
+  o.type = "triangle"; o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.08);
+  g2.gain.setValueAtTime(g * 0.5, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+  o.connect(g2); g2.connect(musicBus); o.start(t); o.stop(t + 0.12);
+}
+function mBass(t, freq, dur = 0.18, g = 0.14, type = "sawtooth") {
+  const ac = audioCtx; if (!ac || !musicBus) return;
+  const o = ac.createOscillator(), f = ac.createBiquadFilter(), gn = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  f.type = "lowpass";
+  f.frequency.setValueAtTime(600, t);
+  f.frequency.exponentialRampToValueAtTime(180, t + dur);
+  gn.gain.setValueAtTime(0.0001, t);
+  gn.gain.exponentialRampToValueAtTime(g, t + 0.01);
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(f); f.connect(gn); gn.connect(musicBus);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function mReese(t, freq, dur = 0.35, g = 0.1) {
+  const ac = audioCtx; if (!ac || !musicBus) return;
+  const o1 = ac.createOscillator(), o2 = ac.createOscillator();
+  const f = ac.createBiquadFilter(), gn = ac.createGain(), lfo = ac.createOscillator(), lfoG = ac.createGain();
+  o1.type = "sawtooth"; o2.type = "sawtooth";
+  o1.frequency.setValueAtTime(freq, t);
+  o2.frequency.setValueAtTime(freq * 1.01, t);
+  f.type = "lowpass"; f.Q.value = 8;
+  f.frequency.setValueAtTime(220, t);
+  lfo.type = "sine"; lfo.frequency.setValueAtTime(station === "riddim" ? 2.2 : 5.5, t);
+  lfoG.gain.value = 160;
+  lfo.connect(lfoG); lfoG.connect(f.frequency);
+  gn.gain.setValueAtTime(0.0001, t);
+  gn.gain.exponentialRampToValueAtTime(g, t + 0.03);
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o1.connect(f); o2.connect(f); f.connect(gn); gn.connect(musicBus);
+  o1.start(t); o2.start(t); lfo.start(t);
+  o1.stop(t + dur + 0.02); o2.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
+}
+function mStab(t, freq, g = 0.05) {
+  const ac = audioCtx; if (!ac || !musicBus) return;
+  const o = ac.createOscillator(), gn = ac.createGain();
+  o.type = "square"; o.frequency.setValueAtTime(freq, t);
+  gn.gain.setValueAtTime(g, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  o.connect(gn); gn.connect(musicBus);
+  o.start(t); o.stop(t + 0.14);
+}
+
+// Chord roots for variety (Hz, roughly F minor / related)
+const BASS_NOTES = [87.31, 92.5, 103.83, 116.54, 130.81]; // F G Ab Bb C
+function noteAt(step) {
+  const bar = Math.floor(step / 16) % 4;
+  return BASS_NOTES[bar % BASS_NOTES.length];
+}
+
+function scheduleStep(step, t) {
+  const st = station;
+  const s = step % 16; // 16th-note grid, 1 bar
+  if (st === "house") {
+    // 4-on-the-floor
+    if (s % 4 === 0) mKick(t, 0.5);
+    if (s % 2 === 1) mHat(t, false, 0.045);
+    if (s === 6 || s === 14) mHat(t, true, 0.05);
+    if (s === 4 || s === 12) mSnare(t, 0.12);
+    if (s % 4 === 0) mBass(t, noteAt(step) / 2, 0.2, 0.12, "sawtooth");
+    if (s === 0 || s === 8) mStab(t, noteAt(step) * 2, 0.035);
+  } else if (st === "dnb") {
+    // Amen-ish / 2-step-ish approximation at 16ths
+    if (s === 0 || s === 10) mKick(t, 0.48);
+    if (s === 4 || s === 12) mSnare(t, 0.22);
+    if (s === 6 || s === 14) mSnare(t, 0.08); // ghost
+    if (s % 2 === 0) mHat(t, false, 0.04);
+    if (s === 3 || s === 11) mHat(t, true, 0.045);
+    if (s === 0 || s === 8) mReese(t, noteAt(step) / 2, 0.28, 0.09);
+    else if (s % 4 === 0) mBass(t, noteAt(step) / 2, 0.12, 0.08, "square");
+  } else {
+    // Riddim — half-time, heavy
+    if (s === 0) mKick(t, 0.58);
+    if (s === 8) mSnare(t, 0.28);
+    if (s === 4 || s === 12) mHat(t, false, 0.03);
+    if (s === 14) mHat(t, true, 0.04);
+    if (s === 0) mReese(t, noteAt(step) / 2, 0.55, 0.12);
+    if (s === 8) mBass(t, noteAt(step) / 2 * 0.75, 0.25, 0.1, "sawtooth");
+  }
+}
+
+function musicSchedulerTick() {
+  if (!music.running || !audioCtx) return;
+  const ac = audioCtx;
+  const bpm = RADIO[station].bpm;
+  const stepDur = (60 / bpm) / 4; // 16th
+  const horizon = 0.12;
+  while (music.nextT < ac.currentTime + horizon) {
+    scheduleStep(music.step, music.nextT);
+    music.nextT += stepDur;
+    music.step++;
+  }
+  music.timer = setTimeout(musicSchedulerTick, 25);
+}
+
+function startRadio() {
+  const ac = ensureAudio();
+  if (!ac || muted) return;
+  stopRadio();
+  music.running = true;
+  music.step = 0;
+  music.nextT = ac.currentTime + 0.05;
+  // gentle fade-in
+  if (musicBus) {
+    musicBus.gain.cancelScheduledValues(ac.currentTime);
+    musicBus.gain.setValueAtTime(0.001, ac.currentTime);
+    musicBus.gain.linearRampToValueAtTime(0.22, ac.currentTime + 0.6);
+  }
+  musicSchedulerTick();
+}
+function stopRadio() {
+  music.running = false;
+  if (music.timer) { clearTimeout(music.timer); music.timer = null; }
+}
+function setStation(id) {
+  if (!RADIO[id]) return;
+  station = id;
+  META.station = id;
+  saveMeta(META);
+  if (music.running && !muted) startRadio(); // restart groove on new station
+  SFX.click();
+}
+
+// Back-compat aliases used elsewhere
+function startBgHum() { startRadio(); }
+function stopBgHum() { stopRadio(); }
 
 const SFX = {
   click() { tone({ freq: 540, dur: 0.05, type: "triangle", gain: 0.04 }); },
@@ -220,22 +415,6 @@ const SFX = {
   },
   weather() { tone({ freq: 300, dur: 0.2, type: "sine", gain: 0.03, slide: 100 }); },
 };
-
-function startBgHum() {
-  const ac = ensureAudio(); if (!ac || bgNode || muted) return;
-  // Soft suburban drone + tick
-  const o = ac.createOscillator();
-  const g = ac.createGain();
-  o.type = "sine"; o.frequency.value = 55;
-  g.gain.value = 0.012;
-  o.connect(g); g.connect(ac.destination); o.start();
-  bgNode = { o, g };
-}
-function stopBgHum() {
-  if (!bgNode) return;
-  try { bgNode.o.stop(); } catch {}
-  bgNode = null;
-}
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -643,8 +822,15 @@ addEventListener("keydown", e => {
   if (["Space","ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.code)) e.preventDefault();
   if (e.code === "KeyM") {
     muted = !muted;
-    if (muted) stopBgHum(); else if (state === ST.PLAY) startBgHum();
-    msg(muted ? "Sound off" : "Sound on", 1.2);
+    if (muted) stopRadio();
+    else if (state === ST.PLAY || state === ST.PAUSE) startRadio();
+    msg(muted ? "Sound off" : "Tuned to " + RADIO[station].name, 1.4);
+  }
+  // Quick station switch: 1 House · 2 DnB · 3 Riddim (not during gate mini-game)
+  if ((state === ST.PLAY || state === ST.PAUSE || state === ST.TITLE) && state !== ST.GATE && !e.repeat) {
+    if (e.code === "Digit1" || e.code === "Numpad1") { setStation("house"); if (state !== ST.TITLE) msg("📻 House", 1.2); }
+    if (e.code === "Digit2" || e.code === "Numpad2") { setStation("dnb"); if (state !== ST.TITLE) msg("📻 DnB", 1.2); }
+    if (e.code === "Digit3" || e.code === "Numpad3") { setStation("riddim"); if (state !== ST.TITLE) msg("📻 Riddim", 1.2); }
   }
   if (e.code === "KeyP" || e.code === "Escape") {
     if (state === ST.PLAY) { state = ST.PAUSE; SFX.click(); }
@@ -678,12 +864,19 @@ function hitUI(x, y) {
   if (state === ST.TITLE && y > H * 0.55) onBtn("play");
 }
 function onBtn(id) {
+  if (id.startsWith("radio_")) {
+    ensureAudio();
+    setStation(id.slice(6));
+    // Preview the station on title/pause
+    if (state === ST.TITLE || state === ST.PAUSE || state === ST.HOWTO) startRadio();
+    return;
+  }
   SFX.click();
   if (id === "play") { state = ST.PLAY; resetGame(); }
   if (id === "howto") state = ST.HOWTO;
-  if (id === "back" || id === "menu") state = ST.TITLE;
+  if (id === "back" || id === "menu") { stopRadio(); state = ST.TITLE; }
   if (id === "again") { state = ST.PLAY; resetGame(); }
-  if (id === "resume") state = ST.PLAY;
+  if (id === "resume") { state = ST.PLAY; if (!muted) startRadio(); }
   if (id === "share") shareScore();
 }
 function hitGate(x, y) {
@@ -1990,7 +2183,9 @@ function drawHUD() {
     ctx.fillText(G.event.replace("_", " ").toUpperCase(), W / 2, 133);
   }
 
-  // high score tiny
+  // radio + high score
+  ctx.fillStyle = RADIO[station].color; ctx.font = "bold 10px system-ui"; ctx.textAlign = "left";
+  ctx.fillText("♪ " + RADIO[station].name, 14, H - 14);
   ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = "10px system-ui"; ctx.textAlign = "right";
   ctx.fillText("BEST " + META.highScore, W - 14, H - 14);
 
@@ -2021,31 +2216,67 @@ function drawHUD() {
 function drawTitle() {
   ctx.fillStyle = "rgba(5,15,30,0.5)"; ctx.fillRect(0, 0, W, H);
   const prev = G.carX; G.carX = W / 2;
-  ctx.save(); ctx.translate(0, -36); drawTesla(); ctx.restore(); G.carX = prev;
+  ctx.save(); ctx.translate(0, -50); drawTesla(); ctx.restore(); G.carX = prev;
 
-  panel(22, 150, W - 44, 380);
+  panel(18, 130, W - 36, 430);
   ctx.textAlign = "center";
-  ctx.fillStyle = "#FF9900"; ctx.font = "bold 13px system-ui";
-  ctx.fillText("AMAZON FLEX EDITION", W / 2, 185);
-  ctx.fillStyle = "#fff"; ctx.font = "bold 30px system-ui";
-  ctx.fillText("Tesla Paperboy", W / 2, 225);
-  ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "13px system-ui";
-  ctx.fillText("Juice-heavy Flex chaos · 90s routes", W / 2, 252);
-  ctx.fillText("High score: " + META.highScore + " · Best streak: " + META.bestStreak, W / 2, 274);
+  ctx.fillStyle = "#FF9900"; ctx.font = "bold 12px system-ui";
+  ctx.fillText("AMAZON FLEX EDITION", W / 2, 158);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 28px system-ui";
+  ctx.fillText("Tesla Paperboy", W / 2, 192);
+  ctx.fillStyle = "rgba(255,255,255,0.65)"; ctx.font = "12px system-ui";
+  ctx.fillText("High " + META.highScore + " · Streak " + META.bestStreak, W / 2, 214);
 
-  const chips = ["❤️ 3 hearts", "⚡ FSD combos", "🌦️ Weather runs", "📦 3 package types"];
-  let cy = 305;
-  for (const c of chips) {
-    ctx.fillStyle = "rgba(255,255,255,0.1)"; roundRect(W / 2 - 105, cy - 12, 210, 24, 8); ctx.fill();
-    ctx.fillStyle = "#E3F2FD"; ctx.font = "12px system-ui"; ctx.fillText(c, W / 2, cy + 4); cy += 28;
-  }
+  // ── Tune-in radio ──
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "bold 13px system-ui";
+  ctx.fillText("Tune in", W / 2, 242);
+  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "11px system-ui";
+  ctx.fillText("What are we flexing to?", W / 2, 258);
 
   UI.buttons = [];
-  btn("play", W / 2 - 110, 430, 220, 50, "Tap to Start", "primary");
-  btn("howto", W / 2 - 110, 492, 220, 44, "How to Play", "secondary");
-  for (const b of UI.buttons) drawBtn(b);
-  ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.font = "11px system-ui";
-  ctx.fillText("A/D steer · Space throw · P pause · M mute", W / 2, H - 26);
+  const stations = ["house", "dnb", "riddim"];
+  const bw = 100, gap = 8;
+  const totalW = stations.length * bw + (stations.length - 1) * gap;
+  let bx = (W - totalW) / 2;
+  const by = 272;
+  for (const id of stations) {
+    const r = RADIO[id];
+    const sel = station === id;
+    // station chip
+    ctx.fillStyle = sel ? r.color : "rgba(255,255,255,0.1)";
+    roundRect(bx, by, bw, 52, 10); ctx.fill();
+    if (sel) {
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+      roundRect(bx, by, bw, 52, 10); ctx.stroke();
+    }
+    ctx.fillStyle = sel ? "#1A1A1A" : "#ECEFF1";
+    ctx.font = "bold 14px system-ui"; ctx.textAlign = "center";
+    ctx.fillText(r.name, bx + bw / 2, by + 22);
+    ctx.font = "9px system-ui";
+    ctx.globalAlpha = sel ? 0.85 : 0.55;
+    ctx.fillText(r.bpm + " BPM", bx + bw / 2, by + 40);
+    ctx.globalAlpha = 1;
+    btn("radio_" + id, bx, by, bw, 52, "", "secondary");
+    bx += bw + gap;
+  }
+  ctx.fillStyle = RADIO[station].color; ctx.font = "11px system-ui"; ctx.textAlign = "center";
+  ctx.fillText("♪ " + RADIO[station].tag, W / 2, 342);
+
+  const chips = ["❤️ 3 hearts", "⚡ FSD", "🌦️ Weather", "📦 Packages"];
+  let cx = 36;
+  for (const c of chips) {
+    ctx.fillStyle = "rgba(255,255,255,0.08)"; roundRect(cx, 358, 78, 22, 8); ctx.fill();
+    ctx.fillStyle = "#B0BEC5"; ctx.font = "10px system-ui";
+    ctx.fillText(c, cx + 39, 373); cx += 82;
+  }
+
+  btn("play", W / 2 - 110, 400, 220, 48, "Tap to Start", "primary");
+  btn("howto", W / 2 - 110, 458, 220, 40, "How to Play", "secondary");
+  for (const b of UI.buttons) {
+    if (b.label) drawBtn(b); // radio chips already drawn
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.font = "10px system-ui"; ctx.textAlign = "center";
+  ctx.fillText("Keys 1/2/3 switch station · M mute · P pause", W / 2, H - 24);
 }
 
 function drawHowTo() {
@@ -2062,6 +2293,7 @@ function drawHowTo() {
     ["HEARTS", "Crashes cost hearts. Soft misses are oops — not instant death."],
     ["FSD", "Every 3 deliveries: Autopilot ~10s. Focus on packages."],
     ["WEATHER", "Golden hour +score. Rain makes throws a bit floatier."],
+    ["RADIO", "Tune House / DnB / Riddim on the title screen (or keys 1–3)."],
   ];
   let y = 90;
   ctx.textAlign = "left";
@@ -2105,15 +2337,33 @@ function drawGate() {
 
 function drawPause() {
   ctx.fillStyle = "rgba(5,15,30,0.65)"; ctx.fillRect(0, 0, W, H);
-  panel(40, 200, W - 80, 260);
+  panel(30, 150, W - 60, 380);
   ctx.fillStyle = "#fff"; ctx.font = "bold 26px system-ui"; ctx.textAlign = "center";
-  ctx.fillText("Paused", W / 2, 250);
+  ctx.fillText("Paused", W / 2, 195);
   ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "13px system-ui";
-  ctx.fillText("Score " + G.score + " · Streak " + G.streak, W / 2, 280);
+  ctx.fillText("Score " + G.score + " · Streak " + G.streak, W / 2, 222);
+
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "bold 12px system-ui";
+  ctx.fillText("Radio", W / 2, 252);
   UI.buttons = [];
-  btn("resume", W / 2 - 100, 310, 200, 46, "Resume", "primary");
-  btn("menu", W / 2 - 100, 370, 200, 42, "Quit to Title", "secondary");
-  for (const b of UI.buttons) drawBtn(b);
+  const stations = ["house", "dnb", "riddim"];
+  const bw = 90, gap = 8;
+  let bx = (W - (stations.length * bw + (stations.length - 1) * gap)) / 2;
+  for (const id of stations) {
+    const r = RADIO[id];
+    const sel = station === id;
+    ctx.fillStyle = sel ? r.color : "rgba(255,255,255,0.12)";
+    roundRect(bx, 265, bw, 40, 8); ctx.fill();
+    ctx.fillStyle = sel ? "#1A1A1A" : "#ECEFF1";
+    ctx.font = "bold 13px system-ui";
+    ctx.fillText(r.name, bx + bw / 2, 290);
+    btn("radio_" + id, bx, 265, bw, 40, "", "secondary");
+    bx += bw + gap;
+  }
+
+  btn("resume", W / 2 - 100, 330, 200, 46, "Resume", "primary");
+  btn("menu", W / 2 - 100, 390, 200, 42, "Quit to Title", "secondary");
+  for (const b of UI.buttons) if (b.label) drawBtn(b);
 }
 
 function drawEnd() {
