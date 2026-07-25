@@ -1008,7 +1008,7 @@ function handleObstacleHit(o) {
       "You almost hit Mr. Fluffernutter!",
     ]));
     burst(o.x, o.y, "#CE93D8", 16);
-    floatTxt(o.x, o.y - 16, "BROOM SMACK!", "#E1BEE7", 15);
+    floatTxt(o.x, o.y - 16, "PHONE SMACK!", "#E1BEE7", 15);
     SFX.lady();
     SFX.hit();
     return;
@@ -1085,15 +1085,15 @@ function spawnAngryLady(h) {
     side: h.side,
     age: 0,
     shake: 0,
-    broom: 0,
+    wave: 0,
     yellT: 0,
   });
 
-  floatTxt(startX, startY - 20, "HEY YOU!!!", "#F8BBD0", 16);
+  floatTxt(startX, startY - 20, "I'M FILMING!!!", "#F8BBD0", 16);
   spawnMessage(pick([
     "😱 Old lady incoming — you were speeding!",
     "Classic Paperboy energy: angry neighbor activated!",
-    "She's got a broom and a bone to pick!",
+    "She's filming you for the HOA group chat!",
   ]), 2.6);
   SFX.lady();
   burst(startX, startY, "#F8BBD0", 10);
@@ -1101,7 +1101,7 @@ function spawnAngryLady(h) {
 
 function updateLady(o, dt, scrollAmt) {
   o.age += dt;
-  o.broom += dt * 14;
+  o.wave += dt * 14;
   o.yellT -= dt;
 
   if (o.phase === "exit") {
@@ -1114,7 +1114,7 @@ function updateLady(o, dt, scrollAmt) {
       o.phase = "chase";
       o.x = o.roadX;
       if (o.yellT <= 0) {
-        floatTxt(o.x, o.y - 24, pick(["SLOW DOWN!", "MY LAWN!", "HOA!!!", "RASCAL!"]), "#FF80AB", 13);
+        floatTxt(o.x, o.y - 24, pick(["I'M FILMING!", "HOA CHAT!", "SLOW DOWN!", "GOT YOUR PLATE!"]), "#FF80AB", 13);
         o.yellT = 1.1;
         SFX.lady();
       }
@@ -1128,7 +1128,7 @@ function updateLady(o, dt, scrollAmt) {
     // Run toward player (down screen) faster than scroll so she can catch up
     o.y += 95 * dt;
     if (o.yellT <= 0 && Math.random() < 0.02) {
-      floatTxt(o.x, o.y - 22, pick(["GET BACK HERE!", "I SAW THAT!", "TESLA HOOLIGAN!"]), "#F48FB1", 12);
+      floatTxt(o.x, o.y - 22, pick(["SENDING TO HOA!", "I SAW THAT!", "TESLA HOOLIGAN!"]), "#F48FB1", 12);
       o.yellT = 1.4;
     }
   }
@@ -2186,12 +2186,12 @@ function drawObstacles() {
   }
 }
 
-/** Classic Paperboy scary old lady — curlers, robe, broom of justice */
+/** Classic Paperboy scary old lady — curlers, robe, cellphone of justice */
 function drawAngryLady(o) {
   const x = o.x, y = o.y;
   const dir = (o.vx || 0) >= 0 ? 1 : -1;
-  const run = Math.sin(o.broom) * 4;
-  const broomA = Math.sin(o.broom * 1.3) * 0.55;
+  const run = Math.sin(o.wave || 0) * 4;
+  const phoneA = Math.sin((o.wave || 0) * 1.3) * 0.4;
 
   ctx.save();
   ctx.translate(x, y);
@@ -2232,29 +2232,36 @@ function drawAngryLady(o) {
   ctx.fillStyle = "#6A1B9A";
   ctx.fillRect(-11, 2, 22, 3);
 
-  // arms
+  // free arm (shaking fist energy)
   ctx.fillStyle = "#FFCC80";
   ctx.fillRect(-13, -2, 5, 10);
-  ctx.fillRect(8, -4 + run, 5, 10);
 
-  // broom (weapon)
+  // arm holding phone up (filming / smacking)
   ctx.save();
-  ctx.translate(12 * dir, -2);
-  ctx.rotate(broomA * dir);
-  ctx.strokeStyle = "#6D4C41";
-  ctx.lineWidth = 2.5;
+  ctx.translate(9, -2 + run * 0.2);
+  ctx.rotate(phoneA * dir - 0.35 * dir);
+  ctx.fillStyle = "#FFCC80";
+  roundRect(-2, -2, 5, 11, 2);
+  ctx.fill();
+  // smartphone
+  ctx.fillStyle = "#212121";
+  roundRect(-4, -16, 10, 16, 2.5);
+  ctx.fill();
+  // screen glow (she's recording)
+  ctx.fillStyle = "#81D4FA";
+  roundRect(-2.5, -14, 7, 11, 1.2);
+  ctx.fill();
+  // camera flash blink while chasing
+  if (o.phase === "chase" && Math.sin(now() / 90) > 0.4) {
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.beginPath();
+    ctx.arc(1, -13, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // home button / notch
+  ctx.fillStyle = "#424242";
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, -28);
-  ctx.stroke();
-  // bristles
-  ctx.fillStyle = "#A1887F";
-  ctx.beginPath();
-  ctx.moveTo(-7, -28);
-  ctx.lineTo(7, -28);
-  ctx.lineTo(5, -18);
-  ctx.lineTo(-5, -18);
-  ctx.closePath();
+  ctx.arc(1, -1.5, 1.2, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
@@ -2312,12 +2319,12 @@ function drawAngryLady(o) {
   // yell bubble occasionally
   if (o.yellT > 0.7) {
     ctx.fillStyle = "rgba(255,255,255,0.92)";
-    roundRect(-18, -48, 36, 14, 6);
+    roundRect(-22, -50, 44, 16, 6);
     ctx.fill();
     ctx.fillStyle = "#AD1457";
-    ctx.font = "bold 8px system-ui";
+    ctx.font = "bold 7px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("SLOW!!", 0, -38);
+    ctx.fillText(pick(["I'M FILMING!", "HOA VIDEO!", "SLOW!!"]), 0, -39);
   }
 
   ctx.restore();
@@ -2934,7 +2941,7 @@ function drawHowTo() {
     ["ASSIST", "Aim near a pad to snap/lock. Bigger pads early. Flatter throws."],
     ["RAMP", "First ~35s is Easy Stretch — sparse traffic, then it ramps gently."],
     ["FSD", "Every 3 deliveries: Autopilot ~10s so you can focus on throws."],
-    ["LADY", "Drive too fast and a scary old lady runs out with a broom. Classic!"],
+    ["LADY", "Drive too fast and a scary old lady runs out filming you on her phone."],
     ["SOUND", "SFX on by default. Press M to mute. Works after first tap."],
   ];
   let y = 100;
@@ -3033,7 +3040,7 @@ function drawEnd() {
     ["Pirate justice", String(G.pirateBonus)],
     ["Snacks claimed", String(G.snacks)],
     ["Failed drops", String(G.fails)],
-    ["Broom assaults", String(G.ladyHits || 0)],
+    ["Phone assaults", String(G.ladyHits || 0)],
     ["Vehicle damage", Math.round(G.damage) + "%"],
   ];
   let y = 215;
