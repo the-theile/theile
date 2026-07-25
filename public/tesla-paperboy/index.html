@@ -104,16 +104,20 @@ function difficulty() {
 }
 
 function aimAssistStrength() {
-  // Strong magnet most of the route — players were still overshooting
-  return lerp(0.92, 0.62, difficulty() / MAX_DIFF);
+  // Very strong magnet — full pass aims for fairness first
+  return lerp(0.96, 0.72, difficulty() / MAX_DIFF);
 }
 
 function porchPad() {
-  return lerp(34, 18, difficulty() / MAX_DIFF);
+  return lerp(42, 24, difficulty() / MAX_DIFF);
 }
 
 function assistRadius() {
-  return lerp(150, 95, difficulty() / MAX_DIFF);
+  return lerp(175, 115, difficulty() / MAX_DIFF);
+}
+
+function snapDistance() {
+  return lerp(100, 68, difficulty() / MAX_DIFF);
 }
 
 // ─── Sound (Web Audio, no external files) ───────────────────
@@ -205,6 +209,18 @@ const SFX = {
     tone({ freq: 700, dur: 0.07, type: "sine", gain: 0.05 });
     tone({ freq: 900, dur: 0.1, type: "sine", gain: 0.04, delay: 0.06 });
   },
+  crack() {
+    noiseBurst(0.1, 0.05, 2800);
+    tone({ freq: 900, dur: 0.06, type: "square", gain: 0.03, slide: -200 });
+  },
+  knock() {
+    tone({ freq: 160, dur: 0.1, type: "triangle", gain: 0.05, slide: -40 });
+    noiseBurst(0.08, 0.04, 800);
+  },
+  dismiss() {
+    tone({ freq: 400, dur: 0.08, type: "sine", gain: 0.05, slide: 180 });
+    tone({ freq: 620, dur: 0.12, type: "triangle", gain: 0.04, delay: 0.06 });
+  },
   /** Classic Paperboy shriek — angry old lady */
   lady() {
     tone({ freq: 720, dur: 0.12, type: "sawtooth", gain: 0.045, slide: 280 });
@@ -251,7 +267,7 @@ function resetGame() {
     gateActive: false, gateOptions: [], gateCorrect: 0, gateTimer: 0,
     invuln: 0, shake: 0, combo: 0, bestCombo: 0, aimPreview: null,
     coachPhase: 0, wrecked: false, birds: [],
-    ladyCD: 6, ladyHits: 0,
+    ladyCD: 6, ladyHits: 0, threatBeans: 0,
   });
   G.clouds = [];
   for (let i = 0; i < 7; i++) {
@@ -263,8 +279,9 @@ function resetGame() {
   for (let i = 0; i < 3; i++) {
     G.birds.push({ x: rand(0, W), y: rand(40, 100), s: rand(20, 40), flap: rand(0, 10) });
   }
-  // Seed calm houses (easy flags set inside spawn for early route)
-  for (let i = 0; i < 5; i++) spawnHouse(-i * 175 - 80);
+  // Seed calm houses (roomier for larger buildings)
+  for (let i = 0; i < 4; i++) spawnHouse(-i * 210 - 80);
+  G.threatBeans = 0;
   spawnMessage("Only DROP pads need packages — orange rings!", 3);
   setTimeoutCoach();
 }
@@ -305,30 +322,45 @@ function spawnHouse(y) {
   const early = state === STATE.PLAY && elapsed() < EASY_SECS;
 
   // Not every house needs a package — clearer focus on real drops
-  // Early: ~65% stops · later: ~45% stops
-  const deliveryChance = early ? 0.68 : lerp(0.58, 0.42, diff / MAX_DIFF);
+  const deliveryChance = early ? 0.7 : lerp(0.6, 0.44, diff / MAX_DIFF);
   const needsDelivery = Math.random() < deliveryChance;
 
-  // Hazards only matter near delivery stops (and still rare early)
   const hasPool = needsDelivery && !early && Math.random() < 0.08 + diff * 0.15;
   const hasRing = needsDelivery && Math.random() < (early ? 0.08 : 0.2 + diff * 0.12);
   const hasSnack = needsDelivery && Math.random() < 0.14 + (early ? 0.1 : 0);
   const hasPirate = needsDelivery && !early && Math.random() < 0.05 + diff * 0.1;
   const hasDog = !early && Math.random() < 0.05 + diff * 0.08;
   const hasMailbox = Math.random() < 0.85;
-  const hasDriveway = Math.random() < 0.75;
+  const hasDriveway = Math.random() < 0.88;
+  const hasParkedCar = hasDriveway && Math.random() < 0.58;
   const hasBush = Math.random() < 0.8;
   const hasFence = Math.random() < 0.55;
   const hasPlanters = Math.random() < 0.6;
   const style = pick(["ranch", "ranch", "cottage", "modern"]);
 
-  // Delivery pads are large and readable
-  const porchW = needsDelivery ? (early ? 50 : lerp(48, 40, diff / MAX_DIFF)) : 28;
-  const porchH = needsDelivery ? (early ? 40 : lerp(38, 32, diff / MAX_DIFF)) : 20;
-  const porchX = side === 0 ? ROAD_L - 8 - porchW : ROAD_R + 8;
+  // Bigger homes + oversized DROP pads (aim readability)
+  const scale = 1.28;
+  const porchW = needsDelivery ? (early ? 58 : lerp(56, 46, diff / MAX_DIFF)) : 32;
+  const porchH = needsDelivery ? (early ? 46 : lerp(44, 36, diff / MAX_DIFF)) : 22;
+  const porchX = side === 0 ? ROAD_L - 6 - porchW : ROAD_R + 6;
+
+  // Parked car sits on driveway (not a Tesla collision trap — package target)
+  let parkedCar = null;
+  if (hasParkedCar) {
+    parkedCar = {
+      // world-relative offsets updated each draw/hit via house.y
+      ox: side === 0 ? ROAD_L - 48 : ROAD_R + 28,
+      oy: 38,
+      w: 34,
+      h: 52,
+      color: pick(["#ECEFF1", "#E53935", "#1E88E5", "#43A047", "#FB8C00", "#5E35B1", "#37474F", "#FAFAFA"]),
+      cracked: false,
+      dented: false,
+    };
+  }
 
   const house = {
-    y, side, color,
+    y, side, color, scale,
     porchX, porchW, porchH,
     roof: pick(["#6D4C41", "#455A64", "#5D4037", "#37474F", "#795548", "#8D6E63", "#BF360C"]),
     trim: pick(["#FFFFFF", "#FAFAFA", "#FFF8E1", "#EFEBE9", "#ECEFF1"]),
@@ -337,14 +369,14 @@ function spawnHouse(y) {
     delivered: false, glow: 1,
     needsDelivery,
     hasPool, hasRing, hasSnack, hasPirate, hasDog, hasMailbox, hasDriveway, hasBush,
-    hasFence, hasPlanters, style,
-    poolX: side === 0 ? ROAD_L - 100 : ROAD_R + 100,
-    ringHit: false, snackTaken: false, pirateHit: false,
+    hasFence, hasPlanters, hasParkedCar, parkedCar, style,
+    poolX: side === 0 ? ROAD_L - 105 : ROAD_R + 105,
+    ringHit: false, snackTaken: false, pirateHit: false, windowBroken: false,
     number: 100 + ((G.houses.length + 1) * 2 + side),
     windowLit: Math.random() < 0.4,
     garage: Math.random() < 0.45,
     shutters: Math.random() < 0.55,
-    ladySpawned: false, // scary old lady already released from this house
+    ladySpawned: false,
   };
   G.houses.push(house);
 
@@ -474,8 +506,8 @@ function findAssistTarget(aimX, aimY) {
   }
   if (!best) return { x: aimX, y: aimY, assisted: false, porch: null, house: null, snap: false };
 
-  // Close enough → hard snap to pad center (big fairness win)
-  const snapDist = lerp(78, 48, difficulty() / MAX_DIFF);
+  // Close enough → hard snap to pad center
+  const snapDist = snapDistance();
   if (bestD < snapDist) {
     return {
       x: best.cx, y: best.cy,
@@ -484,12 +516,13 @@ function findAssistTarget(aimX, aimY) {
     };
   }
 
-  const pull = Math.min(1, strength * (1 - bestD / radius) * 1.15);
+  // Soft pull, then extra sticky bias on release range
+  const pull = Math.min(1, strength * (1 - bestD / radius) * 1.25);
   return {
     x: lerp(aimX, best.cx, pull),
     y: lerp(aimY, best.cy, pull),
-    assisted: pull > 0.15,
-    snap: false,
+    assisted: pull > 0.12,
+    snap: pull > 0.85,
     porch: best,
     house: bestH,
     pull,
@@ -497,13 +530,12 @@ function findAssistTarget(aimX, aimY) {
 }
 
 function clampAim(startX, startY, aimX, aimY) {
-  // Keep throws in the "porch band" so pads aren't behind the car or sky-high
-  const maxDist = lerp(200, 270, difficulty() / MAX_DIFF);
-  aimY = clamp(aimY, 90, CAR_Y - 70);
-  // Bias aim into side yards slightly when aiming near road center
-  if (aimX > ROAD_L + 10 && aimX < ROAD_R - 10) {
-    // prefer nearest curb when aiming over asphalt
-    aimX = aimX < ROAD_CX ? ROAD_L - 20 : ROAD_R + 20;
+  const maxDist = lerp(195, 265, difficulty() / MAX_DIFF);
+  aimY = clamp(aimY, 95, CAR_Y - 75);
+  // Soft curb bias (don't hard-yank over the road — was confusing aim)
+  if (aimX > ROAD_L + 16 && aimX < ROAD_R - 16) {
+    const curb = aimX < ROAD_CX ? ROAD_L - 18 : ROAD_R + 18;
+    aimX = lerp(aimX, curb, 0.35);
   }
   const d = dist(startX, startY, aimX, aimY);
   if (d > maxDist) {
@@ -511,11 +543,24 @@ function clampAim(startX, startY, aimX, aimY) {
     aimX = startX + (aimX - startX) * k;
     aimY = startY + (aimY - startY) * k;
   }
-  // Pull long throws shorter — main overthrow fix
-  if (startY - aimY > 170) {
-    aimY = lerp(aimY, startY - 155, lerp(0.5, 0.25, difficulty() / MAX_DIFF));
+  if (startY - aimY > 160) {
+    aimY = lerp(aimY, startY - 148, lerp(0.55, 0.3, difficulty() / MAX_DIFF));
   }
   return { x: aimX, y: aimY };
+}
+
+/** If player is roughly aiming at best stop, force lock (release stickiness) */
+function stickyReleaseAim(aimX, aimY) {
+  const best = bestActiveStop();
+  if (!best) return { x: aimX, y: aimY, snap: false, house: null, porch: null };
+  const p = best.porch;
+  const d = dist(aimX, aimY, p.cx, p.cy);
+  // Generous sticky zone — main anti-frustration tool
+  if (d < snapDistance() * 1.35 || (Math.abs(aimX - p.cx) < 70 && Math.abs(aimY - p.cy) < 90)) {
+    return { x: p.cx, y: p.cy, snap: true, house: best.house, porch: p };
+  }
+  const a = findAssistTarget(aimX, aimY);
+  return { x: a.x, y: a.y, snap: !!a.snap, house: a.house, porch: a.porch };
 }
 
 /** Best active delivery pad for HUD highlight / space throw */
@@ -547,11 +592,11 @@ function updateAimPreview(px, py) {
   }
   const startX = G.carX, startY = CAR_Y - 18;
   let { x, y } = clampAim(startX, startY, px, py);
-  const assist = findAssistTarget(x, y);
+  const sticky = stickyReleaseAim(x, y);
   G.aimPreview = {
-    x: assist.x, y: assist.y,
-    assisted: assist.assisted,
-    snap: !!assist.snap,
+    x: sticky.x, y: sticky.y,
+    assisted: sticky.snap || dist(x, y, sticky.x, sticky.y) > 2,
+    snap: !!sticky.snap,
     sx: startX, sy: startY,
   };
 }
@@ -712,35 +757,40 @@ function pickGate(i) {
 // ─── Throw ──────────────────────────────────────────────────
 function throwPackage(tx, ty, alreadyAssisted) {
   if (G.throwCD > 0 || state !== STATE.PLAY) return;
-  G.throwCD = lerp(0.26, 0.18, difficulty() / MAX_DIFF);
+  G.throwCD = lerp(0.24, 0.16, difficulty() / MAX_DIFF);
   const startX = G.carX;
   const startY = CAR_Y - 18;
-  let aimX = tx, aimY = ty;
-  let assistMeta = null;
-  if (!alreadyAssisted) {
-    const c = clampAim(startX, startY, aimX, aimY);
-    assistMeta = findAssistTarget(c.x, c.y);
-    aimX = assistMeta.x; aimY = assistMeta.y;
-  } else {
-    const c = clampAim(startX, startY, aimX, aimY);
-    // still apply assist/snap for fairness
-    assistMeta = findAssistTarget(c.x, c.y);
-    if (assistMeta.assisted) { aimX = assistMeta.x; aimY = assistMeta.y; }
-    else { aimX = c.x; aimY = c.y; }
+  const c = clampAim(startX, startY, tx, ty);
+  // Always run sticky release — strongest aim help on throw
+  const sticky = stickyReleaseAim(c.x, c.y);
+  let aimX = sticky.x, aimY = sticky.y;
+  let targetHouse = sticky.house;
+
+  // Tap-to-auto: if best pad is "beside" the car, force it
+  const best = bestActiveStop();
+  if (best && Math.abs(best.porch.cx - G.carX) < 95 && best.porch.cy > CAR_Y - 280 && best.porch.cy < CAR_Y - 60) {
+    if (!sticky.snap || dist(aimX, aimY, best.porch.cx, best.porch.cy) > 20) {
+      // mild auto when close to pad lane
+      if (Math.abs(c.x - best.porch.cx) < 90) {
+        aimX = best.porch.cx;
+        aimY = best.porch.cy;
+        targetHouse = best.house;
+      }
+    }
   }
+
   const d = dist(startX, startY, aimX, aimY);
-  // Flatter, more readable arcs — less "over the house" feel
-  const flight = clamp(d / lerp(280, 360, difficulty() / MAX_DIFF), 0.38, 0.85);
+  const flight = clamp(d / lerp(270, 340, difficulty() / MAX_DIFF), 0.36, 0.8);
   G.packages.push({
     x: startX, y: startY,
     sx: startX, sy: startY,
     tx: aimX, ty: aimY,
     t: 0, dur: flight,
-    arc: lerp(28, 42, Math.min(d / 220, 1)),
+    arc: lerp(24, 38, Math.min(d / 220, 1)),
     rot: rand(0, Math.PI),
     vr: rand(-5, 5),
     done: false,
-    targetHouse: assistMeta && assistMeta.house,
+    targetHouse,
   });
   SFX.throw();
 }
@@ -918,11 +968,11 @@ function update(dt) {
   if (G.ladyCD > 0) G.ladyCD -= dt;
   trySpawnAngryLady(e, diff);
 
-  // Houses — roomy spacing so throws stay readable
+  // Houses — roomier for larger buildings
   G.nextHouseDist -= scrollAmt;
   if (G.nextHouseDist <= 0) {
-    spawnHouse(-90);
-    G.nextHouseDist = lerp(210, 155, diff / MAX_DIFF);
+    spawnHouse(-100);
+    G.nextHouseDist = lerp(240, 180, diff / MAX_DIFF);
   }
 
   // Obstacles — sparse overall (was far too dense)
@@ -939,7 +989,7 @@ function update(dt) {
     if (G.nextGateIn <= 0 && !G.gateActive) startGate();
   }
 
-  // Packages
+  // Packages — flight + mid-air impacts (Paperboy style)
   for (const pk of G.packages) {
     if (pk.done) continue;
     pk.t += dt;
@@ -949,6 +999,11 @@ function update(dt) {
     const linearY = lerp(pk.sy, pk.ty, ease);
     pk.y = linearY - Math.sin(u * Math.PI) * pk.arc;
     pk.rot += pk.vr * dt;
+    // After package leaves the car a bit, allow hits
+    if (u > 0.12 && u < 0.98 && resolvePackageMidair(pk)) {
+      pk.done = true;
+      continue;
+    }
     if (u >= 1) {
       pk.done = true;
       resolvePackageLanding(pk);
@@ -1142,8 +1197,117 @@ function updateLady(o, dt, scrollAmt) {
   }
 }
 
+/** Mid-flight package hits: threats, cars, cones — classic Paperboy chaos */
+function resolvePackageMidair(pk) {
+  // Threats / road objects
+  for (const o of G.obstacles) {
+    if (o.dead || o.pkgHit) continue;
+    const r = o.type === "car" ? 28 : o.type === "lady" ? 22 : o.type === "dog" ? 18 : 16;
+    if (dist(pk.x, pk.y, o.x, o.y) < r) {
+      return packageHitEntity(pk, o);
+    }
+  }
+  // Parked driveway cars + house windows
+  for (const h of G.houses) {
+    if (h.parkedCar && !h.parkedCar.dead) {
+      const pc = h.parkedCar;
+      const cx = pc.ox, cy = h.y + pc.oy;
+      if (Math.abs(pk.x - cx) < pc.w * 0.45 && Math.abs(pk.y - cy) < pc.h * 0.45) {
+        return packageHitParkedCar(pk, h);
+      }
+    }
+    // window smash if package hits house face (not porch)
+    if (!h.windowBroken && packageHitsWindow(pk, h)) {
+      return packageHitWindow(pk, h);
+    }
+  }
+  return false;
+}
+
+function packageHitsWindow(pk, h) {
+  const sc = h.scale || 1.28;
+  const hw = (h.style === "modern" ? 72 : 70) * sc;
+  const hh = (h.style === "cottage" ? 70 : 78) * sc;
+  const hx = h.side === 0 ? 2 : ROAD_R + 6;
+  const hy = h.y - 28;
+  // window region on house face
+  const wx = h.side === 0 ? hx + 10 : hx + hw - 36;
+  const wy = hy + 16;
+  return pk.x > wx - 4 && pk.x < wx + 30 && pk.y > wy - 4 && pk.y < wy + 24;
+}
+
+function packageHitEntity(pk, o) {
+  o.pkgHit = true;
+  // Threats get dismissed (bonus). Static hazards knock over.
+  const dismissTypes = { lady: 1, ped: 1, dog: 1, scooter: 1, cone: 1 };
+  if (dismissTypes[o.type]) {
+    const bonus = o.type === "lady" ? 60 : o.type === "ped" ? 40 : o.type === "dog" ? 35 : 25;
+    G.score += bonus;
+    G.combo++;
+    G.bestCombo = Math.max(G.bestCombo, G.combo);
+    G.threatBeans = (G.threatBeans || 0) + 1;
+    o.dead = true;
+    o.hit = true;
+    // ragdoll knock
+    burst(o.x, o.y, o.type === "lady" ? "#F8BBD0" : "#FFCC80", 14);
+    floatTxt(o.x, o.y - 14, "BEANED! +" + bonus, "#69F0AE", 14);
+    spawnMessage(pick([
+      "Package justice! Threat dismissed.",
+      "Paperboy special — right in the kisser!",
+      o.type === "lady" ? "Filmed THAT, Karen?" : "Nice toss!",
+    ]), 1.8);
+    SFX.dismiss();
+    return true;
+  }
+  if (o.type === "car") {
+    // Moving traffic — dent + bounce, small penalty
+    G.score = Math.max(0, G.score - 15);
+    G.combo = 0;
+    o.vx = (o.vx || 0) + (pk.x < o.x ? 40 : -40);
+    burst(pk.x, pk.y, "#90A4AE", 12);
+    floatTxt(pk.x, pk.y, "traffic ding −15", "#FF8A65", 12);
+    SFX.crack();
+    return true;
+  }
+  return false;
+}
+
+function packageHitParkedCar(pk, h) {
+  const pc = h.parkedCar;
+  if (!pc.cracked) {
+    pc.cracked = true;
+    pc.dented = true;
+    G.score = Math.max(0, G.score - 20);
+    G.combo = 0;
+    G.fails++;
+    burst(pk.x, pk.y, "#B0BEC5", 14);
+    floatTxt(pk.x, pk.y - 10, "CRACKED WINDSHIELD −20", "#EF9A9A", 13);
+    spawnMessage("You tagged a parked car. HOA will bill Flex.", 2);
+    SFX.crack();
+  } else {
+    floatTxt(pk.x, pk.y, "already dented", "#BDBDBD", 11);
+    SFX.knock();
+  }
+  return true;
+}
+
+function packageHitWindow(pk, h) {
+  h.windowBroken = true;
+  h.windowLit = false;
+  G.score = Math.max(0, G.score - 25);
+  G.combo = 0;
+  G.fails++;
+  burst(pk.x, pk.y, "#E1F5FE", 16);
+  floatTxt(pk.x, pk.y, "WINDOW SMASH −25", "#4FC3F7", 13);
+  spawnMessage("Classic Paperboy — you broke a window!", 2);
+  SFX.crack();
+  return true;
+}
+
 function resolvePackageLanding(pk) {
-  // Prefer intended assist target first (generous forgiveness)
+  // Midair-style checks one more time at landing
+  if (resolvePackageMidair(pk)) return;
+
   const ordered = [];
   if (pk.targetHouse && isActiveStop(pk.targetHouse)) ordered.push(pk.targetHouse);
   for (const h of G.houses) {
@@ -1154,8 +1318,8 @@ function resolvePackageLanding(pk) {
     const porch = getPorchRect(h);
     const onPad = pk.x > porch.x && pk.x < porch.x + porch.w &&
                   pk.y > porch.y && pk.y < porch.y + porch.h;
-    // Extra forgiveness radius around active DROP pads
-    const nearPad = isActiveStop(h) && dist(pk.x, pk.y, porch.cx, porch.cy) < lerp(38, 26, difficulty() / MAX_DIFF);
+    // Extra forgiveness around active DROP pads
+    const nearPad = isActiveStop(h) && dist(pk.x, pk.y, porch.cx, porch.cy) < lerp(48, 32, difficulty() / MAX_DIFF);
 
     if (onPad || nearPad) {
       if (!h.needsDelivery) {
@@ -1258,11 +1422,33 @@ function resolvePackageLanding(pk) {
     }
   }
 
+  // Driveway short-drop (not a full fail — package slides on concrete)
+  for (const h of G.houses) {
+    if (!h.hasDriveway) continue;
+    const dwx = h.side === 0 ? ROAD_L - 30 : ROAD_R + 4;
+    if (pk.x > dwx - 8 && pk.x < dwx + 36 && pk.y > h.y + 5 && pk.y < h.y + 60) {
+      floatTxt(pk.x, pk.y, "driveway skid", "#B0BEC5", 12);
+      burst(pk.x, pk.y, "#9E9E9E", 8);
+      G.combo = 0;
+      SFX.knock();
+      return;
+    }
+  }
+
   if (pk.x > ROAD_L && pk.x < ROAD_R) {
     floatTxt(pk.x, pk.y, "road pizza", "#BDBDBD", 12);
-    burst(pk.x, pk.y, "#9E9E9E", 5);
+    burst(pk.x, pk.y, "#9E9E9E", 6);
+    // asphalt scuff marks as particles
+    for (let i = 0; i < 4; i++) {
+      G.particles.push({
+        x: pk.x + rand(-8, 8), y: pk.y + rand(-4, 4),
+        vx: rand(-20, 20), vy: rand(-10, 10),
+        life: 0.4, max: 0.4, r: rand(2, 4), color: "#546E7A",
+      });
+    }
   } else {
-    floatTxt(pk.x, pk.y, "missed drop", "#BDBDBD", 12);
+    floatTxt(pk.x, pk.y, "lawn splat", "#AED581", 12);
+    burst(pk.x, pk.y, "#7CB342", 6);
     G.combo = 0;
   }
   SFX.miss();
@@ -1699,34 +1885,48 @@ function drawHouses() {
 
 function drawHouse(h) {
   const facingRight = h.side === 0;
-  const hw = h.style === "modern" ? 72 : 70;
-  const hh = h.style === "cottage" ? 70 : 78;
-  const hx = h.side === 0 ? 3 : ROAD_R + 8;
-  const hy = h.y - 26;
+  const sc = h.scale || 1.28;
+  const hw = (h.style === "modern" ? 72 : 70) * sc;
+  const hh = (h.style === "cottage" ? 70 : 78) * sc;
+  const hx = h.side === 0 ? 2 : ROAD_R + 6;
+  const hy = h.y - 28;
   const brick = h.brick || "#A1887F";
   const accent = h.accent || "#1565C0";
 
-  // driveway (stamped concrete)
+  // driveway (wider stamped concrete into curb)
   if (h.hasDriveway) {
-    const dw = 24;
-    const dx = facingRight ? ROAD_L - 22 : ROAD_R;
-    ctx.fillStyle = "#A0A0A0";
+    const dw = 32;
+    const dx = facingRight ? ROAD_L - 28 : ROAD_R - 2;
+    const g = ctx.createLinearGradient(dx, 0, dx + (facingRight ? dw : -dw), 0);
+    g.addColorStop(0, "#9E9E9E");
+    g.addColorStop(0.5, "#BDBDBD");
+    g.addColorStop(1, "#8A8A8A");
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(facingRight ? hx + hw : hx, hy + hh - 8);
-    ctx.lineTo(dx, h.y + 52);
-    ctx.lineTo(dx + (facingRight ? dw : -dw), h.y + 52);
-    ctx.lineTo(facingRight ? hx + hw : hx, hy + hh + 12);
+    ctx.moveTo(facingRight ? hx + hw - 4 : hx + 4, hy + hh - 6);
+    ctx.lineTo(dx, h.y + 58);
+    ctx.lineTo(dx + (facingRight ? dw : -dw), h.y + 58);
+    ctx.lineTo(facingRight ? hx + hw - 4 : hx + 4, hy + hh + 14);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.1)";
+    // curb cut
+    ctx.fillStyle = "#D4B896";
+    ctx.fillRect(facingRight ? ROAD_L - 8 : ROAD_R - 2, h.y + 50, 10, 14);
+    // expansion joints
+    ctx.strokeStyle = "rgba(0,0,0,0.12)";
     ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-      const yy = h.y + 8 + i * 12;
+    for (let i = 0; i < 5; i++) {
+      const yy = h.y + 6 + i * 11;
       ctx.beginPath();
-      ctx.moveTo(dx + (facingRight ? 2 : -dw + 2), yy);
-      ctx.lineTo(dx + (facingRight ? dw - 2 : -2), yy);
+      ctx.moveTo(dx + (facingRight ? 3 : -dw + 3), yy);
+      ctx.lineTo(dx + (facingRight ? dw - 3 : -3), yy);
       ctx.stroke();
     }
+  }
+
+  // parked car on driveway
+  if (h.parkedCar) {
+    drawParkedCar(h);
   }
 
   // low fence segment
@@ -1902,9 +2102,9 @@ function drawHouse(h) {
   }
 
   // windows + shutters
-  const wx = facingRight ? hx + 8 : hx + hw - 32;
-  drawWindow(wx, hy + 14, 24, 18, h.windowLit, h.shutters, accent);
-  if (!h.garage) drawWindow(facingRight ? hx + 8 : hx + hw - 28, hy + 40, 18, 14, false, h.shutters, accent);
+  const wx = facingRight ? hx + 10 : hx + hw - 36;
+  drawWindow(wx, hy + 16, 26 * sc * 0.85, 18 * sc * 0.85, h.windowLit && !h.windowBroken, h.shutters, accent, h.windowBroken);
+  if (!h.garage) drawWindow(facingRight ? hx + 10 : hx + hw - 32, hy + 44, 18, 14, false, h.shutters, accent, false);
 
   // house number plaque
   ctx.fillStyle = h.trim;
@@ -2077,7 +2277,7 @@ function drawDropTarget(h) {
   ctx.restore();
 }
 
-function drawWindow(x, y, w, h, lit, shutters, accent) {
+function drawWindow(x, y, w, h, lit, shutters, accent, broken) {
   if (shutters) {
     ctx.fillStyle = accent || "#1565C0";
     roundRect(x - 5, y, 5, h, 1);
@@ -2088,29 +2288,90 @@ function drawWindow(x, y, w, h, lit, shutters, accent) {
     ctx.fillRect(x - 3, y + 2, 1, h - 4);
     ctx.fillRect(x + w + 2, y + 2, 1, h - 4);
   }
-  ctx.fillStyle = lit ? "#FFF9C4" : "#E3F2FD";
+  ctx.fillStyle = broken ? "#37474F" : lit ? "#FFF9C4" : "#E3F2FD";
   roundRect(x, y, w, h, 2);
   ctx.fill();
   ctx.strokeStyle = "#78909C";
   ctx.lineWidth = 1.5;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  ctx.beginPath();
-  ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h);
-  ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2);
-  ctx.stroke();
-  // mullion highlight
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.lineWidth = 0.8;
-  ctx.strokeRect(x + 2, y + 2, w / 2 - 3, h / 2 - 3);
-  if (lit) {
-    ctx.fillStyle = "rgba(255,249,196,0.22)";
+  if (broken) {
+    // shattered pane cracks
+    ctx.strokeStyle = "rgba(200,230,255,0.75)";
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(x, y + h);
-    ctx.lineTo(x - 4, y + h + 10);
-    ctx.lineTo(x + w + 4, y + h + 10);
-    ctx.lineTo(x + w, y + h);
-    ctx.fill();
+    ctx.moveTo(x + 2, y + 3);
+    ctx.lineTo(x + w * 0.45, y + h * 0.55);
+    ctx.lineTo(x + w - 2, y + 4);
+    ctx.moveTo(x + w * 0.5, y + 2);
+    ctx.lineTo(x + w * 0.3, y + h - 2);
+    ctx.moveTo(x + w * 0.55, y + h * 0.4);
+    ctx.lineTo(x + 3, y + h - 3);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h);
+    ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(x + 2, y + 2, w / 2 - 3, h / 2 - 3);
+    if (lit) {
+      ctx.fillStyle = "rgba(255,249,196,0.22)";
+      ctx.beginPath();
+      ctx.moveTo(x, y + h);
+      ctx.lineTo(x - 4, y + h + 10);
+      ctx.lineTo(x + w + 4, y + h + 10);
+      ctx.lineTo(x + w, y + h);
+      ctx.fill();
+    }
   }
+}
+
+function drawParkedCar(h) {
+  const pc = h.parkedCar;
+  if (!pc) return;
+  const x = pc.ox, y = h.y + pc.oy;
+  const w = pc.w, ht = pc.h;
+  ctx.save();
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + ht * 0.4, w * 0.5, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // body
+  ctx.fillStyle = pc.dented ? shade(pc.color, -25) : pc.color;
+  roundRect(x - w / 2, y - ht / 2, w, ht, 7);
+  ctx.fill();
+  // cabin glass
+  ctx.fillStyle = pc.cracked ? "rgba(80,90,100,0.85)" : "rgba(30,50,70,0.75)";
+  roundRect(x - w / 2 + 5, y - ht / 2 + 10, w - 10, ht * 0.32, 4);
+  ctx.fill();
+  if (pc.cracked) {
+    ctx.strokeStyle = "rgba(200,230,255,0.7)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - 6, y - ht / 2 + 12);
+    ctx.lineTo(x + 2, y - ht / 2 + 22);
+    ctx.lineTo(x + 8, y - ht / 2 + 14);
+    ctx.stroke();
+  }
+  // wheels
+  ctx.fillStyle = "#212121";
+  roundRect(x - w / 2 - 1, y - ht / 2 + 8, 5, 12, 2);
+  roundRect(x + w / 2 - 4, y - ht / 2 + 8, 5, 12, 2);
+  roundRect(x - w / 2 - 1, y + ht / 2 - 20, 5, 12, 2);
+  roundRect(x + w / 2 - 4, y + ht / 2 - 20, 5, 12, 2);
+  // lights
+  ctx.fillStyle = "#FFECB3";
+  roundRect(x - w / 2 + 4, y + ht / 2 - 10, 8, 4, 1);
+  roundRect(x + w / 2 - 12, y + ht / 2 - 10, 8, 4, 1);
+  if (pc.dented) {
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.arc(x + 6, y, 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function shade(hex, amt) {
@@ -2432,43 +2693,57 @@ function drawAimPreview() {
   if (state !== STATE.PLAY) return;
   ctx.save();
 
-  // Always hint nearest DROP while playing (subtle)
+  // Always highlight best DROP (reticle + guide line)
   const best = bestActiveStop();
-  if (best && !G.aimPreview) {
+  if (best) {
     const p = best.porch;
-    ctx.globalAlpha = 0.25;
+    const pulse = 0.5 + Math.sin(now() / 180) * 0.5;
+    ctx.globalAlpha = 0.35 + pulse * 0.25;
     ctx.strokeStyle = "#00E5FF";
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
     ctx.beginPath();
-    ctx.moveTo(G.carX, CAR_Y - 20);
+    ctx.moveTo(G.carX, CAR_Y - 22);
     ctx.lineTo(p.cx, p.cy);
     ctx.stroke();
     ctx.setLineDash([]);
+    // pad landing X ghost
+    ctx.globalAlpha = 0.5 + pulse * 0.35;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(p.cx - 10, p.cy - 8); ctx.lineTo(p.cx + 10, p.cy + 8);
+    ctx.moveTo(p.cx + 10, p.cy - 8); ctx.lineTo(p.cx - 10, p.cy + 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(p.cx, p.cy + 2, 18, 11, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   if (!G.aimPreview) { ctx.restore(); return; }
   const { x, y, sx, sy, assisted } = G.aimPreview;
   const snap = G.aimPreview.snap;
-  // trajectory dots (match flatter throw arc ~35)
+  // trajectory dots (match flatter arc)
   for (let i = 1; i <= 10; i++) {
     const u = i / 11;
     const px = lerp(sx, x, smoothstep(u));
-    const py = lerp(sy, y, smoothstep(u)) - Math.sin(u * Math.PI) * 35;
-    ctx.globalAlpha = 0.2 + u * 0.5;
+    const py = lerp(sy, y, smoothstep(u)) - Math.sin(u * Math.PI) * 32;
+    ctx.globalAlpha = 0.22 + u * 0.5;
     ctx.fillStyle = snap ? "#69F0AE" : assisted ? "#00E5FF" : "#FFB74D";
     ctx.beginPath();
-    ctx.arc(px, py, 3.2 - u * 0.4, 0, Math.PI * 2);
+    ctx.arc(px, py, 3.4 - u * 0.4, 0, Math.PI * 2);
     ctx.fill();
   }
-  // landing marker
-  ctx.globalAlpha = 0.85;
+  // predicted landing on pad
+  ctx.globalAlpha = 0.9;
   ctx.strokeStyle = snap ? "#69F0AE" : assisted ? "#00E5FF" : "#FF9900";
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.ellipse(x, y + 4, 16, 10, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y + 4, 17, 11, 0, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(x - 8, y - 4); ctx.lineTo(x + 8, y + 8);
+  ctx.moveTo(x + 8, y - 4); ctx.lineTo(x - 8, y + 8);
+  ctx.stroke();
   ctx.fillStyle = snap ? "#69F0AE" : assisted ? "#00E5FF" : "#FFB74D";
   ctx.font = "bold 11px system-ui";
   ctx.textAlign = "center";
@@ -2940,12 +3215,12 @@ function drawHowTo() {
   const lines = [
     ["STEER", "Drag the bottom half (or A/D / arrows)."],
     ["THROW", "Hold top half to aim (ghost arc). Release to throw. Space locks nearest DROP."],
-    ["TARGETS", "Only houses with orange DROP pads need packages. AIM HERE = best target."],
-    ["ASSIST", "Aim near a pad to snap/lock. Bigger pads early. Flatter throws."],
-    ["RAMP", "First ~35s is Easy Stretch — sparse traffic, then it ramps gently."],
+    ["TARGETS", "Only orange DROP pads need packages. Cyan X = best stop."],
+    ["ASSIST", "Aim near a pad to LOCK. Hold top half, release to throw."],
+    ["CHAOS", "Bean threats for bonus. Miss onto cars/windows = cracks & dings."],
     ["FSD", "Every 3 deliveries: Autopilot ~10s so you can focus on throws."],
-    ["LADY", "Drive too fast and a scary old lady runs out filming you on her phone."],
-    ["SOUND", "SFX on by default. Press M to mute. Works after first tap."],
+    ["LADY", "Speed too much and she runs out filming you on her phone."],
+    ["SOUND", "SFX on. Press M to mute."],
   ];
   let y = 100;
   ctx.textAlign = "left";
@@ -3044,6 +3319,7 @@ function drawEnd() {
     ["Snacks claimed", String(G.snacks)],
     ["Failed drops", String(G.fails)],
     ["Phone assaults", String(G.ladyHits || 0)],
+    ["Threat beans", String(G.threatBeans || 0)],
     ["Vehicle damage", Math.round(G.damage) + "%"],
   ];
   let y = 215;
