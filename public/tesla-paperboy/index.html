@@ -132,7 +132,8 @@ function drawPill(x, y, w, h, fill, stroke) {
 // ═══════════════════════════════════════════════════════════
 const ROUTE_TIME = 90;
 const EASY_SECS = 30;
-const ROAD_L = 76, ROAD_R = 314;
+// Slightly narrower road → wider yards for larger houses
+const ROAD_L = 88, ROAD_R = 302;
 const ROAD_CX = (ROAD_L + ROAD_R) / 2;
 const ROAD_W = ROAD_R - ROAD_L;
 const CAR_Y = 555;
@@ -622,7 +623,7 @@ function resetGame() {
   if (weather === "rain") {
     for (let i = 0; i < 28; i++) G.rain.push({ x: rand(0, W), y: rand(0, H), z: rand(0.5, 1.1) });
   }
-  for (let i = 0; i < 4; i++) spawnHouse(-i * 220 - 70);
+  for (let i = 0; i < 5; i++) spawnHouse(-i * 145 - 50);
   pickNextPackage();
   msg(wi.name, 2);
   startBgHum();
@@ -650,9 +651,9 @@ function spawnHouse(y) {
   const needsDelivery = Math.random() < (early ? 0.72 : lerp(0.62, 0.45, diff / MAX_DIFF));
   const special = needsDelivery && Math.random() < 0.1 ? pick(["fresh", "prime"]) : null;
 
-  // Compact porches that sit in the yard strip, not over the house body
-  const porchW = needsDelivery ? (early ? 36 : lerp(34, 28, diff / MAX_DIFF)) : 22;
-  const porchH = needsDelivery ? (early ? 30 : lerp(28, 24, diff / MAX_DIFF)) : 18;
+  // Stoops sized for larger houses (still stay in yard strip)
+  const porchW = needsDelivery ? (early ? 30 : lerp(28, 24, diff / MAX_DIFF)) : 20;
+  const porchH = needsDelivery ? (early ? 34 : lerp(32, 28, diff / MAX_DIFF)) : 20;
   const hasDriveway = Math.random() < 0.85;
   // Parked cars only when driveway exists; placed BELOW house (see layoutParked)
   const hasParked = hasDriveway && Math.random() < 0.5;
@@ -685,36 +686,42 @@ function spawnHouse(y) {
   };
   G.houses.push(h);
 
-  G.props.push({ type: "palm", x: side === 0 ? rand(12, 40) : rand(W - 40, W - 12), y: y - 16, scale: rand(0.9, 1.2) });
-  if (h.hasBush) G.props.push({ type: "bush", x: side === 0 ? rand(18, 52) : rand(W - 52, W - 18), y: y + 30 });
-  if (h.hasPool) G.props.push({ type: "pool", x: h.poolX, y: y + 8 });
-  if (Math.random() < 0.35) G.props.push({ type: "pole", x: side === 0 ? rand(8, 26) : rand(W - 26, W - 8), y: y - 48 });
-  if (Math.random() < 0.2) G.props.push({ type: "hydrant", x: side === 0 ? ROAD_L - 24 : ROAD_R + 18, y: y + 55 });
-  // No yard-sign text clutter (kept rare decorative option off by default)
+  G.props.push({ type: "palm", x: side === 0 ? rand(14, 44) : rand(W - 44, W - 14), y: y - 14, scale: rand(1.0, 1.35) });
+  if (h.hasBush) G.props.push({ type: "bush", x: side === 0 ? rand(16, 48) : rand(W - 48, W - 16), y: y + 28 });
+  if (h.hasPool) G.props.push({ type: "pool", x: h.poolX, y: y + 6 });
+  if (Math.random() < 0.4) G.props.push({ type: "pole", x: side === 0 ? rand(10, 28) : rand(W - 28, W - 10), y: y - 40 });
+  if (Math.random() < 0.22) G.props.push({ type: "hydrant", x: side === 0 ? ROAD_L - 22 : ROAD_R + 16, y: y + 48 });
 }
 
 function spawnObstacle() {
   const diff = difficulty();
-  if (Math.random() < lerp(0.42, 0.12, diff / MAX_DIFF)) return;
+  if (Math.random() < lerp(0.4, 0.12, diff / MAX_DIFF)) return;
   if (G.fsd > 0 && Math.random() < 0.7) return;
   if (G.obstacles.filter(o => !o.dead).length >= (diff < 0.25 ? 1 : diff < 0.5 ? 2 : 3)) return;
 
   let type;
-  if (diff < 0.2) type = Math.random() < 0.82 ? "cone" : "scooter";
-  else if (diff < 0.4) type = pick(["cone","cone","scooter","cone"]);
-  else if (diff < 0.6) type = pick(["cone","scooter","ped","cone"]);
-  else type = pick(["cone","scooter","ped","dog","car","scooter"]);
+  // pothole / barrier / branch are static road hazards (readable with cones)
+  if (diff < 0.2) type = pick(["cone", "cone", "pothole", "scooter"]);
+  else if (diff < 0.4) type = pick(["cone", "pothole", "barrier", "scooter", "cone"]);
+  else if (diff < 0.6) type = pick(["cone", "pothole", "barrier", "branch", "scooter", "ped"]);
+  else type = pick(["cone", "pothole", "barrier", "branch", "scooter", "ped", "dog", "car"]);
 
-  // Construction zone event: more cones
-  if (G.event === "construction") type = Math.random() < 0.7 ? "cone" : type;
+  if (G.event === "construction") type = pick(["cone", "cone", "barrier", "pothole", type]);
 
   let x = rand(ROAD_L + 28, ROAD_R - 28);
-  if (Math.random() < (diff < 0.35 ? 0.9 : 0.68)) {
+  // Static hazards can sit more mid-lane; movers stay shoulder-biased
+  const staticHaz = type === "pothole" || type === "barrier" || type === "branch" || type === "cone";
+  if (!staticHaz && Math.random() < (diff < 0.35 ? 0.9 : 0.68)) {
     x = Math.random() < 0.5 ? rand(ROAD_L + 24, ROAD_L + 58) : rand(ROAD_R - 58, ROAD_R - 24);
+  } else if (type === "pothole") {
+    x = rand(ROAD_L + 36, ROAD_R - 36); // pot holes on travel path
   }
 
-  const o = { type, x, y: -70, w: 28, h: 28, vx: 0, dead: false, hit: false, anim: 0, pkgHit: false };
+  const o = { type, x, y: -70, w: 28, h: 28, vx: 0, dead: false, hit: false, anim: 0, pkgHit: false, seed: rand(0, 100) };
   if (type === "cone") { o.w = 18; o.h = 22; }
+  if (type === "pothole") { o.w = 34; o.h = 22; }
+  if (type === "barrier") { o.w = 40; o.h = 18; }
+  if (type === "branch") { o.w = 36; o.h = 16; o.rot = rand(-0.4, 0.4); }
   if (type === "scooter") { o.w = 16; o.h = 36; o.vx = pick([-14, 14]) * (0.5 + diff * 0.4); }
   if (type === "car") {
     o.w = 46; o.h = 74; o.color = pick(["#E53935","#1E88E5","#43A047","#FB8C00","#5E35B1","#FAFAFA","#37474F"]);
@@ -736,45 +743,39 @@ function spawnObstacle() {
  * (toward the player), never under the porch.
  */
 function layoutHouse(h) {
-  // Compact footprint so porch never sits on the roof/body
-  const hw = h.style === "modern" ? 44 : h.style === "cottage" ? 42 : 46;
-  const hh = h.style === "cottage" ? 50 : 54;
-  // Left: house against left edge. Right: house against right edge.
-  const hx = h.side === 0 ? 5 : W - 5 - hw;
-  const hy = h.y - 14;
+  // Larger suburban footprint (wider yards after ROAD_L tweak)
+  const hw = h.style === "modern" ? 58 : h.style === "cottage" ? 56 : 60;
+  const hh = h.style === "cottage" ? 68 : 72;
+  const hx = h.side === 0 ? 4 : W - 4 - hw;
+  const hy = h.y - 22;
 
-  // Porch = stoop on the road-facing wall, in the strip between house and curb
-  let porchW = Math.min(h.porchW || 30, 32);
-  let porchH = Math.min(h.porchH || 26, 28);
+  // Stoop on road-facing wall — room for porch between wall and curb
+  let porchW = Math.min(h.porchW || 28, 28);
+  let porchH = Math.min(h.porchH || 30, 32);
   let porchX, porchY;
   if (h.side === 0) {
-    porchX = hx + hw; // starts at house wall, extends toward road
-    const maxW = Math.max(18, ROAD_L - 8 - porchX);
+    porchX = hx + hw - 2; // slight attach to wall
+    const maxW = Math.max(16, ROAD_L - 10 - porchX);
     porchW = Math.min(porchW, maxW);
   } else {
-    porchX = ROAD_R + 8;
-    const maxW = Math.max(18, hx - porchX);
+    const maxW = Math.max(16, hx - (ROAD_R + 10));
     porchW = Math.min(porchW, maxW);
-    // keep stoop snug against house wall
-    porchX = hx - porchW;
+    porchX = hx - porchW + 2;
   }
-  porchY = hy + hh * 0.4; // door height — beside wall, not over roof
+  porchY = hy + hh * 0.38;
 
-  // Driveway BELOW house (higher y = toward player / bottom of screen)
   const driveTop = hy + hh + 2;
   let car = null;
   if (h.parkedCar) {
-    const cw = h.parkedCar.w || 26, ch = h.parkedCar.h || 40;
-    // Centered under house footprint on the driveway slab
+    const cw = h.parkedCar.w || 30, ch = h.parkedCar.h || 44;
     const cx = hx + hw / 2;
-    const cy = driveTop + 26;
+    const cy = driveTop + 28;
     car = { cx, cy, w: cw, h: ch, x: cx - cw / 2, y: cy - ch / 2 };
   }
 
-  // Window on main wall facing road (on the house body only)
-  const winW = 20, winH = 15;
-  const winX = h.side === 0 ? hx + 6 : hx + hw - 26;
-  const winY = hy + 14;
+  const winW = 24, winH = 18;
+  const winX = h.side === 0 ? hx + 8 : hx + hw - 32;
+  const winY = hy + 16;
 
   return {
     hx, hy, hw, hh,
@@ -1208,24 +1209,29 @@ function hitsParked(pk, h) {
 
 function hitEntity(pk, o) {
   o.pkgHit = true;
-  const dismiss = { lady: 60, ped: 40, dog: 35, scooter: 28, cone: 22 };
+  const dismiss = { lady: 60, ped: 40, dog: 35, scooter: 28, cone: 22, barrier: 20, branch: 18 };
   if (dismiss[o.type] != null) {
     const bonus = Math.round(dismiss[o.type] * (pk.def?.mult || 1));
     G.score += Math.round(bonus * G.weatherMult);
     G.threatBeans++;
-    G.streak++; // still counts as stylish
+    G.streak++;
     G.bestStreak = Math.max(G.bestStreak, G.streak);
     o.dead = true; o.hit = true;
-    confetti(o.x, o.y); shake(7); hitStop(0.05);
-    floatT(o.x, o.y - 14, "+" + bonus, "#A5D6A7", 13, 0.7);
+    confetti(o.x, o.y); shake(5); hitStop(0.04);
+    floatT(o.x, o.y - 14, "+" + bonus, "#A5D6A7", 13, 0.65);
     SFX.dismiss();
     if (o.type === "dog") SFX.bark();
     return true;
   }
+  // Potholes aren't "beanable" — package just vanishes into the hole
+  if (o.type === "pothole") {
+    burst(pk.x, pk.y, "#37474F", 10);
+    SFX.miss();
+    return true;
+  }
   if (o.type === "car") {
     G.score = Math.max(0, G.score - 15); G.streak = 0;
-    burst(pk.x, pk.y, "#90A4AE", 14); shake(6);
-    burst(pk.x, pk.y, "#90A4AE", 10); shake(4);
+    burst(pk.x, pk.y, "#90A4AE", 12); shake(4);
     SFX.horn(); SFX.crack(); return true;
   }
   return false;
@@ -1366,12 +1372,12 @@ function update(dt) {
 
   if (state === ST.TITLE || state === ST.HOWTO) {
     G.scroll += 32 * dt; G.roadLines += 32 * dt;
-    if (!G.houses.length) for (let i = 0; i < 5; i++) spawnHouse(i * 200 - 80);
+    if (!G.houses.length) for (let i = 0; i < 6; i++) spawnHouse(i * 140 - 80);
     for (const h of G.houses) h.y += 32 * dt;
     for (const p of G.props) p.y += 32 * dt;
     G.houses = G.houses.filter(h => h.y < H + 120);
     G.props = G.props.filter(p => p.y < H + 120);
-    if (G.houses.length < 4) spawnHouse(-90);
+    if (G.houses.length < 6) spawnHouse(-90);
     G.carX = ROAD_CX + Math.sin(now() / 900) * 40;
     return;
   }
@@ -1463,8 +1469,9 @@ function update(dt) {
 
   G.nextHouseDist -= scrollAmt;
   if (G.nextHouseDist <= 0) {
-    spawnHouse(-100);
-    G.nextHouseDist = lerp(235, 175, diff / MAX_DIFF);
+    spawnHouse(-90);
+    // Tighter suburban spacing (was very sparse)
+    G.nextHouseDist = lerp(155, 118, diff / MAX_DIFF);
   }
 
   G.spawnT -= dt;
@@ -1530,13 +1537,21 @@ function onCarHit(o) {
     return;
   }
   const table = {
-    cone: "Traffic cone!", scooter: "Lime scooter!", car: "Fender bender!",
-    ped: "Phone zombie!", dog: "Doggo attack!",
+    cone: "Traffic cone!",
+    scooter: "Lime scooter!",
+    car: "Fender bender!",
+    ped: "Phone zombie!",
+    dog: "Doggo attack!",
+    pothole: "Pothole! Florida roads win again.",
+    barrier: "Construction barrier!",
+    branch: "Fallen branch!",
   };
   if (o.type === "dog") { G.dogIncidents++; SFX.bark(); }
   if (o.type === "car") SFX.horn();
+  // Soft hazards: pothole/barrier/branch cost a heart but feel lighter
   loseHeart(table[o.type] || "Ouch!");
-  burst(o.x, o.y, "#FF7043", 14); SFX.hit();
+  burst(o.x, o.y, o.type === "pothole" ? "#455A64" : "#FF7043", 12);
+  SFX.hit();
 }
 
 function startGate() {
@@ -2069,21 +2084,45 @@ function drawHouse(h) {
   // Door on road-facing wall
   const doorX = L.doorX;
   const doorY = L.doorY;
+  softShadow(3, 0.1);
   ctx.fillStyle = h.trim;
-  roundRect(doorX - 1, doorY, 18, 28, 2);
+  roundRect(doorX - 2, doorY, 20, 30, 3);
   ctx.fill();
-  ctx.fillStyle = shade(h.accent, -25);
-  roundRect(doorX, doorY + 2, 16, 24, 2);
+  clearShadow();
+  ctx.fillStyle = shade(h.accent, -22);
+  roundRect(doorX, doorY + 2, 16, 26, 2);
+  ctx.fill();
+  // Door window pane
+  ctx.fillStyle = h.windowLit ? "rgba(255,249,196,0.55)" : "rgba(187,222,251,0.55)";
+  roundRect(doorX + 3, doorY + 5, 10, 7, 1);
+  ctx.fill();
+  ctx.fillStyle = "#FFD54F";
+  ctx.beginPath();
+  ctx.arc(doorX + 12, doorY + 16, 1.4, 0, Math.PI * 2);
   ctx.fill();
   if (h.hasRing) {
-    ctx.fillStyle = h.ringHit ? "#FF5252" : "#263238";
+    ctx.fillStyle = h.ringHit ? "#FF5252" : "#37474F";
     ctx.beginPath();
-    ctx.arc(doorX + 8, doorY - 2, 3.5, 0, Math.PI * 2);
+    ctx.arc(doorX + 8, doorY - 3, 3.2, 0, Math.PI * 2);
     ctx.fill();
+    if (!h.ringHit) {
+      ctx.fillStyle = "#81C784";
+      ctx.beginPath();
+      ctx.arc(doorX + 8, doorY - 3, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // Window (matches hitbox)
   drawWin(L.winX, L.winY, L.winW, L.winH, h.windowLit && !h.windowBroken, h.shutters, h.accent, h.windowBroken);
+  // Second small window for larger houses
+  if (hw > 52 && !h.garage) {
+    const wx2 = h.side === 0 ? L.winX : L.winX;
+    const wy2 = L.winY + L.winH + 8;
+    if (wy2 + 12 < hy + hh - 16) {
+      drawWin(wx2, wy2, 14, 11, false, false, h.accent, false);
+    }
+  }
 
   // Quiet house number plaque (small, low contrast)
   ctx.fillStyle = "rgba(255,255,255,0.35)";
@@ -2260,7 +2299,78 @@ function drawParked(h) {
 function drawObstacles() {
   for (const o of G.obstacles) {
     if (o.y < -80 || o.y > H + 80) continue;
-    if (o.type === "cone") {
+    if (o.type === "pothole") {
+      // Irregular dark asphalt crater
+      const s = o.seed || 1;
+      softShadow(6, 0.2);
+      ctx.fillStyle = "rgba(30,36,42,0.92)";
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y, 16 + (s % 5), 10 + (s % 3), 0.15, 0, Math.PI * 2);
+      ctx.fill();
+      clearShadow();
+      ctx.fillStyle = "rgba(20,24,28,0.95)";
+      ctx.beginPath();
+      ctx.ellipse(o.x - 2, o.y + 1, 10, 6, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      // Cracked rim
+      ctx.strokeStyle = "rgba(90,100,110,0.55)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y, 17 + (s % 4), 11, 0.1, 0.2, Math.PI * 1.7);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.beginPath();
+      ctx.ellipse(o.x + 4, o.y - 3, 4, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (o.type === "barrier") {
+      // Orange/white striped construction barrier
+      softShadow(5, 0.14);
+      ctx.fillStyle = "#ECEFF1";
+      roundRect(o.x - 20, o.y - 8, 40, 16, 3);
+      ctx.fill();
+      clearShadow();
+      ctx.fillStyle = "#FF8A50";
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(o.x - 18 + i * 10, o.y - 8);
+        ctx.lineTo(o.x - 12 + i * 10, o.y - 8);
+        ctx.lineTo(o.x - 14 + i * 10, o.y + 8);
+        ctx.lineTo(o.x - 20 + i * 10, o.y + 8);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.strokeStyle = "rgba(0,0,0,0.12)";
+      ctx.lineWidth = 1;
+      roundRect(o.x - 20, o.y - 8, 40, 16, 3);
+      ctx.stroke();
+      // Feet
+      ctx.fillStyle = "#78909C";
+      ctx.fillRect(o.x - 18, o.y + 7, 5, 4);
+      ctx.fillRect(o.x + 13, o.y + 7, 5, 4);
+    } else if (o.type === "branch") {
+      // Fallen palm frond / branch on asphalt
+      softShadow(4, 0.12);
+      ctx.save();
+      ctx.translate(o.x, o.y);
+      ctx.rotate(o.rot || 0);
+      ctx.strokeStyle = "#6D4C41";
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-16, 2);
+      ctx.quadraticCurveTo(0, -6, 16, 0);
+      ctx.stroke();
+      ctx.strokeStyle = "#558B2F";
+      ctx.lineWidth = 2;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 6, -1);
+        ctx.quadraticCurveTo(i * 8, -10, i * 12, -8);
+        ctx.stroke();
+      }
+      ctx.restore();
+      clearShadow();
+    } else if (o.type === "cone") {
       // Soft construction cone matching pastel world
       softShadow(5, 0.12);
       ctx.fillStyle = "#FF8A50";
@@ -3166,7 +3276,7 @@ function grade() {
 G.weather = "sunny";
 for (let i = 0; i < 7; i++) G.clouds.push({ x: rand(-40, W + 40), y: rand(18, 100), w: rand(50, 100), s: rand(6, 14), layer: Math.random() });
 for (let i = 0; i < 3; i++) G.birds.push({ x: rand(0, W), y: rand(40, 100), s: rand(20, 36), flap: rand(0, 8) });
-for (let i = 0; i < 4; i++) spawnHouse(i * 200 - 40);
+for (let i = 0; i < 5; i++) spawnHouse(i * 140 - 30);
 
 function frame(t) {
   let dt = clamp((t - lastT) / 1000, 0, 0.05);
