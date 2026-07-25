@@ -104,13 +104,108 @@ function difficulty() {
 }
 
 function aimAssistStrength() {
-  // Stay helpful for most of the route
-  return lerp(0.82, 0.42, difficulty() / MAX_DIFF);
+  // Strong magnet most of the route — players were still overshooting
+  return lerp(0.92, 0.62, difficulty() / MAX_DIFF);
 }
 
 function porchPad() {
-  return lerp(26, 12, difficulty() / MAX_DIFF);
+  return lerp(34, 18, difficulty() / MAX_DIFF);
 }
+
+function assistRadius() {
+  return lerp(150, 95, difficulty() / MAX_DIFF);
+}
+
+// ─── Sound (Web Audio, no external files) ───────────────────
+let audioCtx = null;
+let sfxMuted = false;
+
+function ensureAudio() {
+  if (sfxMuted) return null;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function tone({ freq = 440, dur = 0.12, type = "sine", gain = 0.08, slide = 0, delay = 0 }) {
+  const ac = ensureAudio();
+  if (!ac) return;
+  const t0 = ac.currentTime + delay;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if (slide) o.frequency.linearRampToValueAtTime(freq + slide, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g);
+  g.connect(ac.destination);
+  o.start(t0);
+  o.stop(t0 + dur + 0.02);
+}
+
+function noiseBurst(dur = 0.08, gain = 0.04, filterFreq = 1200) {
+  const ac = ensureAudio();
+  if (!ac) return;
+  const n = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const f = ac.createBiquadFilter();
+  f.type = "lowpass";
+  f.frequency.value = filterFreq;
+  const g = ac.createGain();
+  g.gain.value = gain;
+  src.connect(f); f.connect(g); g.connect(ac.destination);
+  src.start();
+}
+
+const SFX = {
+  click() { tone({ freq: 520, dur: 0.06, type: "triangle", gain: 0.05 }); },
+  throw() {
+    tone({ freq: 280, dur: 0.1, type: "square", gain: 0.035, slide: 160 });
+    noiseBurst(0.06, 0.03, 1800);
+  },
+  deliver() {
+    tone({ freq: 523, dur: 0.09, type: "sine", gain: 0.07 });
+    tone({ freq: 659, dur: 0.1, type: "sine", gain: 0.06, delay: 0.07 });
+    tone({ freq: 784, dur: 0.14, type: "sine", gain: 0.05, delay: 0.14 });
+  },
+  miss() { tone({ freq: 180, dur: 0.14, type: "triangle", gain: 0.04, slide: -60 }); },
+  splash() {
+    noiseBurst(0.18, 0.05, 900);
+    tone({ freq: 220, dur: 0.12, type: "sine", gain: 0.03, slide: -80 });
+  },
+  hit() {
+    noiseBurst(0.1, 0.06, 500);
+    tone({ freq: 90, dur: 0.15, type: "sawtooth", gain: 0.04, slide: -40 });
+  },
+  fsd() {
+    tone({ freq: 440, dur: 0.12, type: "sine", gain: 0.05, slide: 220 });
+    tone({ freq: 660, dur: 0.18, type: "sine", gain: 0.045, delay: 0.08, slide: 180 });
+    tone({ freq: 880, dur: 0.22, type: "triangle", gain: 0.04, delay: 0.16 });
+  },
+  pirate() {
+    tone({ freq: 300, dur: 0.08, type: "square", gain: 0.05 });
+    tone({ freq: 450, dur: 0.12, type: "square", gain: 0.04, delay: 0.08 });
+  },
+  gateOk() {
+    tone({ freq: 392, dur: 0.1, type: "sine", gain: 0.06 });
+    tone({ freq: 523, dur: 0.16, type: "sine", gain: 0.06, delay: 0.1 });
+  },
+  gateBad() {
+    tone({ freq: 200, dur: 0.2, type: "sawtooth", gain: 0.04, slide: -80 });
+  },
+  snack() {
+    tone({ freq: 700, dur: 0.07, type: "sine", gain: 0.05 });
+    tone({ freq: 900, dur: 0.1, type: "sine", gain: 0.04, delay: 0.06 });
+  },
+};
 
 // ─── Game State ─────────────────────────────────────────────
 const STATE = { TITLE: 0, HOWTO: 1, PLAY: 2, GATE: 3, END: 4 };
@@ -160,7 +255,7 @@ function resetGame() {
   }
   // Seed calm houses (easy flags set inside spawn for early route)
   for (let i = 0; i < 5; i++) spawnHouse(-i * 175 - 80);
-  spawnMessage("Easy stretch — hit the glowing porches!", 2.8);
+  spawnMessage("Only DROP pads need packages — orange rings!", 3);
   setTimeoutCoach();
 }
 
@@ -199,32 +294,46 @@ function spawnHouse(y) {
   const diff = state === STATE.PLAY ? difficulty() : 0.15;
   const early = state === STATE.PLAY && elapsed() < EASY_SECS;
 
-  // Early route: calm yards, bigger clearer targets
-  const hasPool = !early && Math.random() < 0.08 + diff * 0.18;
-  const hasRing = Math.random() < (early ? 0.1 : 0.25 + diff * 0.15);
-  const hasSnack = Math.random() < 0.12 + (early ? 0.1 : 0);
-  const hasPirate = !early && Math.random() < 0.05 + diff * 0.12;
-  const hasDog = !early && Math.random() < 0.06 + diff * 0.1;
-  const hasMailbox = Math.random() < 0.85;
-  const hasDriveway = Math.random() < 0.7;
-  const hasBush = Math.random() < 0.75;
+  // Not every house needs a package — clearer focus on real drops
+  // Early: ~65% stops · later: ~45% stops
+  const deliveryChance = early ? 0.68 : lerp(0.58, 0.42, diff / MAX_DIFF);
+  const needsDelivery = Math.random() < deliveryChance;
 
-  const porchW = early ? 46 : lerp(44, 34, diff);
-  const porchH = early ? 36 : lerp(34, 28, diff);
+  // Hazards only matter near delivery stops (and still rare early)
+  const hasPool = needsDelivery && !early && Math.random() < 0.08 + diff * 0.15;
+  const hasRing = needsDelivery && Math.random() < (early ? 0.08 : 0.2 + diff * 0.12);
+  const hasSnack = needsDelivery && Math.random() < 0.14 + (early ? 0.1 : 0);
+  const hasPirate = needsDelivery && !early && Math.random() < 0.05 + diff * 0.1;
+  const hasDog = !early && Math.random() < 0.05 + diff * 0.08;
+  const hasMailbox = Math.random() < 0.85;
+  const hasDriveway = Math.random() < 0.75;
+  const hasBush = Math.random() < 0.8;
+  const hasFence = Math.random() < 0.55;
+  const hasPlanters = Math.random() < 0.6;
+  const style = pick(["ranch", "ranch", "cottage", "modern"]);
+
+  // Delivery pads are large and readable
+  const porchW = needsDelivery ? (early ? 50 : lerp(48, 40, diff / MAX_DIFF)) : 28;
+  const porchH = needsDelivery ? (early ? 40 : lerp(38, 32, diff / MAX_DIFF)) : 20;
   const porchX = side === 0 ? ROAD_L - 8 - porchW : ROAD_R + 8;
 
   const house = {
     y, side, color,
     porchX, porchW, porchH,
-    roof: pick(["#6D4C41", "#455A64", "#5D4037", "#37474F", "#795548", "#8D6E63"]),
-    trim: pick(["#FFFFFF", "#FAFAFA", "#FFF8E1", "#EFEBE9"]),
+    roof: pick(["#6D4C41", "#455A64", "#5D4037", "#37474F", "#795548", "#8D6E63", "#BF360C"]),
+    trim: pick(["#FFFFFF", "#FAFAFA", "#FFF8E1", "#EFEBE9", "#ECEFF1"]),
+    accent: pick(["#1565C0", "#2E7D32", "#6A1B9A", "#C62828", "#00838F", "#EF6C00"]),
+    brick: pick(["#A1887F", "#8D6E63", "#BCAAA4", "#D7CCC8"]),
     delivered: false, glow: 1,
+    needsDelivery,
     hasPool, hasRing, hasSnack, hasPirate, hasDog, hasMailbox, hasDriveway, hasBush,
+    hasFence, hasPlanters, style,
     poolX: side === 0 ? ROAD_L - 100 : ROAD_R + 100,
     ringHit: false, snackTaken: false, pirateHit: false,
     number: 100 + ((G.houses.length + 1) * 2 + side),
-    windowLit: Math.random() < 0.35,
-    garage: Math.random() < 0.4,
+    windowLit: Math.random() < 0.4,
+    garage: Math.random() < 0.45,
+    shutters: Math.random() < 0.55,
   };
   G.houses.push(house);
 
@@ -332,49 +441,83 @@ function getPorchRect(h) {
   };
 }
 
+function isActiveStop(h) {
+  return h && h.needsDelivery && !h.delivered;
+}
+
 function findAssistTarget(aimX, aimY) {
   const strength = aimAssistStrength();
-  const radius = lerp(110, 55, difficulty()); // generous early magnet radius
-  let best = null, bestD = radius;
+  const radius = assistRadius();
+  let best = null, bestH = null, bestD = radius;
   for (const h of G.houses) {
-    if (h.delivered) continue;
+    if (!isActiveStop(h)) continue;
     const p = getPorchRect(h);
-    // only assist toward porches in throw zone ahead of car
-    if (p.cy > CAR_Y - 20 || p.cy < 40) continue;
+    // only assist toward pads in the throw band ahead of the car
+    if (p.cy > CAR_Y - 30 || p.cy < 60) continue;
     const d = dist(aimX, aimY, p.cx, p.cy);
     if (d < bestD) {
       bestD = d;
       best = p;
+      bestH = h;
     }
   }
-  if (!best) return { x: aimX, y: aimY, assisted: false, porch: null };
-  // Pull aim toward porch center (stronger when closer & early)
-  const pull = strength * (1 - bestD / radius);
+  if (!best) return { x: aimX, y: aimY, assisted: false, porch: null, house: null, snap: false };
+
+  // Close enough → hard snap to pad center (big fairness win)
+  const snapDist = lerp(78, 48, difficulty() / MAX_DIFF);
+  if (bestD < snapDist) {
+    return {
+      x: best.cx, y: best.cy,
+      assisted: true, snap: true,
+      porch: best, house: bestH, pull: 1,
+    };
+  }
+
+  const pull = Math.min(1, strength * (1 - bestD / radius) * 1.15);
   return {
     x: lerp(aimX, best.cx, pull),
-    y: lerp(aimY, best.cy, pull * 0.95),
-    assisted: pull > 0.12,
+    y: lerp(aimY, best.cy, pull),
+    assisted: pull > 0.15,
+    snap: false,
     porch: best,
+    house: bestH,
     pull,
   };
 }
 
 function clampAim(startX, startY, aimX, aimY) {
-  // Shorter max range early so players don't overthrow past porches
-  const maxDist = lerp(210, 300, difficulty());
-  // Prefer landing in porch band (y ~ 120–420)
-  aimY = clamp(aimY, 70, CAR_Y - 50);
+  // Keep throws in the "porch band" so pads aren't behind the car or sky-high
+  const maxDist = lerp(200, 270, difficulty() / MAX_DIFF);
+  aimY = clamp(aimY, 90, CAR_Y - 70);
+  // Bias aim into side yards slightly when aiming near road center
+  if (aimX > ROAD_L + 10 && aimX < ROAD_R - 10) {
+    // prefer nearest curb when aiming over asphalt
+    aimX = aimX < ROAD_CX ? ROAD_L - 20 : ROAD_R + 20;
+  }
   const d = dist(startX, startY, aimX, aimY);
   if (d > maxDist) {
     const k = maxDist / d;
     aimX = startX + (aimX - startX) * k;
     aimY = startY + (aimY - startY) * k;
   }
-  // Soft vertical bias: slightly pull long throws closer
-  if (startY - aimY > 200) {
-    aimY = lerp(aimY, startY - 175, lerp(0.35, 0.1, difficulty()));
+  // Pull long throws shorter — main overthrow fix
+  if (startY - aimY > 170) {
+    aimY = lerp(aimY, startY - 155, lerp(0.5, 0.25, difficulty() / MAX_DIFF));
   }
   return { x: aimX, y: aimY };
+}
+
+/** Best active delivery pad for HUD highlight / space throw */
+function bestActiveStop() {
+  let best = null, bestH = null, bestScore = 1e9;
+  for (const h of G.houses) {
+    if (!isActiveStop(h)) continue;
+    const p = getPorchRect(h);
+    if (p.cy > CAR_Y - 40 || p.cy < 70) continue;
+    const score = Math.abs(p.cx - G.carX) * 0.5 + Math.abs(p.cy - (CAR_Y - 170)) * 0.5;
+    if (score < bestScore) { bestScore = score; best = p; bestH = h; }
+  }
+  return best ? { porch: best, house: bestH } : null;
 }
 
 // ─── Input ──────────────────────────────────────────────────
@@ -394,11 +537,17 @@ function updateAimPreview(px, py) {
   const startX = G.carX, startY = CAR_Y - 18;
   let { x, y } = clampAim(startX, startY, px, py);
   const assist = findAssistTarget(x, y);
-  G.aimPreview = { x: assist.x, y: assist.y, assisted: assist.assisted, sx: startX, sy: startY };
+  G.aimPreview = {
+    x: assist.x, y: assist.y,
+    assisted: assist.assisted,
+    snap: !!assist.snap,
+    sx: startX, sy: startY,
+  };
 }
 
 function onPointerDown(e) {
   e.preventDefault();
+  ensureAudio();
   const id = e.pointerId ?? 0;
   const p = canvasPos(e);
   pointers.set(id, p);
@@ -467,9 +616,11 @@ canvas.addEventListener("contextmenu", e => e.preventDefault());
 
 window.addEventListener("keydown", e => {
   keys[e.code] = true;
+  ensureAudio();
   if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+  if (e.code === "KeyM") { sfxMuted = !sfxMuted; spawnMessage(sfxMuted ? "Sound off" : "Sound on", 1.2); }
   if (state === STATE.TITLE && (e.code === "Enter" || e.code === "Space")) {
-    state = STATE.PLAY; resetGame();
+    state = STATE.PLAY; resetGame(); SFX.click();
   }
   if (state === STATE.HOWTO && (e.code === "Enter" || e.code === "Space" || e.code === "Escape")) {
     state = STATE.TITLE;
@@ -490,16 +641,8 @@ window.addEventListener("keydown", e => {
 window.addEventListener("keyup", e => { keys[e.code] = false; });
 
 function nearestPorchTarget() {
-  let best = null, bestScore = 1e9;
-  for (const h of G.houses) {
-    if (h.delivered) continue;
-    const p = getPorchRect(h);
-    if (p.cy > CAR_Y - 40 || p.cy < 80) continue;
-    // Prefer porches near car X and mid-screen
-    const score = Math.abs(p.cx - G.carX) * 0.55 + Math.abs(p.cy - (CAR_Y - 180)) * 0.45;
-    if (score < bestScore) { bestScore = score; best = p; }
-  }
-  return best;
+  const b = bestActiveStop();
+  return b ? b.porch : null;
 }
 
 // ─── UI ─────────────────────────────────────────────────────
@@ -516,6 +659,7 @@ function handleUIClick(x, y) {
   }
 }
 function onButton(id) {
+  SFX.click();
   if (id === "play") { state = STATE.PLAY; resetGame(); }
   if (id === "howto") { state = STATE.HOWTO; }
   if (id === "back") { state = STATE.TITLE; }
@@ -540,12 +684,14 @@ function pickGate(i) {
     floatTxt(W / 2, 280, "GATE OPEN +50", "#4CAF50", 20);
     burst(W / 2, 320, "#4CAF50", 16);
     spawnMessage("Gate code accepted. Welcome, Flexer.", 2);
+    SFX.gateOk();
   } else {
     G.damage = clamp(G.damage + 14, 0, MAX_DAMAGE);
     G.time = Math.max(0, G.time - 2.5);
     G.shake = 10;
     floatTxt(W / 2, 280, "WRONG CODE!", "#FF5252", 18);
     spawnMessage("Wrong code… HOA delay + damage.", 2.4);
+    SFX.gateBad();
   }
   state = STATE.PLAY;
   G.gateActive = false;
@@ -555,31 +701,37 @@ function pickGate(i) {
 // ─── Throw ──────────────────────────────────────────────────
 function throwPackage(tx, ty, alreadyAssisted) {
   if (G.throwCD > 0 || state !== STATE.PLAY) return;
-  G.throwCD = lerp(0.28, 0.2, difficulty());
+  G.throwCD = lerp(0.26, 0.18, difficulty() / MAX_DIFF);
   const startX = G.carX;
   const startY = CAR_Y - 18;
   let aimX = tx, aimY = ty;
+  let assistMeta = null;
   if (!alreadyAssisted) {
     const c = clampAim(startX, startY, aimX, aimY);
-    const a = findAssistTarget(c.x, c.y);
-    aimX = a.x; aimY = a.y;
+    assistMeta = findAssistTarget(c.x, c.y);
+    aimX = assistMeta.x; aimY = assistMeta.y;
   } else {
     const c = clampAim(startX, startY, aimX, aimY);
-    aimX = c.x; aimY = c.y;
+    // still apply assist/snap for fairness
+    assistMeta = findAssistTarget(c.x, c.y);
+    if (assistMeta.assisted) { aimX = assistMeta.x; aimY = assistMeta.y; }
+    else { aimX = c.x; aimY = c.y; }
   }
   const d = dist(startX, startY, aimX, aimY);
-  // Slightly slower, more readable arcs early
-  const flight = clamp(d / lerp(300, 400, difficulty()), 0.42, 0.95);
+  // Flatter, more readable arcs — less "over the house" feel
+  const flight = clamp(d / lerp(280, 360, difficulty() / MAX_DIFF), 0.38, 0.85);
   G.packages.push({
     x: startX, y: startY,
     sx: startX, sy: startY,
     tx: aimX, ty: aimY,
     t: 0, dur: flight,
-    arc: lerp(48, 62, Math.min(d / 250, 1)),
+    arc: lerp(28, 42, Math.min(d / 220, 1)),
     rot: rand(0, Math.PI),
-    vr: rand(-6, 6),
+    vr: rand(-5, 5),
     done: false,
+    targetHouse: assistMeta && assistMeta.house,
   });
+  SFX.throw();
 }
 
 function startGate() {
@@ -609,6 +761,7 @@ function tryFSD() {
     G.fsd = FSD_DURATION;
     spawnMessage("⚡ FSD ENGAGED — focus on throws!", 2.8);
     burst(G.carX, CAR_Y, "#00B0FF", 22);
+    SFX.fsd();
   }
 }
 
@@ -681,9 +834,9 @@ function update(dt) {
   if (G.coachPhase === 0 && e > 0.8) {
     G.coachPhase = 1;
     spawnMessage("Drag bottom to steer · Tap/hold top to aim & throw", 3.2);
-  } else if (G.coachPhase === 1 && e > 6 && G.deliveries === 0) {
+  } else if (G.coachPhase === 1 && e > 5 && G.deliveries === 0) {
     G.coachPhase = 2;
-    spawnMessage("Orange glow = porch target. Aim a little short!", 3);
+    spawnMessage("Only DROP / AIM HERE pads need packages!", 3.2);
   } else if (G.coachPhase === 2 && e > EASY_SECS) {
     G.coachPhase = 3;
     spawnMessage("Traffic picking up — stay sharp!", 2.4);
@@ -838,16 +991,35 @@ function handleObstacleHit(o) {
   damagePlayer(t.dmg, t.msg);
   burst(o.x, o.y, "#FF7043", 12);
   floatTxt(o.x, o.y - 10, "ouch", "#FF5252", 13);
+  SFX.hit();
 }
 
 function resolvePackageLanding(pk) {
+  // Prefer intended assist target first (generous forgiveness)
+  const ordered = [];
+  if (pk.targetHouse && isActiveStop(pk.targetHouse)) ordered.push(pk.targetHouse);
   for (const h of G.houses) {
-    if (h.delivered) continue;
-    const porch = getPorchRect(h);
+    if (h !== pk.targetHouse) ordered.push(h);
+  }
 
-    // Porch hit (generous rect)
-    if (pk.x > porch.x && pk.x < porch.x + porch.w &&
-        pk.y > porch.y && pk.y < porch.y + porch.h) {
+  for (const h of ordered) {
+    const porch = getPorchRect(h);
+    const onPad = pk.x > porch.x && pk.x < porch.x + porch.w &&
+                  pk.y > porch.y && pk.y < porch.y + porch.h;
+    // Extra forgiveness radius around active DROP pads
+    const nearPad = isActiveStop(h) && dist(pk.x, pk.y, porch.cx, porch.cy) < lerp(38, 26, difficulty() / MAX_DIFF);
+
+    if (onPad || nearPad) {
+      if (!h.needsDelivery) {
+        floatTxt(porch.cx, porch.cy, "no delivery here", "#B0BEC5", 12);
+        SFX.miss();
+        return;
+      }
+      if (h.delivered) {
+        floatTxt(porch.cx, porch.cy, "already delivered", "#B0BEC5", 12);
+        SFX.miss();
+        return;
+      }
 
       if (h.hasPirate && !h.pirateHit) {
         h.pirateHit = true;
@@ -862,10 +1034,11 @@ function resolvePackageLanding(pk) {
         floatTxt(porch.cx, porch.cy, "PIRATE BONKED! +" + bonus, "#FFD54F", 15);
         burst(pk.x, pk.y, "#FFD54F", 14);
         spawnMessage("Beaned a porch pirate. Justice!", 2);
+        SFX.pirate();
         return;
       }
 
-      if (h.hasRing && Math.random() < lerp(0.08, 0.22, difficulty())) {
+      if (h.hasRing && Math.random() < lerp(0.05, 0.16, difficulty() / MAX_DIFF)) {
         h.ringHit = true;
         G.fails++;
         G.combo = 0;
@@ -873,6 +1046,7 @@ function resolvePackageLanding(pk) {
         floatTxt(pk.x, pk.y, "Ring cam −10", "#FF8A65", 13);
         burst(pk.x, pk.y, "#90A4AE", 8);
         spawnMessage("Tagged the Ring camera. HOA has footage.", 2);
+        SFX.miss();
         return;
       }
 
@@ -886,6 +1060,9 @@ function resolvePackageLanding(pk) {
         note = "SNACKS! +" + pts;
         spawnMessage("Customer left Gatorade & cookies! 🍪", 2);
         burst(pk.x, pk.y, "#FFB74D", 16);
+        SFX.snack();
+      } else {
+        SFX.deliver();
       }
       G.score += pts;
       G.deliveries++;
@@ -906,6 +1083,7 @@ function resolvePackageLanding(pk) {
         floatTxt(pk.x, pk.y, "SPLASH! −20", "#4FC3F7", 14);
         burst(pk.x, pk.y, "#29B6F6", 18);
         spawnMessage("Package went for a swim.", 2);
+        SFX.splash();
         return;
       }
     }
@@ -920,6 +1098,7 @@ function resolvePackageLanding(pk) {
         floatTxt(pk.x, pk.y, "DOG GOT IT", "#A1887F", 13);
         burst(pk.x, pk.y, "#8D6E63", 8);
         spawnMessage("Good boy. Bad metrics.", 2);
+        SFX.miss();
         if (Math.random() < 0.3) {
           G.obstacles.push({
             type: "dog", x: dogX, y: dogY, w: 26, h: 16,
@@ -935,9 +1114,10 @@ function resolvePackageLanding(pk) {
     floatTxt(pk.x, pk.y, "road pizza", "#BDBDBD", 12);
     burst(pk.x, pk.y, "#9E9E9E", 5);
   } else {
-    floatTxt(pk.x, pk.y, "missed porch", "#BDBDBD", 12);
+    floatTxt(pk.x, pk.y, "missed drop", "#BDBDBD", 12);
     G.combo = 0;
   }
+  SFX.miss();
 }
 
 // ─── Drawing ────────────────────────────────────────────────
@@ -1371,120 +1551,195 @@ function drawHouses() {
 
 function drawHouse(h) {
   const facingRight = h.side === 0;
-  const hw = 68, hh = 76;
-  const hx = h.side === 0 ? 4 : ROAD_R + 10;
-  const hy = h.y - 24;
+  const hw = h.style === "modern" ? 72 : 70;
+  const hh = h.style === "cottage" ? 70 : 78;
+  const hx = h.side === 0 ? 3 : ROAD_R + 8;
+  const hy = h.y - 26;
+  const brick = h.brick || "#A1887F";
+  const accent = h.accent || "#1565C0";
 
-  // driveway
+  // driveway (stamped concrete)
   if (h.hasDriveway) {
-    ctx.fillStyle = "#9E9E9E";
-    const dw = 22;
-    const dx = facingRight ? ROAD_L - 20 : ROAD_R - 2;
+    const dw = 24;
+    const dx = facingRight ? ROAD_L - 22 : ROAD_R;
+    ctx.fillStyle = "#A0A0A0";
     ctx.beginPath();
-    ctx.moveTo(facingRight ? hx + hw : hx, hy + hh - 10);
-    ctx.lineTo(dx, h.y + 50);
-    ctx.lineTo(dx + (facingRight ? dw : -dw), h.y + 50);
-    ctx.lineTo(facingRight ? hx + hw : hx, hy + hh + 10);
+    ctx.moveTo(facingRight ? hx + hw : hx, hy + hh - 8);
+    ctx.lineTo(dx, h.y + 52);
+    ctx.lineTo(dx + (facingRight ? dw : -dw), h.y + 52);
+    ctx.lineTo(facingRight ? hx + hw : hx, hy + hh + 12);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    for (let i = 0; i < 3; i++) {
-      ctx.fillRect(dx + (facingRight ? 4 : -14), h.y + 10 + i * 14, 10, 2);
-    }
-  }
-
-  // shadow
-  ctx.fillStyle = "rgba(0,0,0,0.14)";
-  ctx.beginPath();
-  ctx.ellipse(hx + hw / 2 + 4, hy + hh + 6, hw * 0.48, 9, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // body with subtle stucco gradient
-  const bg = ctx.createLinearGradient(hx, hy, hx + hw, hy + hh);
-  bg.addColorStop(0, h.color);
-  bg.addColorStop(1, shade(h.color, -18));
-  ctx.fillStyle = bg;
-  roundRect(hx, hy, hw, hh, 3);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.1)";
-  ctx.lineWidth = 1.5;
-  roundRect(hx, hy, hw, hh, 3);
-  ctx.stroke();
-
-  // roof with shingle bands
-  ctx.fillStyle = h.roof;
-  ctx.beginPath();
-  ctx.moveTo(hx - 6, hy + 10);
-  ctx.lineTo(hx + hw / 2, hy - 26);
-  ctx.lineTo(hx + hw + 6, hy + 10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.12)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 4; i++) {
-    const t = 0.2 + i * 0.18;
-    const y1 = lerp(hy - 26, hy + 10, t);
-    const half = lerp(0, hw / 2 + 6, t);
-    ctx.beginPath();
-    ctx.moveTo(hx + hw / 2 - half, y1);
-    ctx.lineTo(hx + hw / 2 + half, y1);
-    ctx.stroke();
-  }
-  // roof highlight edge
-  ctx.strokeStyle = "rgba(255,255,255,0.14)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(hx + 4, hy + 6);
-  ctx.lineTo(hx + hw / 2, hy - 20);
-  ctx.stroke();
-  // gutter
-  ctx.strokeStyle = h.trim;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(hx - 4, hy + 10);
-  ctx.lineTo(hx + hw + 4, hy + 10);
-  ctx.stroke();
-  // wall AC unit (Florida classic)
-  {
-    const acx = facingRight ? hx + 4 : hx + hw - 16;
-    ctx.fillStyle = "#90A4AE";
-    roundRect(acx, hy + hh - 22, 14, 10, 1);
-    ctx.fill();
-    ctx.fillStyle = "#78909C";
-    for (let i = 0; i < 3; i++) ctx.fillRect(acx + 2, hy + hh - 20 + i * 3, 10, 1.5);
-  }
-
-  // garage
-  if (h.garage) {
-    const gx = facingRight ? hx + 6 : hx + hw - 30;
-    ctx.fillStyle = "#78909C";
-    roundRect(gx, hy + 38, 26, 28, 2);
-    ctx.fill();
-    ctx.strokeStyle = "#546E7A";
+    ctx.strokeStyle = "rgba(0,0,0,0.1)";
+    ctx.lineWidth = 1;
     for (let i = 0; i < 4; i++) {
+      const yy = h.y + 8 + i * 12;
       ctx.beginPath();
-      ctx.moveTo(gx + 2, hy + 44 + i * 6);
-      ctx.lineTo(gx + 24, hy + 44 + i * 6);
+      ctx.moveTo(dx + (facingRight ? 2 : -dw + 2), yy);
+      ctx.lineTo(dx + (facingRight ? dw - 2 : -2), yy);
       ctx.stroke();
     }
   }
 
-  // door
-  const doorX = facingRight ? hx + hw - 24 : hx + 10;
-  ctx.fillStyle = "#5D4037";
-  roundRect(doorX, hy + 30, 18, 34, 2);
-  ctx.fill();
-  ctx.fillStyle = h.trim;
-  ctx.fillRect(doorX + 1, hy + 31, 16, 3);
-  ctx.fillStyle = "#BBDEFB";
-  ctx.fillRect(doorX + 4, hy + 36, 10, 8);
-  // knob
-  ctx.fillStyle = "#FFD54F";
+  // low fence segment
+  if (h.hasFence) {
+    const fx0 = facingRight ? hx - 2 : hx + hw - 2;
+    ctx.strokeStyle = h.trim;
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 5; i++) {
+      const fy = hy + hh - 8 + i * 0;
+      const px = facingRight ? hx - 6 : hx + hw + 2;
+      ctx.fillStyle = shade(h.trim, -10);
+      ctx.fillRect(px + (facingRight ? -i * 5 : i * 5), hy + hh - 2, 3, 14);
+    }
+    ctx.strokeStyle = shade(h.trim, -20);
+    ctx.beginPath();
+    const baseX = facingRight ? hx - 28 : hx + hw + 2;
+    ctx.moveTo(baseX, hy + hh + 2);
+    ctx.lineTo(baseX + (facingRight ? 26 : 26), hy + hh + 2);
+    ctx.stroke();
+  }
+
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.16)";
   ctx.beginPath();
-  ctx.arc(doorX + 14, hy + 50, 1.8, 0, Math.PI * 2);
+  ctx.ellipse(hx + hw / 2 + 3, hy + hh + 7, hw * 0.5, 10, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Ring
+  // foundation / brick skirt
+  ctx.fillStyle = brick;
+  ctx.fillRect(hx - 1, hy + hh - 12, hw + 2, 14);
+  ctx.fillStyle = "rgba(0,0,0,0.08)";
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 6; c++) {
+      ctx.fillRect(hx + 2 + c * 11 + (r % 2) * 5, hy + hh - 10 + r * 4, 9, 3);
+    }
+  }
+
+  // main stucco body
+  const bg = ctx.createLinearGradient(hx, hy, hx + hw, hy + hh);
+  bg.addColorStop(0, shade(h.color, 8));
+  bg.addColorStop(0.45, h.color);
+  bg.addColorStop(1, shade(h.color, -22));
+  ctx.fillStyle = bg;
+  roundRect(hx, hy, hw, hh - 10, h.style === "modern" ? 2 : 4);
+  ctx.fill();
+  // stucco noise
+  ctx.fillStyle = "rgba(255,255,255,0.04)";
+  for (let i = 0; i < 12; i++) {
+    ctx.fillRect(hx + 4 + (i * 17) % (hw - 8), hy + 8 + (i * 13) % (hh - 24), 3, 2);
+  }
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  ctx.lineWidth = 1.5;
+  roundRect(hx, hy, hw, hh - 10, h.style === "modern" ? 2 : 4);
+  ctx.stroke();
+
+  // modern accent strip
+  if (h.style === "modern") {
+    ctx.fillStyle = accent;
+    ctx.fillRect(hx, hy + 8, 5, hh - 28);
+  }
+
+  // roof
+  ctx.fillStyle = h.roof;
+  ctx.beginPath();
+  if (h.style === "modern") {
+    ctx.moveTo(hx - 4, hy + 14);
+    ctx.lineTo(hx - 2, hy - 8);
+    ctx.lineTo(hx + hw + 6, hy + 4);
+    ctx.lineTo(hx + hw + 4, hy + 14);
+  } else {
+    ctx.moveTo(hx - 7, hy + 12);
+    ctx.lineTo(hx + hw / 2, hy - 28);
+    ctx.lineTo(hx + hw + 7, hy + 12);
+  }
+  ctx.closePath();
+  ctx.fill();
+  // shingles
+  ctx.strokeStyle = "rgba(0,0,0,0.14)";
+  ctx.lineWidth = 1;
+  if (h.style !== "modern") {
+    for (let i = 0; i < 5; i++) {
+      const t = 0.15 + i * 0.15;
+      const y1 = lerp(hy - 28, hy + 12, t);
+      const half = lerp(0, hw / 2 + 7, t);
+      ctx.beginPath();
+      ctx.moveTo(hx + hw / 2 - half, y1);
+      ctx.lineTo(hx + hw / 2 + half, y1);
+      ctx.stroke();
+    }
+  }
+  // gutter + fascia
+  ctx.strokeStyle = h.trim;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(hx - 5, hy + 12);
+  ctx.lineTo(hx + hw + 5, hy + 12);
+  ctx.stroke();
+  // chimney (stable per house)
+  if (h.number % 3 === 0) {
+    const chx = facingRight ? hx + 10 : hx + hw - 18;
+    ctx.fillStyle = brick;
+    ctx.fillRect(chx, hy - 22, 10, 20);
+    ctx.fillStyle = shade(brick, -20);
+    ctx.fillRect(chx - 1, hy - 24, 12, 4);
+  }
+
+  // porch overhang toward street
+  const porchRoofX = facingRight ? hx + hw - 8 : hx - 18;
+  ctx.fillStyle = shade(h.roof, 15);
+  ctx.globalAlpha = 0.9;
+  ctx.fillRect(porchRoofX, hy + 26, 28, 5);
+  ctx.globalAlpha = 1;
+  // porch posts
+  ctx.fillStyle = h.trim;
+  ctx.fillRect(porchRoofX + 3, hy + 31, 3, 28);
+  ctx.fillRect(porchRoofX + 22, hy + 31, 3, 28);
+
+  // wall AC
+  {
+    const acx = facingRight ? hx + 4 : hx + hw - 16;
+    ctx.fillStyle = "#90A4AE";
+    roundRect(acx, hy + hh - 34, 14, 11, 1);
+    ctx.fill();
+    ctx.fillStyle = "#607D8B";
+    for (let i = 0; i < 3; i++) ctx.fillRect(acx + 2, hy + hh - 32 + i * 3, 10, 1.5);
+  }
+
+  // garage
+  if (h.garage) {
+    const gx = facingRight ? hx + 6 : hx + hw - 32;
+    ctx.fillStyle = "#78909C";
+    roundRect(gx, hy + 36, 28, 30, 2);
+    ctx.fill();
+    ctx.strokeStyle = "#546E7A";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(gx + 2, hy + 42 + i * 5);
+      ctx.lineTo(gx + 26, hy + 42 + i * 5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#455A64";
+    ctx.fillRect(gx + 10, hy + 48, 8, 3);
+  }
+
+  // door with frame
+  const doorX = facingRight ? hx + hw - 26 : hx + 10;
+  ctx.fillStyle = h.trim;
+  roundRect(doorX - 2, hy + 28, 22, 38, 2);
+  ctx.fill();
+  ctx.fillStyle = shade(accent, -30);
+  roundRect(doorX, hy + 30, 18, 34, 2);
+  ctx.fill();
+  ctx.fillStyle = "#BBDEFB";
+  roundRect(doorX + 3, hy + 34, 12, 9, 1);
+  ctx.fill();
+  ctx.fillStyle = "#FFD54F";
+  ctx.beginPath();
+  ctx.arc(doorX + 14, hy + 52, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+
   if (h.hasRing) {
     ctx.fillStyle = h.ringHit ? "#FF5252" : "#263238";
     ctx.beginPath();
@@ -1498,75 +1753,89 @@ function drawHouse(h) {
     }
   }
 
-  // windows
-  const wx = facingRight ? hx + 8 : hx + hw - 30;
-  drawWindow(wx, hy + 16, 22, 18, h.windowLit);
-  if (!h.garage) drawWindow(facingRight ? hx + 8 : hx + hw - 30, hy + 42, 18, 14, false);
+  // windows + shutters
+  const wx = facingRight ? hx + 8 : hx + hw - 32;
+  drawWindow(wx, hy + 14, 24, 18, h.windowLit, h.shutters, accent);
+  if (!h.garage) drawWindow(facingRight ? hx + 8 : hx + hw - 28, hy + 40, 18, 14, false, h.shutters, accent);
 
   // house number plaque
   ctx.fillStyle = h.trim;
-  roundRect(hx + hw / 2 - 14, hy + hh - 16, 28, 12, 2);
+  roundRect(hx + hw / 2 - 15, hy + hh - 28, 30, 13, 2);
   ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.strokeRect(hx + hw / 2 - 14.5, hy + hh - 27.5, 29, 12);
   ctx.fillStyle = "#37474F";
-  ctx.font = "bold 10px system-ui";
+  ctx.font = "bold 11px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText(String(h.number), hx + hw / 2, hy + hh - 7);
+  ctx.fillText(String(h.number), hx + hw / 2, hy + hh - 18);
+
+  // planters
+  if (h.hasPlanters) {
+    const px = facingRight ? doorX - 14 : doorX + 22;
+    ctx.fillStyle = "#6D4C41";
+    roundRect(px, hy + hh - 22, 12, 8, 1);
+    ctx.fill();
+    ctx.fillStyle = "#43A047";
+    ctx.beginPath();
+    ctx.ellipse(px + 6, hy + hh - 24, 7, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#E91E63";
+    ctx.beginPath();
+    ctx.arc(px + 4, hy + hh - 26, 1.5, 0, Math.PI * 2);
+    ctx.arc(px + 8, hy + hh - 25, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // mailbox
   if (h.hasMailbox) {
-    const mx = facingRight ? ROAD_L - 28 : ROAD_R + 20;
-    const my = h.y + 42;
-    ctx.fillStyle = "#78909C";
+    const mx = facingRight ? ROAD_L - 30 : ROAD_R + 18;
+    const my = h.y + 44;
+    ctx.fillStyle = "#607D8B";
     ctx.fillRect(mx + 5, my, 3, 14);
-    ctx.fillStyle = "#546E7A";
-    roundRect(mx, my - 10, 14, 10, 2);
+    ctx.fillStyle = "#455A64";
+    roundRect(mx, my - 11, 14, 11, 2);
     ctx.fill();
-    ctx.fillStyle = "#FF8A65";
-    ctx.fillRect(mx + 10, my - 6, 5, 2);
+    ctx.fillStyle = h.needsDelivery && !h.delivered ? "#FF9900" : "#90A4AE";
+    ctx.fillRect(mx + 10, my - 7, 5, 2.5);
   }
 
-  // porch pad (stone)
-  const porch = getPorchRect(h);
-  const pg = ctx.createLinearGradient(porch.x, porch.y, porch.x, porch.y + h.porchH);
-  pg.addColorStop(0, "#D7CCC8");
+  // porch pad
+  const pg = ctx.createLinearGradient(h.porchX, h.y + 6, h.porchX, h.y + 6 + h.porchH);
+  pg.addColorStop(0, "#E0D6CC");
   pg.addColorStop(1, "#BCAAA4");
   ctx.fillStyle = pg;
-  roundRect(h.porchX, h.y + 6, h.porchW, h.porchH, 4);
+  roundRect(h.porchX, h.y + 6, h.porchW, h.porchH, 5);
   ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  // paver lines
+  ctx.strokeStyle = "rgba(0,0,0,0.1)";
   ctx.lineWidth = 1;
-  roundRect(h.porchX, h.y + 6, h.porchW, h.porchH, 4);
+  ctx.beginPath();
+  ctx.moveTo(h.porchX + h.porchW / 2, h.y + 8);
+  ctx.lineTo(h.porchX + h.porchW / 2, h.y + 4 + h.porchH);
+  ctx.moveTo(h.porchX + 4, h.y + 6 + h.porchH / 2);
+  ctx.lineTo(h.porchX + h.porchW - 4, h.y + 6 + h.porchH / 2);
   ctx.stroke();
 
-  // glowing Amazon target
-  if (!h.delivered) {
+  // ── Delivery target (ONLY active stops) ──
+  if (isActiveStop(h)) {
+    drawDropTarget(h);
+  } else if (h.needsDelivery && h.delivered) {
     const gx = h.porchX + h.porchW / 2;
-    const gy = h.y + 6 + h.porchH / 2;
-    const pulse = 0.55 + Math.sin(now() / 220 + h.number) * 0.45;
-    // soft ground ring
-    ctx.save();
-    ctx.globalAlpha = 0.25 + pulse * 0.35;
-    ctx.strokeStyle = "#FF9900";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.ellipse(gx, gy + 2, 16 + pulse * 4, 10 + pulse * 2, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.shadowColor = "#FF9900";
-    ctx.shadowBlur = 16;
-    drawAmazonBox(gx, gy, 1);
-    ctx.restore();
-  } else {
-    ctx.save();
-    ctx.translate(h.porchX + h.porchW / 2, h.y + 14);
-    drawAmazonBox(0, 0, 0.85);
+    const gy = h.y + 14;
+    drawAmazonBox(gx, gy, 0.9);
     ctx.fillStyle = "#2E7D32";
-    ctx.font = "bold 11px system-ui";
+    ctx.font = "bold 12px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("✓", 0, 20);
-    ctx.restore();
+    ctx.fillText("✓", gx, gy + 18);
+  }
+  // non-delivery: small empty mat only (no glow)
+  else if (!h.needsDelivery) {
+    ctx.fillStyle = "rgba(0,0,0,0.06)";
+    roundRect(h.porchX + 6, h.y + 12, h.porchW - 12, h.porchH - 12, 3);
+    ctx.fill();
   }
 
-  if (h.hasSnack && !h.snackTaken && !h.delivered) {
+  if (h.hasSnack && !h.snackTaken && isActiveStop(h)) {
     const sx = h.side === 0 ? h.porchX - 14 : h.porchX + h.porchW + 2;
     ctx.fillStyle = "#EF5350";
     roundRect(sx, h.y + 12, 12, 14, 2);
@@ -1577,7 +1846,7 @@ function drawHouse(h) {
     ctx.fillText("🍪", sx + 6, h.y + 23);
   }
 
-  if (h.hasPirate && !h.pirateHit && !h.delivered) {
+  if (h.hasPirate && !h.pirateHit && isActiveStop(h)) {
     const px = h.side === 0 ? h.porchX + h.porchW + 4 : h.porchX - 16;
     const py = h.y + 10;
     ctx.fillStyle = "#424242";
@@ -1597,19 +1866,96 @@ function drawHouse(h) {
   }
 }
 
-function drawWindow(x, y, w, h, lit) {
+/** Big clear DROP pad — only on houses that need packages */
+function drawDropTarget(h) {
+  const gx = h.porchX + h.porchW / 2;
+  const gy = h.y + 6 + h.porchH / 2;
+  const pulse = 0.55 + Math.sin(now() / 200 + h.number) * 0.45;
+  const best = bestActiveStop();
+  const isBest = best && best.house === h;
+
+  ctx.save();
+  // outer ground ring
+  ctx.globalAlpha = 0.35 + pulse * 0.4;
+  ctx.strokeStyle = isBest ? "#00E5FF" : "#FF9900";
+  ctx.lineWidth = isBest ? 3.5 : 2.8;
+  ctx.setLineDash(isBest ? [] : [6, 4]);
+  ctx.beginPath();
+  ctx.ellipse(gx, gy + 3, 18 + pulse * 5, 12 + pulse * 3, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // solid inner pad glow
+  ctx.globalAlpha = 0.25 + pulse * 0.2;
+  ctx.fillStyle = isBest ? "#00B0FF" : "#FF9900";
+  ctx.beginPath();
+  ctx.ellipse(gx, gy + 3, 14, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // floating package icon
+  ctx.globalAlpha = 1;
+  ctx.shadowColor = isBest ? "#00E5FF" : "#FF9900";
+  ctx.shadowBlur = 14 + pulse * 8;
+  drawAmazonBox(gx, gy - 2 - pulse * 2, 1.15);
+  ctx.shadowBlur = 0;
+
+  // DROP label
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = isBest ? "#00E5FF" : "#FF9900";
+  ctx.font = "bold 10px system-ui";
+  ctx.textAlign = "center";
+  ctx.strokeStyle = "rgba(0,0,0,0.45)";
+  ctx.lineWidth = 3;
+  const label = isBest ? "AIM HERE" : "DROP";
+  ctx.strokeText(label, gx, gy + 22);
+  ctx.fillText(label, gx, gy + 22);
+
+  // road-side arrow cue
+  const edgeX = h.side === 0 ? ROAD_L - 4 : ROAD_R + 4;
+  ctx.globalAlpha = 0.55 + pulse * 0.3;
+  ctx.fillStyle = isBest ? "#00E5FF" : "#FF9900";
+  ctx.beginPath();
+  if (h.side === 0) {
+    ctx.moveTo(edgeX, gy);
+    ctx.lineTo(edgeX - 10, gy - 6);
+    ctx.lineTo(edgeX - 10, gy + 6);
+  } else {
+    ctx.moveTo(edgeX, gy);
+    ctx.lineTo(edgeX + 10, gy - 6);
+    ctx.lineTo(edgeX + 10, gy + 6);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawWindow(x, y, w, h, lit, shutters, accent) {
+  if (shutters) {
+    ctx.fillStyle = accent || "#1565C0";
+    roundRect(x - 5, y, 5, h, 1);
+    ctx.fill();
+    roundRect(x + w, y, 5, h, 1);
+    ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.15)";
+    ctx.fillRect(x - 3, y + 2, 1, h - 4);
+    ctx.fillRect(x + w + 2, y + 2, 1, h - 4);
+  }
   ctx.fillStyle = lit ? "#FFF9C4" : "#E3F2FD";
   roundRect(x, y, w, h, 2);
   ctx.fill();
-  ctx.strokeStyle = "#90A4AE";
+  ctx.strokeStyle = "#78909C";
   ctx.lineWidth = 1.5;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
   ctx.beginPath();
   ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h);
   ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2);
   ctx.stroke();
+  // mullion highlight
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(x + 2, y + 2, w / 2 - 3, h / 2 - 3);
   if (lit) {
-    ctx.fillStyle = "rgba(255,249,196,0.25)";
+    ctx.fillStyle = "rgba(255,249,196,0.22)";
     ctx.beginPath();
     ctx.moveTo(x, y + h);
     ctx.lineTo(x - 4, y + h + 10);
@@ -1790,36 +2136,50 @@ function pickStable(seed, arr) {
 }
 
 function drawAimPreview() {
-  if (!G.aimPreview || state !== STATE.PLAY) return;
-  const { x, y, sx, sy, assisted } = G.aimPreview;
-  // trajectory dots
+  if (state !== STATE.PLAY) return;
   ctx.save();
-  for (let i = 1; i <= 8; i++) {
-    const u = i / 9;
-    const px = lerp(sx, x, smoothstep(u));
-    const py = lerp(sy, y, smoothstep(u)) - Math.sin(u * Math.PI) * 50;
-    ctx.globalAlpha = 0.15 + u * 0.45;
-    ctx.fillStyle = assisted ? "#00E5FF" : "#FFB74D";
+
+  // Always hint nearest DROP while playing (subtle)
+  const best = bestActiveStop();
+  if (best && !G.aimPreview) {
+    const p = best.porch;
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = "#00E5FF";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
     ctx.beginPath();
-    ctx.arc(px, py, 3 - u * 0.5, 0, Math.PI * 2);
+    ctx.moveTo(G.carX, CAR_Y - 20);
+    ctx.lineTo(p.cx, p.cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (!G.aimPreview) { ctx.restore(); return; }
+  const { x, y, sx, sy, assisted } = G.aimPreview;
+  const snap = G.aimPreview.snap;
+  // trajectory dots (match flatter throw arc ~35)
+  for (let i = 1; i <= 10; i++) {
+    const u = i / 11;
+    const px = lerp(sx, x, smoothstep(u));
+    const py = lerp(sy, y, smoothstep(u)) - Math.sin(u * Math.PI) * 35;
+    ctx.globalAlpha = 0.2 + u * 0.5;
+    ctx.fillStyle = snap ? "#69F0AE" : assisted ? "#00E5FF" : "#FFB74D";
+    ctx.beginPath();
+    ctx.arc(px, py, 3.2 - u * 0.4, 0, Math.PI * 2);
     ctx.fill();
   }
   // landing marker
-  ctx.globalAlpha = 0.7;
-  ctx.strokeStyle = assisted ? "#00E5FF" : "#FF9900";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([4, 3]);
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = snap ? "#69F0AE" : assisted ? "#00E5FF" : "#FF9900";
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.ellipse(x, y + 4, 14, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y + 4, 16, 10, 0, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.setLineDash([]);
-  if (assisted) {
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = "#00E5FF";
-    ctx.font = "bold 10px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("assist", x, y - 12);
-  }
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = snap ? "#69F0AE" : assisted ? "#00E5FF" : "#FFB74D";
+  ctx.font = "bold 11px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(snap ? "LOCKED" : assisted ? "assist" : "aim", x, y - 14);
   ctx.restore();
 }
 
@@ -2250,9 +2610,9 @@ function drawTitle() {
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.font = "13px system-ui";
   ctx.fillText("Florida suburbs · 90-second routes", W / 2, 260);
-  ctx.fillText("Calm start · Soft aim assist · FSD every 3 drops", W / 2, 280);
+  ctx.fillText("DROP pads only · Aim lock · SFX · FSD every 3", W / 2, 280);
 
-  const chips = ["📦 Glowing porches", "⚡ FSD every 3 drops", "🚪 Gate codes later", "🍪 Snack bonuses"];
+  const chips = ["📦 Orange DROP pads", "🎯 Snap aim assist", "⚡ FSD every 3 drops", "🔊 Built-in sounds"];
   let cy = 312;
   ctx.font = "12px system-ui";
   for (const c of chips) {
@@ -2271,7 +2631,7 @@ function drawTitle() {
 
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.font = "11px system-ui";
-  ctx.fillText("Desktop: A/D or ←/→ · Space throws to nearest porch", W / 2, H - 28);
+  ctx.fillText("Desktop: A/D · Space = nearest DROP · M mutes sound", W / 2, H - 28);
 }
 
 function drawHowTo() {
@@ -2286,12 +2646,12 @@ function drawHowTo() {
 
   const lines = [
     ["STEER", "Drag the bottom half (or A/D / arrows)."],
-    ["THROW", "Press on the top half to aim (ghost arc). Release to throw. Space auto-aims nearest porch."],
-    ["ASSIST", "Early route: soft magnet + bigger porches. Aim a little short of the glow."],
-    ["RAMP", "First ~25s is an Easy Stretch — slower, calmer, then traffic ramps up."],
-    ["FSD", "Every 3 deliveries: Autopilot ~10s — car dodges so you can focus on throws."],
-    ["GATES", "Later in the route, pick the correct 4-digit gate code."],
-    ["BONUS", "Snacks, pirate beanings. Avoid pools, dogs, and Ring cams."],
+    ["THROW", "Hold top half to aim (ghost arc). Release to throw. Space locks nearest DROP."],
+    ["TARGETS", "Only houses with orange DROP pads need packages. AIM HERE = best target."],
+    ["ASSIST", "Aim near a pad to snap/lock. Bigger pads early. Flatter throws."],
+    ["RAMP", "First ~35s is Easy Stretch — sparse traffic, then it ramps gently."],
+    ["FSD", "Every 3 deliveries: Autopilot ~10s so you can focus on throws."],
+    ["SOUND", "SFX on by default. Press M to mute. Works after first tap."],
   ];
   let y = 100;
   ctx.textAlign = "left";
