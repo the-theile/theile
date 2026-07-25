@@ -613,15 +613,16 @@ function spawnHouse(y) {
   const needsDelivery = Math.random() < (early ? 0.72 : lerp(0.62, 0.45, diff / MAX_DIFF));
   const special = needsDelivery && Math.random() < 0.1 ? pick(["fresh", "prime"]) : null;
 
-  const porchW = needsDelivery ? (early ? 60 : lerp(56, 46, diff / MAX_DIFF)) : 30;
-  const porchH = needsDelivery ? (early ? 48 : lerp(44, 36, diff / MAX_DIFF)) : 22;
-  const porchX = side === 0 ? ROAD_L - 6 - porchW : ROAD_R + 6;
-  const hasDriveway = Math.random() < 0.9;
-  const hasParked = hasDriveway && Math.random() < 0.55;
+  // Compact porches that sit in the yard strip, not over the house body
+  const porchW = needsDelivery ? (early ? 36 : lerp(34, 28, diff / MAX_DIFF)) : 22;
+  const porchH = needsDelivery ? (early ? 30 : lerp(28, 24, diff / MAX_DIFF)) : 18;
+  const hasDriveway = Math.random() < 0.85;
+  // Parked cars only when driveway exists; placed BELOW house (see layoutParked)
+  const hasParked = hasDriveway && Math.random() < 0.5;
 
   const h = {
-    y, side, color: pick(HOUSE_COLORS), scale: 1.3,
-    porchX, porchW, porchH, needsDelivery, delivered: false, special,
+    y, side, color: pick(HOUSE_COLORS), scale: 1,
+    porchW, porchH, needsDelivery, delivered: false, special,
     roof: pick(["#6D4C41","#455A64","#5D4037","#37474F","#795548","#BF360C"]),
     trim: pick(["#FFFFFF","#FAFAFA","#FFF8E1","#EFEBE9"]),
     accent: pick(["#1565C0","#2E7D32","#6A1B9A","#C62828","#00838F","#EF6C00"]),
@@ -634,15 +635,15 @@ function spawnHouse(y) {
     hasDog: !early && Math.random() < 0.07,
     hasMailbox: true, hasDriveway, hasBush: Math.random() < 0.75,
     hasFence: Math.random() < 0.5, hasPlanters: Math.random() < 0.55,
-    poolX: side === 0 ? ROAD_L - 105 : ROAD_R + 105,
+    poolX: side === 0 ? 28 : W - 28,
     ringHit: false, snackTaken: false, pirateHit: false, windowBroken: false,
     number: 100 + (G.houses.length * 2 + side + 1),
     windowLit: Math.random() < 0.4, garage: Math.random() < 0.42, shutters: Math.random() < 0.55,
     ladySpawned: false, dogPhase: 0,
+    hasParked,
     parkedCar: hasParked ? {
-      ox: side === 0 ? ROAD_L - 50 : ROAD_R + 30, oy: 40, w: 36, h: 54,
-      color: pick(["#ECEFF1","#E53935","#1E88E5","#43A047","#FB8C00","#37474F"]),
-      cracked: false, dented: false,
+      color: pick(["#ECEFF1","#E53935","#1E88E5","#43A047","#FB8C00","#37474F","#FAFAFA"]),
+      cracked: false, dented: false, w: 28, h: 42,
     } : null,
   };
   G.houses.push(h);
@@ -691,12 +692,75 @@ function spawnObstacle() {
 // ═══════════════════════════════════════════════════════════
 // AIM
 // ═══════════════════════════════════════════════════════════
-function getPorch(h) {
-  const pad = state === ST.PLAY ? padExtra() : 8;
+/**
+ * Shared house geometry so draw + collisions never disagree.
+ * Layout: house sits in the outer yard; porch is a stoop on the
+ * road-facing wall; parked car sits on the driveway BELOW the house
+ * (toward the player), never under the porch.
+ */
+function layoutHouse(h) {
+  // Compact footprint so porch never sits on the roof/body
+  const hw = h.style === "modern" ? 44 : h.style === "cottage" ? 42 : 46;
+  const hh = h.style === "cottage" ? 50 : 54;
+  // Left: house against left edge. Right: house against right edge.
+  const hx = h.side === 0 ? 5 : W - 5 - hw;
+  const hy = h.y - 14;
+
+  // Porch = stoop on the road-facing wall, in the strip between house and curb
+  let porchW = Math.min(h.porchW || 30, 32);
+  let porchH = Math.min(h.porchH || 26, 28);
+  let porchX, porchY;
+  if (h.side === 0) {
+    porchX = hx + hw; // starts at house wall, extends toward road
+    const maxW = Math.max(18, ROAD_L - 8 - porchX);
+    porchW = Math.min(porchW, maxW);
+  } else {
+    porchX = ROAD_R + 8;
+    const maxW = Math.max(18, hx - porchX);
+    porchW = Math.min(porchW, maxW);
+    // keep stoop snug against house wall
+    porchX = hx - porchW;
+  }
+  porchY = hy + hh * 0.4; // door height — beside wall, not over roof
+
+  // Driveway BELOW house (higher y = toward player / bottom of screen)
+  const driveTop = hy + hh + 2;
+  let car = null;
+  if (h.parkedCar) {
+    const cw = h.parkedCar.w || 26, ch = h.parkedCar.h || 40;
+    // Centered under house footprint on the driveway slab
+    const cx = hx + hw / 2;
+    const cy = driveTop + 26;
+    car = { cx, cy, w: cw, h: ch, x: cx - cw / 2, y: cy - ch / 2 };
+  }
+
+  // Window on main wall facing road (on the house body only)
+  const winW = 20, winH = 15;
+  const winX = h.side === 0 ? hx + 6 : hx + hw - 26;
+  const winY = hy + 14;
+
   return {
-    x: h.porchX - pad * 0.2, y: h.y + 6 - pad * 0.15,
-    w: h.porchW + pad * 0.4, h: h.porchH + pad * 0.35,
-    cx: h.porchX + h.porchW / 2, cy: h.y + 6 + h.porchH / 2,
+    hx, hy, hw, hh,
+    porchX, porchY, porchW, porchH,
+    porchCx: porchX + porchW / 2,
+    porchCy: porchY + porchH / 2,
+    doorX: h.side === 0 ? hx + hw - 18 : hx + 4,
+    doorY: hy + hh * 0.38,
+    winX, winY, winW, winH,
+    car, driveTop,
+  };
+}
+
+function getPorch(h) {
+  const L = layoutHouse(h);
+  const pad = state === ST.PLAY ? padExtra() * 0.65 : 6;
+  return {
+    x: L.porchX - pad * 0.15,
+    y: L.porchY - pad * 0.1,
+    w: L.porchW + pad * 0.3,
+    h: L.porchH + pad * 0.25,
+    cx: L.porchCx,
+    cy: L.porchCy,
   };
 }
 function isActive(h) { return h && h.needsDelivery && !h.delivered; }
@@ -1081,23 +1145,28 @@ function resolveMidair(pk) {
     const r = o.type === "car" ? 28 : o.type === "lady" ? 22 : 17;
     if (dist(pk.x, pk.y, o.x, o.y) < r) return hitEntity(pk, o);
   }
+  // Windows first (specific), then parked cars — geometry from layoutHouse
   for (const h of G.houses) {
-    if (h.parkedCar) {
-      const pc = h.parkedCar;
-      if (Math.abs(pk.x - pc.ox) < pc.w * 0.45 && Math.abs(pk.y - (h.y + pc.oy)) < pc.h * 0.45) {
-        return hitParked(pk, h);
-      }
-    }
     if (!h.windowBroken && hitsWindow(pk, h)) return hitWindow(pk, h);
+  }
+  for (const h of G.houses) {
+    if (h.parkedCar && hitsParked(pk, h)) return hitParked(pk, h);
   }
   return false;
 }
 
 function hitsWindow(pk, h) {
-  const sc = h.scale || 1.3;
-  const hw = 70 * sc, hx = h.side === 0 ? 2 : ROAD_R + 6, hy = h.y - 28;
-  const wx = h.side === 0 ? hx + 10 : hx + hw - 36;
-  return pk.x > wx - 4 && pk.x < wx + 32 && pk.y > hy + 12 && pk.y < hy + 40;
+  const L = layoutHouse(h);
+  return pk.x > L.winX && pk.x < L.winX + L.winW &&
+         pk.y > L.winY && pk.y < L.winY + L.winH;
+}
+
+function hitsParked(pk, h) {
+  const L = layoutHouse(h);
+  if (!L.car) return false;
+  const c = L.car;
+  return pk.x > c.x + 3 && pk.x < c.x + c.w - 3 &&
+         pk.y > c.y + 4 && pk.y < c.y + c.h - 4;
 }
 
 function hitEntity(pk, o) {
@@ -1132,8 +1201,8 @@ function hitParked(pk, h) {
     pc.cracked = pc.dented = true;
     G.score = Math.max(0, G.score - 20); G.fails++; G.streak = 0;
     burst(pk.x, pk.y, "#B0BEC5", 16); shake(8);
-    floatT(pk.x, pk.y, "CRACKED −20", "#EF9A9A", 13);
-    msg("Parked car windshield — Flex will hear about this.", 2);
+    floatT(pk.x, pk.y, "PARKED CAR −20", "#EF9A9A", 13);
+    msg("Tagged a parked car on the driveway.", 2);
     SFX.crack();
   } else { floatT(pk.x, pk.y, "already dented", "#BDBDBD", 11); SFX.land(); }
   return true;
@@ -1207,8 +1276,10 @@ function resolveLand(pk) {
       }
     }
     if (h.hasDog) {
-      const dx = h.side === 0 ? h.porchX + h.porchW + 14 : h.porchX - 14;
-      if (dist(pk.x, pk.y, dx, h.y + 40) < 34) {
+      const Ldog = layoutHouse(h);
+      const dx = h.side === 0 ? Ldog.hx + 12 : Ldog.hx + Ldog.hw - 12;
+      const dy = Ldog.driveTop + 18;
+      if (dist(pk.x, pk.y, dx, dy) < 30) {
         G.fails++; G.dogIncidents++; G.streak = 0; G.score = Math.max(0, G.score - 8);
         floatT(pk.x, pk.y, "DOG GOT IT", "#A1887F", 13); SFX.bark(); SFX.miss();
         return;
@@ -1216,11 +1287,16 @@ function resolveLand(pk) {
     }
   }
 
-  // driveway
+  // driveway slab (below house — not porch)
   for (const h of G.houses) {
     if (!h.hasDriveway) continue;
-    const dwx = h.side === 0 ? ROAD_L - 30 : ROAD_R + 4;
-    if (pk.x > dwx - 8 && pk.x < dwx + 36 && pk.y > h.y + 5 && pk.y < h.y + 60) {
+    const L = layoutHouse(h);
+    const top = L.driveTop;
+    const dw = Math.min(L.hw + 8, 58);
+    const dx = h.side === 0 ? L.hx + 4 : L.hx + L.hw - dw - 4;
+    if (pk.x > dx && pk.x < dx + dw && pk.y > top && pk.y < top + 52) {
+      // Don't count as driveway if it's on the parked car (already handled)
+      if (h.parkedCar && hitsParked(pk, h)) continue;
       floatT(pk.x, pk.y, "driveway skid", "#B0BEC5", 12);
       burst(pk.x, pk.y, "#9E9E9E", 8); G.streak = 0; SFX.land(); return;
     }
@@ -1676,131 +1752,237 @@ function drawHouses() {
 }
 
 function drawHouse(h) {
+  const L = layoutHouse(h);
+  const { hx, hy, hw, hh } = L;
   const facingRight = h.side === 0;
-  const sc = h.scale || 1.3;
-  const hw = (h.style === "modern" ? 74 : 72) * sc;
-  const hh = (h.style === "cottage" ? 72 : 80) * sc;
-  const hx = h.side === 0 ? 2 : ROAD_R + 5;
-  const hy = h.y - 30;
 
+  // Driveway slab BELOW house (toward player) — car parks here, not under porch
   if (h.hasDriveway) {
-    const dw = 34, dx = facingRight ? ROAD_L - 30 : ROAD_R - 2;
-    ctx.fillStyle = "#A0A0A0";
-    ctx.beginPath();
-    ctx.moveTo(facingRight ? hx + hw : hx, hy + hh - 6);
-    ctx.lineTo(dx, h.y + 58);
-    ctx.lineTo(dx + (facingRight ? dw : -dw), h.y + 58);
-    ctx.lineTo(facingRight ? hx + hw : hx, hy + hh + 14);
-    ctx.closePath(); ctx.fill();
+    const top = L.driveTop;
+    const dw = Math.min(hw + 8, 58);
+    const dx = facingRight ? hx + 4 : hx + hw - dw - 4;
+    ctx.fillStyle = "#9E9E9E";
+    roundRect(dx, top, dw, 52, 3);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.12)";
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(dx + 4, top + i * 12);
+      ctx.lineTo(dx + dw - 4, top + i * 12);
+      ctx.stroke();
+    }
+    // curb cut toward road
+    ctx.fillStyle = "#BDBDBD";
+    if (facingRight) {
+      ctx.beginPath();
+      ctx.moveTo(dx + dw, top + 20);
+      ctx.lineTo(ROAD_L - 4, top + 28);
+      ctx.lineTo(ROAD_L - 4, top + 44);
+      ctx.lineTo(dx + dw, top + 40);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(dx, top + 20);
+      ctx.lineTo(ROAD_R + 4, top + 28);
+      ctx.lineTo(ROAD_R + 4, top + 44);
+      ctx.lineTo(dx, top + 40);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
+
+  // Parked car first (under driveway, never covering porch)
   if (h.parkedCar) drawParked(h);
 
-  ctx.fillStyle = "rgba(0,0,0,0.15)";
-  ctx.beginPath(); ctx.ellipse(hx + hw / 2 + 3, hy + hh + 6, hw * 0.48, 10, 0, 0, Math.PI * 2); ctx.fill();
+  // House shadow
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
+  ctx.beginPath();
+  ctx.ellipse(hx + hw / 2 + 2, hy + hh + 4, hw * 0.42, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
 
-  // brick skirt
-  ctx.fillStyle = h.brick; ctx.fillRect(hx - 1, hy + hh - 14, hw + 2, 16);
+  // Foundation / brick skirt
+  ctx.fillStyle = h.brick;
+  ctx.fillRect(hx - 1, hy + hh - 10, hw + 2, 12);
 
+  // Body
   const bg = ctx.createLinearGradient(hx, hy, hx + hw, hy + hh);
-  bg.addColorStop(0, shade(h.color, 10)); bg.addColorStop(1, shade(h.color, -20));
-  ctx.fillStyle = bg; roundRect(hx, hy, hw, hh - 12, 4); ctx.fill();
-  if (h.style === "modern") { ctx.fillStyle = h.accent; ctx.fillRect(hx, hy + 10, 6, hh - 30); }
+  bg.addColorStop(0, shade(h.color, 10));
+  bg.addColorStop(1, shade(h.color, -18));
+  ctx.fillStyle = bg;
+  roundRect(hx, hy, hw, hh - 8, 3);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.1)";
+  ctx.lineWidth = 1.2;
+  roundRect(hx, hy, hw, hh - 8, 3);
+  ctx.stroke();
+  if (h.style === "modern") {
+    ctx.fillStyle = h.accent;
+    ctx.fillRect(hx, hy + 8, 5, hh - 24);
+  }
 
-  // roof
+  // Roof sits ON TOP of house only
   ctx.fillStyle = h.roof;
   ctx.beginPath();
   if (h.style === "modern") {
-    ctx.moveTo(hx - 4, hy + 14); ctx.lineTo(hx, hy - 6); ctx.lineTo(hx + hw + 6, hy + 6); ctx.lineTo(hx + hw + 4, hy + 14);
+    ctx.moveTo(hx - 3, hy + 10);
+    ctx.lineTo(hx + 2, hy - 8);
+    ctx.lineTo(hx + hw + 4, hy + 4);
+    ctx.lineTo(hx + hw + 2, hy + 10);
   } else {
-    ctx.moveTo(hx - 8, hy + 12); ctx.lineTo(hx + hw / 2, hy - 30); ctx.lineTo(hx + hw + 8, hy + 12);
+    ctx.moveTo(hx - 5, hy + 10);
+    ctx.lineTo(hx + hw / 2, hy - 18);
+    ctx.lineTo(hx + hw + 5, hy + 10);
   }
-  ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = h.trim; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(hx - 5, hy + 12); ctx.lineTo(hx + hw + 5, hy + 12); ctx.stroke();
+  ctx.closePath();
+  ctx.fill();
+  // Gutter line
+  ctx.strokeStyle = h.trim;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(hx - 3, hy + 10);
+  ctx.lineTo(hx + hw + 3, hy + 10);
+  ctx.stroke();
 
-  // special banner
   if (h.special && !h.delivered && h.needsDelivery) {
     ctx.fillStyle = h.special === "fresh" ? "#00C853" : "#FF9900";
-    roundRect(hx + 8, hy - 8, hw - 16, 14, 4); ctx.fill();
-    ctx.fillStyle = "#fff"; ctx.font = "bold 9px system-ui"; ctx.textAlign = "center";
-    ctx.fillText(h.special === "fresh" ? "FRESH 2×" : "PRIME", hx + hw / 2, hy + 2);
+    roundRect(hx + 6, hy - 4, hw - 12, 12, 3);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 8px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(h.special === "fresh" ? "FRESH 2×" : "PRIME", hx + hw / 2, hy + 5);
   }
 
-  // garage
+  // Garage on yard side (away from road)
   if (h.garage) {
-    const gx = facingRight ? hx + 8 : hx + hw - 36;
-    ctx.fillStyle = "#78909C"; roundRect(gx, hy + 40, 30, 32, 2); ctx.fill();
+    const gx = facingRight ? hx + 4 : hx + hw - 26;
+    ctx.fillStyle = "#78909C";
+    roundRect(gx, hy + hh - 36, 24, 26, 2);
+    ctx.fill();
+    ctx.strokeStyle = "#546E7A";
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(gx + 2, hy + hh - 30 + i * 6);
+      ctx.lineTo(gx + 22, hy + hh - 30 + i * 6);
+      ctx.stroke();
+    }
   }
 
-  // door
-  const doorX = facingRight ? hx + hw - 28 : hx + 12;
-  ctx.fillStyle = h.trim; roundRect(doorX - 2, hy + 30, 24, 40, 2); ctx.fill();
-  ctx.fillStyle = shade(h.accent, -25); roundRect(doorX, hy + 32, 20, 36, 2); ctx.fill();
+  // Door on road-facing wall
+  const doorX = L.doorX;
+  const doorY = L.doorY;
+  ctx.fillStyle = h.trim;
+  roundRect(doorX - 1, doorY, 18, 28, 2);
+  ctx.fill();
+  ctx.fillStyle = shade(h.accent, -25);
+  roundRect(doorX, doorY + 2, 16, 24, 2);
+  ctx.fill();
   if (h.hasRing) {
     ctx.fillStyle = h.ringHit ? "#FF5252" : "#263238";
-    ctx.beginPath(); ctx.arc(doorX + 10, hy + 28, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.arc(doorX + 8, doorY - 2, 3.5, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // windows
-  const wx = facingRight ? hx + 12 : hx + hw - 40;
-  drawWin(wx, hy + 18, 28, 20, h.windowLit && !h.windowBroken, h.shutters, h.accent, h.windowBroken);
+  // Window (matches hitbox)
+  drawWin(L.winX, L.winY, L.winW, L.winH, h.windowLit && !h.windowBroken, h.shutters, h.accent, h.windowBroken);
 
-  // number
-  ctx.fillStyle = h.trim; roundRect(hx + hw / 2 - 16, hy + hh - 30, 32, 14, 2); ctx.fill();
-  ctx.fillStyle = "#37474F"; ctx.font = "bold 11px system-ui"; ctx.textAlign = "center";
-  ctx.fillText(String(h.number), hx + hw / 2, hy + hh - 19);
+  // House number on wall
+  ctx.fillStyle = h.trim;
+  roundRect(hx + hw / 2 - 12, hy + hh - 22, 24, 11, 2);
+  ctx.fill();
+  ctx.fillStyle = "#37474F";
+  ctx.font = "bold 9px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(String(h.number), hx + hw / 2, hy + hh - 14);
 
-  // porch
-  const pg = ctx.createLinearGradient(h.porchX, h.y + 6, h.porchX, h.y + 6 + h.porchH);
-  pg.addColorStop(0, "#E0D6CC"); pg.addColorStop(1, "#BCAAA4");
-  ctx.fillStyle = pg; roundRect(h.porchX, h.y + 6, h.porchW, h.porchH, 5); ctx.fill();
+  // Porch stoop — attached to road face, NOT covering the house
+  const pg = ctx.createLinearGradient(L.porchX, L.porchY, L.porchX, L.porchY + L.porchH);
+  pg.addColorStop(0, "#E8DFD6");
+  pg.addColorStop(1, "#BCAAA4");
+  ctx.fillStyle = pg;
+  roundRect(L.porchX, L.porchY, L.porchW, L.porchH, 4);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  ctx.lineWidth = 1;
+  roundRect(L.porchX, L.porchY, L.porchW, L.porchH, 4);
+  ctx.stroke();
+  // Small porch posts
+  ctx.fillStyle = h.trim;
+  ctx.fillRect(L.porchX + 2, L.porchY - 10, 2.5, 12);
+  ctx.fillRect(L.porchX + L.porchW - 5, L.porchY - 10, 2.5, 12);
+  ctx.fillStyle = shade(h.roof, 20);
+  ctx.fillRect(L.porchX - 1, L.porchY - 12, L.porchW + 2, 4);
 
-  if (isActive(h)) drawDrop(h);
+  if (isActive(h)) drawDrop(h, L);
   else if (h.needsDelivery && h.delivered) {
-    drawBox(h.porchX + h.porchW / 2, h.y + 16, 0.9, PKG.standard);
-    ctx.fillStyle = "#2E7D32"; ctx.font = "bold 12px system-ui"; ctx.textAlign = "center";
-    ctx.fillText("✓", h.porchX + h.porchW / 2, h.y + 34);
+    drawBox(L.porchCx, L.porchCy - 2, 0.85, PKG.standard);
+    ctx.fillStyle = "#2E7D32";
+    ctx.font = "bold 11px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("✓", L.porchCx, L.porchCy + 14);
   }
 
   if (h.hasSnack && !h.snackTaken && isActive(h)) {
-    const sx = h.side === 0 ? h.porchX - 14 : h.porchX + h.porchW + 2;
-    ctx.fillStyle = "#EF5350"; roundRect(sx, h.y + 14, 12, 14, 2); ctx.fill();
-    ctx.fillStyle = "#fff"; ctx.font = "9px system-ui"; ctx.fillText("🍪", sx + 6, h.y + 25);
+    const sx = L.porchX + L.porchW / 2 - 6;
+    ctx.fillStyle = "#EF5350";
+    roundRect(sx, L.porchY - 16, 12, 12, 2);
+    ctx.fill();
+    ctx.font = "9px system-ui";
+    ctx.fillText("🍪", sx + 6, L.porchY - 6);
   }
   if (h.hasPirate && !h.pirateHit && isActive(h)) {
-    const px = h.side === 0 ? h.porchX + h.porchW + 4 : h.porchX - 14;
+    const px = L.porchCx + (facingRight ? 14 : -14);
+    const py = L.porchCy;
     ctx.fillStyle = "#424242";
-    ctx.beginPath(); ctx.ellipse(px + 6, h.y + 26, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(px + 6, h.y + 16, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(px, py + 8, 6, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, 5, 0, Math.PI * 2);
+    ctx.fill();
   }
   if (h.hasDog && !h.delivered) {
-    const dx = h.side === 0 ? h.porchX + h.porchW + 14 : h.porchX - 14;
-    drawDog(dx, h.y + 42, h.side === 0 ? 1 : -1, now() / 200);
+    // Dog in yard near driveway, not on porch
+    const dx = facingRight ? hx + 12 : hx + hw - 12;
+    const dy = L.driveTop + 18;
+    drawDog(dx, dy, facingRight ? 1 : -1, now() / 200);
   }
 }
 
-function drawDrop(h) {
-  const gx = h.porchX + h.porchW / 2, gy = h.y + 6 + h.porchH / 2;
+function drawDrop(h, L) {
+  L = L || layoutHouse(h);
+  const gx = L.porchCx, gy = L.porchCy;
   const pulse = 0.55 + Math.sin(now() / 180 + h.number) * 0.45;
   const best = bestStop();
   const isBest = best && best.house === h;
   ctx.save();
   ctx.globalAlpha = 0.35 + pulse * 0.4;
   ctx.strokeStyle = isBest ? "#00E5FF" : "#FF9900";
-  ctx.lineWidth = isBest ? 3.5 : 2.8;
-  ctx.beginPath(); ctx.ellipse(gx, gy + 3, 20 + pulse * 5, 13 + pulse * 3, 0, 0, Math.PI * 2); ctx.stroke();
-  ctx.globalAlpha = 0.22 + pulse * 0.2;
+  ctx.lineWidth = isBest ? 3 : 2.4;
+  ctx.beginPath();
+  ctx.ellipse(gx, gy + 2, 14 + pulse * 3, 10 + pulse * 2, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 0.2 + pulse * 0.18;
   ctx.fillStyle = isBest ? "#00B0FF" : "#FF9900";
-  ctx.beginPath(); ctx.ellipse(gx, gy + 3, 15, 10, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(gx, gy + 2, 11, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.globalAlpha = 1;
-  ctx.shadowColor = isBest ? "#00E5FF" : "#FF9900"; ctx.shadowBlur = 14;
-  drawBox(gx, gy - 2 - pulse * 2, 1.15, PKG.standard);
+  ctx.shadowColor = isBest ? "#00E5FF" : "#FF9900";
+  ctx.shadowBlur = 12;
+  drawBox(gx, gy - 1 - pulse * 1.5, 0.95, PKG.standard);
   ctx.shadowBlur = 0;
   ctx.fillStyle = isBest ? "#00E5FF" : "#FF9900";
-  ctx.font = "bold 10px system-ui"; ctx.textAlign = "center";
-  ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.lineWidth = 3;
-  const lab = isBest ? "AIM HERE" : "DROP";
-  ctx.strokeText(lab, gx, gy + 24); ctx.fillText(lab, gx, gy + 24);
+  ctx.font = "bold 9px system-ui";
+  ctx.textAlign = "center";
+  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  ctx.lineWidth = 2.5;
+  const lab = isBest ? "AIM" : "DROP";
+  ctx.strokeText(lab, gx, gy + L.porchH * 0.5 + 4);
+  ctx.fillText(lab, gx, gy + L.porchH * 0.5 + 4);
   ctx.restore();
 }
 
@@ -1824,17 +2006,34 @@ function drawWin(x, y, w, h, lit, shutters, accent, broken) {
 
 function drawParked(h) {
   const pc = h.parkedCar; if (!pc) return;
-  const x = pc.ox, y = h.y + pc.oy;
+  const L = layoutHouse(h);
+  if (!L.car) return;
+  const { cx: x, cy: y, w, h: ht } = L.car;
   ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.beginPath(); ctx.ellipse(x, y + pc.h * 0.38, pc.w * 0.48, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x, y + ht * 0.38, w * 0.48, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = pc.dented ? shade(pc.color, -25) : pc.color;
-  roundRect(x - pc.w / 2, y - pc.h / 2, pc.w, pc.h, 7); ctx.fill();
+  roundRect(x - w / 2, y - ht / 2, w, ht, 6);
+  ctx.fill();
   ctx.fillStyle = pc.cracked ? "rgba(80,90,100,0.85)" : "rgba(30,50,70,0.75)";
-  roundRect(x - pc.w / 2 + 5, y - pc.h / 2 + 10, pc.w - 10, pc.h * 0.3, 4); ctx.fill();
+  roundRect(x - w / 2 + 4, y - ht / 2 + 8, w - 8, ht * 0.28, 3);
+  ctx.fill();
   if (pc.cracked) {
-    ctx.strokeStyle = "rgba(200,230,255,0.7)"; ctx.beginPath();
-    ctx.moveTo(x - 6, y - 12); ctx.lineTo(x + 2, y); ctx.lineTo(x + 8, y - 10); ctx.stroke();
+    ctx.strokeStyle = "rgba(200,230,255,0.75)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x - 5, y - ht * 0.2);
+    ctx.lineTo(x + 1, y);
+    ctx.lineTo(x + 6, y - ht * 0.15);
+    ctx.stroke();
   }
+  // wheels
+  ctx.fillStyle = "#212121";
+  roundRect(x - w / 2 - 1, y - ht / 2 + 6, 4, 10, 1);
+  roundRect(x + w / 2 - 3, y - ht / 2 + 6, 4, 10, 1);
+  roundRect(x - w / 2 - 1, y + ht / 2 - 16, 4, 10, 1);
+  roundRect(x + w / 2 - 3, y + ht / 2 - 16, 4, 10, 1);
 }
 
 function drawObstacles() {
