@@ -1445,7 +1445,7 @@ function drawHouse(h) {
   ctx.lineTo(hx + hw + 4, hy + 10);
   ctx.stroke();
   // wall AC unit (Florida classic)
-  if (h.side === 0 || Math.random() < 0) {
+  {
     const acx = facingRight ? hx + 4 : hx + hw - 16;
     ctx.fillStyle = "#90A4AE";
     roundRect(acx, hy + hh - 22, 14, 10, 1);
