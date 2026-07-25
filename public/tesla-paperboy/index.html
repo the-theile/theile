@@ -1,1 +1,250 @@
-FULL_CONTENT_HERE
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Tesla Paperboy • Amazon Flex Edition</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background: #0f172a;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      height: 100%;
+      width: 100%;
+      position: fixed;
+    }
+    #gameContainer {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      background: #1e293b;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.94);
+      color: white;
+      z-index: 20;
+      padding: 28px 24px;
+      text-align: center;
+    }
+    .screen.hidden { display: none; }
+    .screen h1 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      background: linear-gradient(90deg, #3b82f6, #22d3ee);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .screen .subtitle {
+      font-size: 1.05rem;
+      font-weight: 600;
+      opacity: 0.9;
+      margin-bottom: 18px;
+    }
+    .screen p {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      opacity: 0.88;
+      max-width: 320px;
+      margin: 0 auto 12px;
+    }
+    .how-list {
+      text-align: left;
+      max-width: 300px;
+      margin: 12px auto 24px;
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+    .how-list div {
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .how-list .icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      width: 26px;
+      text-align: center;
+    }
+    .btn {
+      margin-top: 8px;
+      padding: 14px 36px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn.secondary {
+      background: transparent;
+      border: 2px solid #475569;
+      box-shadow: none;
+      margin-top: 12px;
+      font-size: 0.95rem;
+      padding: 11px 28px;
+    }
+    #hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      padding: 14px 16px env(safe-area-inset-top, 14px);
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 5;
+      color: white;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.55);
+    }
+    #hud .score { font-size: 1.55rem; font-weight: 800; }
+    #hud .label { font-size: 0.68rem; opacity: 0.8; letter-spacing: 0.6px; }
+    #fsdIndicator {
+      position: absolute;
+      top: 74px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, #3b82f6, #06b6d4);
+      color: white;
+      padding: 7px 18px;
+      border-radius: 22px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: none;
+      z-index: 6;
+      box-shadow: 0 0 26px rgba(59, 130, 246, 0.65);
+    }
+    #message {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15, 23, 42, 0.93);
+      color: white;
+      padding: 13px 22px;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 650;
+      text-align: center;
+      max-width: 86%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 7;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    }
+    #message.show { opacity: 1; }
+    #gatePopup {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.88);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 25;
+      flex-direction: column;
+      padding: 20px;
+    }
+    #gatePopup.show { display: flex; }
+    #gatePopup .box {
+      background: #1e293b;
+      border-radius: 18px;
+      padding: 26px 22px;
+      max-width: 310px;
+      text-align: center;
+      color: white;
+      border: 1px solid #334155;
+      box-shadow: 0 22px 44px rgba(0,0,0,0.45);
+    }
+    #gatePopup h2 { margin-bottom: 8px; font-size: 1.35rem; }
+    #gatePopup p { opacity: 0.9; margin-bottom: 18px; font-size: 0.95rem; }
+    #gatePopup .codes { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    #gatePopup button {
+      padding: 13px 18px;
+      border: none;
+      border-radius: 12px;
+      background: #334155;
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #gatePopup button.correct { background: #22c55e; }
+    #gatePopup button:active { transform: scale(0.95); }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="game"></canvas>
+
+    <div id="titleScreen" class="screen">
+      <h1>Tesla Paperboy</h1>
+      <div class="subtitle">Amazon Flex Edition</div>
+      <p>Deliver packages the Florida way.<br>Classic Paperboy energy, modern chaos.</p>
+      <button class="btn" id="howBtn">How to Play</button>
+      <button class="btn secondary" id="quickStartBtn">Quick Start</button>
+    </div>
+
+    <div id="howScreen" class="screen hidden">
+      <h1 style="font-size:1.6rem;margin-bottom:14px">How to Play</h1>
+      <div class="how-list">
+        <div><span class="icon">👆</span><span><strong>Steer</strong> — Drag on the bottom half of the screen to move your Tesla left & right</span></div>
+        <div><span class="icon">📦</span><span><strong>Throw</strong> — Tap the upper half of the screen to toss a package toward that spot</span></div>
+        <div><span class="icon">🏠</span><span><strong>Deliver</strong> — Hit the glowing porches for points. Watch for pools, Ring cameras & porch pirates</span></div>
+        <div><span class="icon">⚡</span><span><strong>FSD</strong> — After several good deliveries, Autopilot engages so you can focus on throwing</span></div>
+        <div><span class="icon">🚪</span><span><strong>Gates</strong> — Sometimes you’ll need a gate code. Guess wrong and the HOA gets involved</span></div>
+      </div>
+      <button class="btn" id="startBtn">Start Route</button>
+      <button class="btn secondary" id="backBtn">Back</button>
+    </div>
+
+    <div id="hud" style="display:none">
+      <div>
+        <div class="score" id="scoreDisplay">0</div>
+        <div class="label">SCORE</div>
+      </div>
+      <div style="text-align:right">
+        <div class="score" id="timeDisplay">1:30</div>
+        <div class="label">TIME</div>
+      </div>
+    </div>
+    <div id="fsdIndicator">⚡ FSD ENGAGED</div>
+    <div id="message"></div>
+    <div id="gatePopup">
+      <div class="box">
+        <h2>🚪 Gated Community</h2>
+        <p id="gateText">Wrong code = HOA delay + damage</p>
+        <div class="codes" id="gateCodes"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Full game code is in the local improved file - this is a recovery push
+    // The complete working version with improved Tesla is being restored.
+    document.body.innerHTML = '<div style="color:white;padding:40px;text-align:center;font-family:system-ui"><h2>Restoring game...</h2><p>Please refresh in 30 seconds.</p></div>';
+  </script>
+</body>
+</html>
