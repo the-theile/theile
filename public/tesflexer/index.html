@@ -181,16 +181,24 @@ function loadMeta() {
   try {
     return Object.assign({
       highScore: 0, bestStreak: 0, games: 0, totalDrops: 0,
-      achievements: {}, station: "house", coachSeen: false,
+      achievements: {}, station: "house", coachSeen: false, difficulty: "easy",
     }, JSON.parse(localStorage.getItem(LS_KEY) || "{}"));
   } catch {
-    return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "house", coachSeen: false };
+    return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "house", coachSeen: false, difficulty: "easy" };
   }
 }
 function saveMeta(m) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(m)); } catch {}
 }
 let META = loadMeta();
+/** Run difficulty: "easy" (forgiving) | "hard" (denser, tighter assist) */
+let DIFF_MODE = META.difficulty === "hard" ? "hard" : "easy";
+function isHard() { return DIFF_MODE === "hard"; }
+function setDifficulty(mode) {
+  DIFF_MODE = mode === "hard" ? "hard" : "easy";
+  META.difficulty = DIFF_MODE;
+  saveMeta(META);
+}
 
 const ACHIEVEMENTS = {
   porchPerfect: { id: "porchPerfect", title: "Porch Perfect", desc: "10 streak in one route" },
@@ -663,25 +671,36 @@ function elapsed() { return ROUTE_TIME - G.time; }
 function difficulty() {
   const e = elapsed();
   // Welcoming first ~28s, meaningful mid, intense but fair final stretch
-  if (e <= EASY_SECS) return (e / EASY_SECS) * 0.14;
-  if (e < 68) return clamp(0.14 + (e - EASY_SECS) / 38 * 0.44, 0, 0.58);
-  return clamp(0.58 + (e - 68) / 22 * (MAX_DIFF - 0.58), 0, MAX_DIFF);
+  let d;
+  if (e <= EASY_SECS) d = (e / EASY_SECS) * 0.14;
+  else if (e < 68) d = clamp(0.14 + (e - EASY_SECS) / 38 * 0.44, 0, 0.58);
+  else d = clamp(0.58 + (e - 68) / 22 * (MAX_DIFF - 0.58), 0, MAX_DIFF);
+  // Hard: faster ramp, denser feel — Easy stays near classic balance
+  if (isHard()) d = clamp(d * 1.32 + 0.06, 0, MAX_DIFF);
+  return d;
 }
 
 function aimStrength() {
   let a = lerp(0.95, 0.7, difficulty() / MAX_DIFF);
+  if (isHard()) a *= 0.86; // tighter assist on Hard
   // Max Flow: brief throw consistency boost
   if (G.flowBoostT > 0) a = lerp(a, Math.min(0.98, a + 0.12), 0.85);
   return a;
 }
-function padExtra() { return lerp(40, 22, difficulty() / MAX_DIFF); }
+function padExtra() {
+  let p = lerp(40, 22, difficulty() / MAX_DIFF);
+  if (isHard()) p *= 0.88;
+  return p;
+}
 function assistR() {
   let r = lerp(170, 110, difficulty() / MAX_DIFF);
+  if (isHard()) r *= 0.88;
   if (G.flowBoostT > 0) r *= 1.12;
   return r;
 }
 function snapD() {
   let d = lerp(105, 70, difficulty() / MAX_DIFF);
+  if (isHard()) d *= 0.9;
   if (G.flowBoostT > 0) d *= 1.15;
   return d;
 }
@@ -760,14 +779,14 @@ function budgetN(n) {
   return Math.max(3, Math.round(n * busy * dprTax));
 }
 
-function msg(text, life = 2.0) {
+function msg(text, life = 2.2) {
   if (G.messages.length > 2) G.messages.shift();
   G.messages.push({ text, life, max: life });
 }
-function floatT(x, y, text, color = "#fff", size = 14, life = 0.7) {
-  // Very calm: few concurrent floats, short life
+function floatT(x, y, text, color = "#fff", size = 16, life = 0.75) {
+  // Larger popups for mobile readability; few concurrent
   if (G.floatText.length > 2) G.floatText.shift();
-  G.floatText.push({ x, y, text, color, size, life, vy: -32 });
+  G.floatText.push({ x, y, text, color, size: Math.max(size, 15), life, vy: -34 });
 }
 function burst(x, y, color, n = 12, speed = 140) {
   n = budgetN(n);
@@ -972,44 +991,57 @@ function spawnHouse(y) {
 
 function spawnObstacle() {
   const diff = difficulty();
-  if (Math.random() < lerp(0.4, 0.12, diff / MAX_DIFF)) return;
-  if (G.fsd > 0 && Math.random() < 0.7) return;
-  if (G.obstacles.filter(o => !o.dead).length >= (diff < 0.25 ? 1 : diff < 0.5 ? 2 : 3)) return;
+  // Hard: fewer skips, denser presence
+  const skipChance = isHard() ? lerp(0.28, 0.06, diff / MAX_DIFF) : lerp(0.4, 0.12, diff / MAX_DIFF);
+  if (Math.random() < skipChance) return;
+  if (G.fsd > 0 && Math.random() < (isHard() ? 0.55 : 0.7)) return;
+  const maxObs = isHard()
+    ? (diff < 0.25 ? 2 : diff < 0.5 ? 3 : 4)
+    : (diff < 0.25 ? 1 : diff < 0.5 ? 2 : 3);
+  if (G.obstacles.filter(o => !o.dead).length >= maxObs) return;
 
   let type;
-  // pothole / barrier / branch are static road hazards (readable with cones)
-  if (diff < 0.2) type = pick(["cone", "cone", "pothole", "scooter"]);
-  else if (diff < 0.4) type = pick(["cone", "pothole", "barrier", "scooter", "cone"]);
-  else if (diff < 0.6) type = pick(["cone", "pothole", "barrier", "branch", "scooter", "ped"]);
-  else type = pick(["cone", "pothole", "barrier", "branch", "scooter", "ped", "dog", "car"]);
+  // Classic + Florida-suburb variety (mower, bike, trash, wet, robot)
+  if (diff < 0.18) type = pick(["cone", "cone", "pothole", "scooter", "wet"]);
+  else if (diff < 0.35) type = pick(["cone", "pothole", "barrier", "scooter", "cone", "trash", "wet"]);
+  else if (diff < 0.55) type = pick(["cone", "pothole", "barrier", "branch", "scooter", "ped", "mower", "bike", "trash"]);
+  else type = pick(["cone", "pothole", "barrier", "branch", "scooter", "ped", "dog", "car", "mower", "bike", "robot", "trash"]);
 
+  if (isHard() && diff > 0.25) {
+    type = pick([type, type, "bike", "mower", "robot", "dog", "scooter"]);
+  }
   if (G.event === "construction") type = pick(["cone", "cone", "barrier", "barrier", "pothole", type]);
   if (G.event === "dog_wave" || G.event === "dog_zone") {
     if (Math.random() < 0.45) type = "dog";
   }
 
   let x = rand(ROAD_L + 28, ROAD_R - 28);
-  // Static hazards can sit more mid-lane; movers stay shoulder-biased
-  const staticHaz = type === "pothole" || type === "barrier" || type === "branch" || type === "cone";
+  const staticHaz = type === "pothole" || type === "barrier" || type === "branch" || type === "cone" || type === "wet";
   if (!staticHaz && Math.random() < (diff < 0.35 ? 0.9 : 0.68)) {
     x = Math.random() < 0.5 ? rand(ROAD_L + 24, ROAD_L + 58) : rand(ROAD_R - 58, ROAD_R - 24);
-  } else if (type === "pothole") {
-    x = rand(ROAD_L + 36, ROAD_R - 36); // pot holes on travel path
+  } else if (type === "pothole" || type === "wet") {
+    x = rand(ROAD_L + 36, ROAD_R - 36);
   }
 
+  const spd = isHard() ? 1.18 : 1;
   const o = { type, x, y: -70, w: 28, h: 28, vx: 0, dead: false, hit: false, anim: 0, pkgHit: false, seed: rand(0, 100) };
-  if (type === "cone") { o.w = 18; o.h = 22; }
-  if (type === "pothole") { o.w = 34; o.h = 22; }
-  if (type === "barrier") { o.w = 40; o.h = 18; }
-  if (type === "branch") { o.w = 36; o.h = 16; o.rot = rand(-0.4, 0.4); }
-  if (type === "scooter") { o.w = 16; o.h = 36; o.vx = pick([-14, 14]) * (0.5 + diff * 0.4); }
+  if (type === "cone") { o.w = 20; o.h = 24; }
+  if (type === "pothole") { o.w = 36; o.h = 24; }
+  if (type === "wet") { o.w = 40; o.h = 22; }
+  if (type === "barrier") { o.w = 44; o.h = 20; }
+  if (type === "branch") { o.w = 38; o.h = 18; o.rot = rand(-0.4, 0.4); }
+  if (type === "scooter") { o.w = 18; o.h = 38; o.vx = pick([-14, 14]) * (0.5 + diff * 0.4) * spd; }
   if (type === "car") {
     o.w = 46; o.h = 74; o.color = pick(["#E53935","#1E88E5","#43A047","#FB8C00","#5E35B1","#FAFAFA","#37474F"]);
-    if (Math.random() < 0.7) { o.x = Math.random() < 0.5 ? ROAD_L + 40 : ROAD_R - 40; o.vy = rand(8, 24); }
-    else o.vy = rand(16, 38 + diff * 20);
+    if (Math.random() < 0.7) { o.x = Math.random() < 0.5 ? ROAD_L + 40 : ROAD_R - 40; o.vy = rand(8, 24) * spd; }
+    else o.vy = rand(16, 38 + diff * 20) * spd;
   }
-  if (type === "ped") { o.w = 18; o.h = 32; o.vx = pick([-16, 16]) * (0.5 + diff * 0.35); }
-  if (type === "dog") { o.w = 28; o.h = 16; o.vx = pick([-28, 28]) * (0.55 + diff * 0.3); }
+  if (type === "ped") { o.w = 18; o.h = 34; o.vx = pick([-16, 16]) * (0.5 + diff * 0.35) * spd; }
+  if (type === "dog") { o.w = 30; o.h = 18; o.vx = pick([-28, 28]) * (0.55 + diff * 0.3) * spd; }
+  if (type === "mower") { o.w = 36; o.h = 28; o.vx = pick([-22, 22]) * (0.45 + diff * 0.25) * spd; o.color = pick(["#C62828","#F9A825","#2E7D32"]); }
+  if (type === "bike") { o.w = 22; o.h = 36; o.vx = pick([-26, 26]) * (0.6 + diff * 0.35) * spd; o.color = pick(["#29B6F6","#EC407A","#66BB6A","#FFA726"]); }
+  if (type === "trash") { o.w = 26; o.h = 34; o.vx = pick([-10, 10]) * (0.35 + diff * 0.2) * spd; o.color = pick(["#546E7A","#37474F","#78909C"]); }
+  if (type === "robot") { o.w = 28; o.h = 24; o.vx = pick([-18, 18]) * (0.5 + diff * 0.3) * spd; }
   G.obstacles.push(o);
 }
 
@@ -1186,7 +1218,8 @@ function findThreatAssist(ax, ay) {
     if (o.dead || o.hit) continue;
     if (o.y < 55 || o.y > CAR_Y - 15) continue;
     const beanable = o.type === "dog" || o.type === "lady" || o.type === "scooter" ||
-      o.type === "ped" || o.type === "cone" || o.type === "barrier" || o.type === "branch";
+      o.type === "ped" || o.type === "cone" || o.type === "barrier" || o.type === "branch" ||
+      o.type === "mower" || o.type === "bike" || o.type === "trash" || o.type === "robot";
     if (!beanable) continue;
     // Lady warn: smaller sticky (riskier near porch)
     const rMul = (o.type === "lady" && o.phase === "warn") ? 0.75 : 1;
@@ -1455,6 +1488,12 @@ function onBtn(id) {
     setStation(id.slice(6));
     // Preview the station on title/pause
     if (state === ST.TITLE || state === ST.PAUSE || state === ST.HOWTO) startRadio();
+    return;
+  }
+  if (id.startsWith("diff_")) {
+    ensureAudio();
+    setDifficulty(id.slice(5));
+    SFX.click();
     return;
   }
   SFX.click();
@@ -1935,7 +1974,10 @@ function hitsParked(pk, h) {
 
 function hitEntity(pk, o) {
   o.pkgHit = true;
-  const dismiss = { lady: 60, ped: 40, dog: 35, scooter: 28, cone: 22, barrier: 20, branch: 18 };
+  const dismiss = {
+    lady: 60, ped: 40, dog: 35, scooter: 28, cone: 22, barrier: 20, branch: 18,
+    mower: 32, bike: 38, trash: 26, robot: 42,
+  };
   if (dismiss[o.type] != null) {
     // Lady during warn is riskier (near porch) but still beanable — slightly less bonus
     let base = dismiss[o.type];
@@ -1954,9 +1996,9 @@ function hitEntity(pk, o) {
     if (o.type === "dog") SFX.bark();
     return true;
   }
-  // Potholes aren't "beanable" — package just vanishes into the hole
-  if (o.type === "pothole") {
-    burst(pk.x, pk.y, "#37474F", 10);
+  // Potholes / wet spots aren't "beanable" — package vanishes
+  if (o.type === "pothole" || o.type === "wet") {
+    burst(pk.x, pk.y, o.type === "wet" ? "#4FC3F7" : "#37474F", 10);
     softFlowHit(8);
     SFX.miss();
     return true;
@@ -2387,7 +2429,8 @@ function update(dt) {
   }
 
   const diff = difficulty();
-  G.baseSpeed = lerp(90, 158, easeOut(diff / MAX_DIFF));
+  // Hard: slightly higher cruise speed for tighter timing
+  G.baseSpeed = lerp(isHard() ? 96 : 90, isHard() ? 168 : 158, easeOut(diff / MAX_DIFF));
   if (G.event === "construction") G.baseSpeed *= 0.88; // slightly slower during construction surge
   G.prevSpeed = G.speed;
   G.speed = G.baseSpeed * (G.fsd > 0 ? 1.06 : 1);
@@ -2432,7 +2475,9 @@ function update(dt) {
     else {
       if (o.type === "car") o.y += (o.vy || 0) * dt;
       o.x += (o.vx || 0) * dt;
-      if ((o.type === "scooter" || o.type === "ped" || o.type === "dog") && (o.x < ROAD_L + 14 || o.x > ROAD_R - 14)) o.vx *= -1;
+      if ((o.type === "scooter" || o.type === "ped" || o.type === "dog" ||
+           o.type === "mower" || o.type === "bike" || o.type === "trash" || o.type === "robot") &&
+          (o.x < ROAD_L + 14 || o.x > ROAD_R - 14)) o.vx *= -1;
     }
   }
 
@@ -2448,7 +2493,10 @@ function update(dt) {
     if (e > 7) spawnObstacle();
     let spawnMul = G.event === "construction" ? 0.55 : 1;
     if (G.event === "dog_wave") spawnMul = 0.75;
-    G.spawnT = lerp(4.6, 1.7, easeOut(diff / MAX_DIFF)) * spawnMul;
+    const baseSpawn = isHard()
+      ? lerp(3.6, 1.25, easeOut(diff / MAX_DIFF))
+      : lerp(4.6, 1.7, easeOut(diff / MAX_DIFF));
+    G.spawnT = baseSpawn * spawnMul;
   }
   // Dog wave: inject 2–3 dogs in quick succession without changing base spawn curve permanently
   if (G.dogWaveLeft > 0 && Math.random() < 0.045) {
@@ -2527,19 +2575,27 @@ function onCarHit(o) {
   }
   const table = {
     cone: "Traffic cone!",
-    scooter: "Lime scooter!",
+    scooter: "Scooter!",
     car: "Fender bender!",
     ped: "Phone zombie!",
     dog: "Doggo attack!",
     pothole: "Pothole! Florida roads win again.",
     barrier: "Construction barrier!",
     branch: "Fallen branch!",
+    mower: "Lawnmower!",
+    bike: "Kid on a bike!",
+    trash: "Trash bin!",
+    wet: "Wet patch — whoops!",
+    robot: "Delivery bot!",
   };
   if (o.type === "dog") { G.dogIncidents++; SFX.bark(); }
   if (o.type === "car") SFX.horn();
-  // Soft hazards: pothole/barrier/branch cost a heart but feel lighter
   loseHeart(table[o.type] || "Ouch!");
-  burst(o.x, o.y, o.type === "pothole" ? "#455A64" : "#FF7043", 12);
+  const burstCol = (o.type === "pothole" || o.type === "wet") ? "#455A64"
+    : o.type === "robot" ? "#4DD0E1"
+    : o.type === "mower" ? "#8BC34A"
+    : "#FF7043";
+  burst(o.x, o.y, burstCol, 12);
   SFX.hit();
 }
 
@@ -2624,20 +2680,19 @@ function draw() {
   else if (state === ST.PAUSE) { drawHUD(); drawPause(); }
   else if (state === ST.END) drawEnd();
 
-  // achievement toast
+  // achievement toast — larger for mobile
   if (G.unlockQueue.length) {
     const a = G.unlockQueue[0];
-    ctx.fillStyle = "rgba(10,22,40,0.9)";
-    roundRect(30, H - 90, W - 60, 44, 12); ctx.fill();
+    softShadow(12, 0.22);
+    ctx.fillStyle = "rgba(10,22,40,0.92)";
+    roundRect(24, H - 100, W - 48, 52, 14); ctx.fill();
+    clearShadow();
     ctx.strokeStyle = "#FFD54F"; ctx.lineWidth = 2;
-    roundRect(30, H - 90, W - 60, 44, 12); ctx.stroke();
-    ctx.fillStyle = "#FFD54F"; ctx.font = "bold 13px system-ui"; ctx.textAlign = "center";
-    ctx.fillText("🏆 " + a.title, W / 2, H - 72);
-    ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = "11px system-ui";
-    ctx.fillText(a.desc, W / 2, H - 56);
-    if (state === ST.PLAY) {
-      // auto pop after a moment via life on fake message
-    }
+    roundRect(24, H - 100, W - 48, 52, 14); ctx.stroke();
+    ctx.fillStyle = "#FFD54F"; ctx.font = "bold 15px system-ui"; ctx.textAlign = "center";
+    ctx.fillText("🏆 " + a.title, W / 2, H - 78);
+    ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.font = "13px system-ui";
+    ctx.fillText(a.desc, W / 2, H - 58);
   }
 }
 
@@ -3589,139 +3644,245 @@ function drawObstacles() {
   for (const o of G.obstacles) {
     if (o.y < -80 || o.y > H + 80) continue;
     if (o.type === "pothole") {
-      // Irregular dark asphalt crater
       const s = o.seed || 1;
-      softShadow(6, 0.2);
-      ctx.fillStyle = "rgba(30,36,42,0.92)";
+      softShadow(7, 0.24);
+      ctx.fillStyle = "#1A2228";
       ctx.beginPath();
-      ctx.ellipse(o.x, o.y, 16 + (s % 5), 10 + (s % 3), 0.15, 0, Math.PI * 2);
+      ctx.ellipse(o.x, o.y, 17 + (s % 5), 11 + (s % 3), 0.15, 0, Math.PI * 2);
       ctx.fill();
       clearShadow();
-      ctx.fillStyle = "rgba(20,24,28,0.95)";
+      ctx.fillStyle = "#0E1216";
       ctx.beginPath();
-      ctx.ellipse(o.x - 2, o.y + 1, 10, 6, -0.2, 0, Math.PI * 2);
+      ctx.ellipse(o.x - 2, o.y + 1, 11, 6.5, -0.2, 0, Math.PI * 2);
       ctx.fill();
-      // Cracked rim
-      ctx.strokeStyle = "rgba(90,100,110,0.55)";
+      ctx.strokeStyle = "rgba(255,183,77,0.45)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y, 18 + (s % 4), 12, 0.1, 0.15, Math.PI * 1.75);
+      ctx.stroke();
+    } else if (o.type === "wet") {
+      // Shiny wet patch — cool blue read
+      softShadow(5, 0.12);
+      const wg = ctx.createRadialGradient(o.x - 4, o.y - 2, 2, o.x, o.y, 22);
+      wg.addColorStop(0, "rgba(129,212,250,0.55)");
+      wg.addColorStop(0.55, "rgba(79,195,247,0.35)");
+      wg.addColorStop(1, "rgba(3,169,244,0.08)");
+      ctx.fillStyle = wg;
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y, 20, 12, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      clearShadow();
+      ctx.strokeStyle = "rgba(255,255,255,0.45)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.ellipse(o.x, o.y, 17 + (s % 4), 11, 0.1, 0.2, Math.PI * 1.7);
+      ctx.ellipse(o.x - 3, o.y - 3, 8, 3, -0.3, 0, Math.PI);
       ctx.stroke();
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      ctx.beginPath();
-      ctx.ellipse(o.x + 4, o.y - 3, 4, 2, 0, 0, Math.PI * 2);
-      ctx.fill();
     } else if (o.type === "barrier") {
-      // Orange/white striped construction barrier
-      softShadow(5, 0.14);
-      ctx.fillStyle = "#ECEFF1";
-      roundRect(o.x - 20, o.y - 8, 40, 16, 3);
+      softShadow(6, 0.16);
+      ctx.fillStyle = "#FAFAFA";
+      roundRect(o.x - 22, o.y - 9, 44, 18, 4);
       ctx.fill();
       clearShadow();
-      ctx.fillStyle = "#FF8A50";
+      ctx.fillStyle = "#FF6D00";
       for (let i = 0; i < 4; i++) {
         ctx.beginPath();
-        ctx.moveTo(o.x - 18 + i * 10, o.y - 8);
-        ctx.lineTo(o.x - 12 + i * 10, o.y - 8);
-        ctx.lineTo(o.x - 14 + i * 10, o.y + 8);
-        ctx.lineTo(o.x - 20 + i * 10, o.y + 8);
+        ctx.moveTo(o.x - 20 + i * 11, o.y - 9);
+        ctx.lineTo(o.x - 12 + i * 11, o.y - 9);
+        ctx.lineTo(o.x - 14 + i * 11, o.y + 9);
+        ctx.lineTo(o.x - 22 + i * 11, o.y + 9);
         ctx.closePath();
         ctx.fill();
       }
-      ctx.strokeStyle = "rgba(0,0,0,0.12)";
-      ctx.lineWidth = 1;
-      roundRect(o.x - 20, o.y - 8, 40, 16, 3);
+      ctx.strokeStyle = "rgba(0,0,0,0.2)";
+      ctx.lineWidth = 1.5;
+      roundRect(o.x - 22, o.y - 9, 44, 18, 4);
       ctx.stroke();
-      // Feet
-      ctx.fillStyle = "#78909C";
-      ctx.fillRect(o.x - 18, o.y + 7, 5, 4);
-      ctx.fillRect(o.x + 13, o.y + 7, 5, 4);
+      ctx.fillStyle = "#607D8B";
+      ctx.fillRect(o.x - 19, o.y + 8, 6, 5);
+      ctx.fillRect(o.x + 13, o.y + 8, 6, 5);
     } else if (o.type === "branch") {
-      // Fallen palm frond / branch on asphalt
-      softShadow(4, 0.12);
+      softShadow(5, 0.14);
       ctx.save();
       ctx.translate(o.x, o.y);
       ctx.rotate(o.rot || 0);
-      ctx.strokeStyle = "#6D4C41";
-      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "#5D4037";
+      ctx.lineWidth = 4.5;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(-16, 2);
-      ctx.quadraticCurveTo(0, -6, 16, 0);
+      ctx.moveTo(-18, 2);
+      ctx.quadraticCurveTo(0, -7, 18, 0);
       ctx.stroke();
-      ctx.strokeStyle = "#558B2F";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#43A047";
+      ctx.lineWidth = 2.5;
       for (let i = -1; i <= 1; i++) {
         ctx.beginPath();
-        ctx.moveTo(i * 6, -1);
-        ctx.quadraticCurveTo(i * 8, -10, i * 12, -8);
+        ctx.moveTo(i * 7, -1);
+        ctx.quadraticCurveTo(i * 10, -12, i * 14, -9);
         ctx.stroke();
       }
       ctx.restore();
       clearShadow();
     } else if (o.type === "cone") {
-      // Soft construction cone matching pastel world
-      softShadow(5, 0.12);
-      ctx.fillStyle = "#FF8A50";
+      // High-read orange cone + white band + base
+      softShadow(6, 0.16);
+      ctx.fillStyle = "#FF6D00";
       ctx.beginPath();
-      ctx.moveTo(o.x, o.y - 14);
-      ctx.lineTo(o.x + 9, o.y + 8);
-      ctx.lineTo(o.x - 9, o.y + 8);
+      ctx.moveTo(o.x, o.y - 16);
+      ctx.lineTo(o.x + 11, o.y + 9);
+      ctx.lineTo(o.x - 11, o.y + 9);
       ctx.closePath();
       ctx.fill();
       clearShadow();
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.fillRect(o.x - 5.5, o.y - 1, 11, 3.5);
-      ctx.fillStyle = "rgba(230,100,40,0.9)";
-      ctx.fillRect(o.x - 10, o.y + 8, 20, 3);
+      ctx.fillStyle = "#FFF8E1";
+      ctx.fillRect(o.x - 6.5, o.y - 2, 13, 4.5);
+      ctx.fillStyle = "#E65100";
+      ctx.fillRect(o.x - 12, o.y + 9, 24, 4);
+      ctx.strokeStyle = "rgba(0,0,0,0.15)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(o.x - 12, o.y + 9, 24, 4);
     } else if (o.type === "scooter") {
-      softShadow(4, 0.1);
-      ctx.strokeStyle = "#26C6DA";
-      ctx.lineWidth = 2.5;
+      softShadow(5, 0.12);
+      ctx.strokeStyle = "#00BCD4";
+      ctx.lineWidth = 3.2;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(o.x, o.y + 12);
-      ctx.lineTo(o.x, o.y - 8);
-      ctx.lineTo(o.x + 7, o.y - 14);
+      ctx.moveTo(o.x, o.y + 14);
+      ctx.lineTo(o.x, o.y - 10);
+      ctx.lineTo(o.x + 9, o.y - 16);
       ctx.stroke();
       clearShadow();
-      ctx.fillStyle = "#37474F";
+      ctx.fillStyle = "#263238";
       ctx.beginPath();
-      ctx.arc(o.x, o.y + 14, 3.5, 0, Math.PI * 2);
-      ctx.arc(o.x, o.y - 3, 3, 0, Math.PI * 2);
+      ctx.arc(o.x, o.y + 15, 4.2, 0, Math.PI * 2);
+      ctx.arc(o.x, o.y - 4, 3.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#80DEEA";
+      roundRect(o.x - 3, o.y + 2, 6, 8, 2);
       ctx.fill();
     } else if (o.type === "car") {
-      softShadow(8, 0.15);
+      softShadow(9, 0.18);
       ctx.fillStyle = o.color;
-      roundRect(o.x - 21, o.y - 34, 42, 68, 10);
+      roundRect(o.x - 22, o.y - 36, 44, 72, 11);
       ctx.fill();
       clearShadow();
-      ctx.fillStyle = "rgba(30,45,60,0.72)";
-      roundRect(o.x - 15, o.y - 20, 30, 22, 5);
+      ctx.fillStyle = "rgba(20,35,50,0.78)";
+      roundRect(o.x - 16, o.y - 22, 32, 24, 5);
       ctx.fill();
-      ctx.fillStyle = "rgba(255,236,179,0.85)";
-      roundRect(o.x - 16, o.y + 26, 9, 4, 1);
+      ctx.fillStyle = "rgba(255,236,179,0.9)";
+      roundRect(o.x - 17, o.y + 28, 10, 5, 1);
       ctx.fill();
-      roundRect(o.x + 7, o.y + 26, 9, 4, 1);
+      roundRect(o.x + 7, o.y + 28, 10, 5, 1);
       ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.12)";
+      ctx.lineWidth = 1.5;
+      roundRect(o.x - 22, o.y - 36, 44, 72, 11);
+      ctx.stroke();
     } else if (o.type === "ped") {
       const bob = Math.sin(o.anim) * 2;
-      const shirt = pickStable(o.x, ["#64B5F6", "#BA68C8", "#4DB6AC", "#FF8A65"]);
-      softShadow(4, 0.1);
+      const shirt = pickStable(o.x, ["#42A5F5", "#AB47BC", "#26A69A", "#FF7043"]);
+      softShadow(5, 0.12);
       ctx.fillStyle = shirt;
-      roundRect(o.x - 6, o.y - 3 + bob, 12, 14, 3);
+      roundRect(o.x - 7, o.y - 3 + bob, 14, 16, 4);
       ctx.fill();
       clearShadow();
       ctx.fillStyle = "#FFCC80";
       ctx.beginPath();
-      ctx.arc(o.x, o.y - 9 + bob, 6, 0, Math.PI * 2);
+      ctx.arc(o.x, o.y - 10 + bob, 6.5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#263238";
-      roundRect(o.x + 5, o.y - 7 + bob, 4, 7, 1);
+      ctx.fillStyle = "#212121";
+      roundRect(o.x + 5, o.y - 8 + bob, 5, 8, 1);
       ctx.fill();
-      ctx.fillStyle = "#455A64";
-      ctx.fillRect(o.x - 4, o.y + 11 + bob, 3.5, 9);
-      ctx.fillRect(o.x + 1, o.y + 11 - bob, 3.5, 9);
+      ctx.fillStyle = "#37474F";
+      ctx.fillRect(o.x - 5, o.y + 12 + bob, 4, 10);
+      ctx.fillRect(o.x + 1, o.y + 12 - bob, 4, 10);
+    } else if (o.type === "mower") {
+      // Riding lawnmower — green deck + red seat, high read
+      softShadow(6, 0.16);
+      ctx.fillStyle = o.color || "#2E7D32";
+      roundRect(o.x - 18, o.y - 4, 36, 16, 5);
+      ctx.fill();
+      clearShadow();
+      ctx.fillStyle = "#C62828";
+      roundRect(o.x - 8, o.y - 14, 16, 12, 3);
+      ctx.fill();
+      ctx.fillStyle = "#FFCC80";
+      ctx.beginPath();
+      ctx.arc(o.x, o.y - 18, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#212121";
+      ctx.beginPath();
+      ctx.arc(o.x - 12, o.y + 10, 5, 0, Math.PI * 2);
+      ctx.arc(o.x + 12, o.y + 10, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#81C784";
+      ctx.fillRect(o.x - 16, o.y + 2, 10, 3);
+    } else if (o.type === "bike") {
+      const bob = Math.sin(o.anim * 1.4) * 1.5;
+      softShadow(4, 0.12);
+      ctx.strokeStyle = o.color || "#29B6F6";
+      ctx.lineWidth = 2.8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(o.x - 10, o.y + 10 + bob, 7, 0, Math.PI * 2);
+      ctx.arc(o.x + 10, o.y + 10 + bob, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      clearShadow();
+      ctx.beginPath();
+      ctx.moveTo(o.x - 10, o.y + 10 + bob);
+      ctx.lineTo(o.x, o.y - 2 + bob);
+      ctx.lineTo(o.x + 10, o.y + 10 + bob);
+      ctx.lineTo(o.x, o.y + 4 + bob);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fillStyle = o.color || "#29B6F6";
+      roundRect(o.x - 5, o.y - 10 + bob, 10, 12, 3);
+      ctx.fill();
+      ctx.fillStyle = "#FFCC80";
+      ctx.beginPath();
+      ctx.arc(o.x, o.y - 16 + bob, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFEB3B";
+      ctx.beginPath();
+      ctx.arc(o.x, o.y - 20 + bob, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (o.type === "trash") {
+      softShadow(6, 0.15);
+      ctx.fillStyle = o.color || "#546E7A";
+      roundRect(o.x - 12, o.y - 14, 24, 30, 5);
+      ctx.fill();
+      clearShadow();
+      ctx.fillStyle = shade(o.color || "#546E7A", 30);
+      roundRect(o.x - 13, o.y - 18, 26, 8, 3);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.2)";
+      ctx.fillRect(o.x - 8, o.y - 8, 4, 18);
+      ctx.fillStyle = "#212121";
+      ctx.beginPath();
+      ctx.arc(o.x - 8, o.y + 16, 3.5, 0, Math.PI * 2);
+      ctx.arc(o.x + 8, o.y + 16, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (o.type === "robot") {
+      // Small delivery bot — white body, cyan light, wheels
+      softShadow(6, 0.14);
+      ctx.fillStyle = "#ECEFF1";
+      roundRect(o.x - 14, o.y - 8, 28, 18, 6);
+      ctx.fill();
+      clearShadow();
+      ctx.fillStyle = "#00E5FF";
+      roundRect(o.x - 8, o.y - 4, 16, 6, 2);
+      ctx.fill();
+      ctx.fillStyle = "#90A4AE";
+      roundRect(o.x - 6, o.y - 14, 12, 8, 3);
+      ctx.fill();
+      ctx.fillStyle = "#37474F";
+      ctx.beginPath();
+      ctx.arc(o.x - 10, o.y + 10, 4, 0, Math.PI * 2);
+      ctx.arc(o.x + 10, o.y + 10, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,229,255,0.5)";
+      ctx.lineWidth = 1.5;
+      roundRect(o.x - 14, o.y - 8, 28, 18, 6);
+      ctx.stroke();
     } else if (o.type === "dog") drawDog(o.x, o.y, o.vx >= 0 ? 1 : -1, o.anim);
     else if (o.type === "lady") drawLady(o);
   }
@@ -4252,8 +4413,9 @@ function drawParticles() {
 function drawFloats() {
   for (const f of G.floatText) {
     ctx.globalAlpha = clamp(f.life * 1.3, 0, 1);
-    ctx.font = `bold ${f.size}px system-ui`; ctx.textAlign = "center";
-    ctx.strokeStyle = "rgba(0,0,0,0.45)"; ctx.lineWidth = 3;
+    const sz = Math.max(f.size || 16, 15);
+    ctx.font = `bold ${sz}px system-ui`; ctx.textAlign = "center";
+    ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 3.5;
     ctx.strokeText(f.text, f.x, f.y);
     ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
   }
@@ -4579,16 +4741,18 @@ function drawSteerArrow(r, side, held) {
 function drawToasts(startY) {
   let my = startY;
   for (const m of G.messages) {
-    ctx.globalAlpha = clamp(m.life * 1.8, 0, 0.85);
-    ctx.font = "11px system-ui";
-    const tw = Math.min(W - 48, ctx.measureText(m.text).width + 20);
-    ctx.fillStyle = "rgba(16,28,46,0.72)";
-    roundRect((W - tw) / 2, my, tw, 24, 10);
+    ctx.globalAlpha = clamp(m.life * 1.8, 0, 0.88);
+    ctx.font = "bold 13px system-ui";
+    const tw = Math.min(W - 40, ctx.measureText(m.text).width + 28);
+    softShadow(8, 0.18);
+    ctx.fillStyle = "rgba(16,28,46,0.82)";
+    roundRect((W - tw) / 2, my, tw, 30, 12);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,248,225,0.95)";
+    clearShadow();
+    ctx.fillStyle = "rgba(255,248,225,0.98)";
     ctx.textAlign = "center";
-    ctx.fillText(m.text, W / 2, my + 16);
-    my += 28;
+    ctx.fillText(m.text, W / 2, my + 20);
+    my += 34;
   }
   ctx.globalAlpha = 1;
 }
@@ -4642,18 +4806,18 @@ function drawEventBanner() {
   const bx = (W - bw) / 2;
   const by = HUD_H + 8 + (1 - slide) * -10;
   softShadow(8, 0.2);
-  ctx.fillStyle = "rgba(16,28,46,0.78)";
-  roundRect(bx, by, bw, bh, 12);
+  ctx.fillStyle = "rgba(16,28,46,0.84)";
+  roundRect(bx, by, bw, bh + 4, 14);
   ctx.fill();
   clearShadow();
-  ctx.strokeStyle = "rgba(255,153,0,0.45)";
+  ctx.strokeStyle = "rgba(255,153,0,0.5)";
   ctx.lineWidth = 1.5;
-  roundRect(bx, by, bw, bh, 12);
+  roundRect(bx, by, bw, bh + 4, 14);
   ctx.stroke();
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 13px system-ui";
+  ctx.font = "bold 15px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText(b.icon + "  " + b.title, W / 2, by + 19);
+  ctx.fillText(b.icon + "  " + b.title, W / 2, by + 22);
   ctx.restore();
 }
 
@@ -4671,23 +4835,23 @@ function drawCoach() {
     roundRect(sb.right.x - 4, sb.right.y - 4, sb.right.w + 8, sb.right.h + 8, 22);
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.fillStyle = "rgba(16,28,46,0.78)";
-    roundRect(W / 2 - 90, H - 140, 180, 28, 12);
+    ctx.fillStyle = "rgba(16,28,46,0.82)";
+    roundRect(W / 2 - 100, H - 144, 200, 34, 14);
     ctx.fill();
     ctx.fillStyle = "#FFCC80";
-    ctx.font = "bold 13px system-ui";
+    ctx.font = "bold 15px system-ui";
     ctx.textAlign = "center";
     ctx.fillText("Hold arrows to steer", W / 2, H - 121);
   } else if (G.coachStep === 2) {
     ctx.fillStyle = `rgba(129,212,250,${0.07 + pulse * 0.05})`;
     ctx.fillRect(0, HUD_H, W, H - HUD_H - 110);
-    ctx.fillStyle = "rgba(16,28,46,0.78)";
-    roundRect(W / 2 - 110, H * 0.28, 220, 28, 12);
+    ctx.fillStyle = "rgba(16,28,46,0.82)";
+    roundRect(W / 2 - 120, H * 0.28, 240, 34, 14);
     ctx.fill();
     ctx.fillStyle = "#81D4FA";
-    ctx.font = "bold 13px system-ui";
+    ctx.font = "bold 15px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("Drag anywhere to throw", W / 2, H * 0.28 + 18);
+    ctx.fillText("Drag anywhere to throw", W / 2, H * 0.28 + 22);
   } else if (G.coachStep === 3) {
     const best = bestStop();
     if (best) {
@@ -4700,13 +4864,13 @@ function drawCoach() {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = "rgba(16,28,46,0.78)";
-    roundRect(W / 2 - 100, HUD_H + 40, 200, 28, 12);
+    ctx.fillStyle = "rgba(16,28,46,0.82)";
+    roundRect(W / 2 - 110, HUD_H + 40, 220, 34, 14);
     ctx.fill();
     ctx.fillStyle = "#4DD0E1";
-    ctx.font = "bold 13px system-ui";
+    ctx.font = "bold 15px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("Aim for the glowing pad", W / 2, HUD_H + 58);
+    ctx.fillText("Aim for the glowing pad", W / 2, HUD_H + 62);
   }
   ctx.restore();
 }
@@ -4714,70 +4878,104 @@ function drawCoach() {
 function drawTitle() {
   ctx.fillStyle = "rgba(5,15,30,0.5)"; ctx.fillRect(0, 0, W, H);
   const prev = G.carX; G.carX = W / 2;
-  ctx.save(); ctx.translate(0, -50); drawCar(); ctx.restore(); G.carX = prev;
+  ctx.save(); ctx.translate(0, -58); drawCar(); ctx.restore(); G.carX = prev;
 
-  panel(18, 130, W - 36, 430);
+  // Glass panel matching new HUD language
+  softShadow(16, 0.25);
+  ctx.fillStyle = "rgba(12, 22, 40, 0.9)";
+  roundRect(16, 118, W - 32, 468, 20);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = "rgba(255,153,0,0.35)";
+  ctx.lineWidth = 1.5;
+  roundRect(16.5, 118.5, W - 33, 467, 19.5);
+  ctx.stroke();
+
   ctx.textAlign = "center";
   ctx.fillStyle = "#FF9900"; ctx.font = "bold 12px system-ui";
-  ctx.fillText("SUNNY SUBURB DELIVERY", W / 2, 158);
+  ctx.fillText("SUNNY SUBURB DELIVERY", W / 2, 144);
   ctx.fillStyle = "#fff"; ctx.font = "bold 34px system-ui";
-  ctx.fillText("TesFlexer", W / 2, 196);
-  ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "11px system-ui";
-  ctx.fillText("Throw packages · dodge chaos · ride the radio", W / 2, 218);
-  ctx.fillStyle = "rgba(255,255,255,0.65)"; ctx.font = "12px system-ui";
-  ctx.fillText("High " + META.highScore + " · Streak " + META.bestStreak, W / 2, 236);
+  ctx.fillText("TesFlexer", W / 2, 182);
+  ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "12px system-ui";
+  ctx.fillText("Throw packages · dodge chaos · ride the radio", W / 2, 204);
+  ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "13px system-ui";
+  ctx.fillText("High " + META.highScore + " · Streak " + META.bestStreak, W / 2, 224);
+
+  UI.buttons = [];
+
+  // ── Difficulty: Easy / Hard ──
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "bold 13px system-ui";
+  ctx.fillText("Difficulty", W / 2, 250);
+  const dw = 118, dg = 12;
+  const dTotal = dw * 2 + dg;
+  let dx = (W - dTotal) / 2;
+  const dy = 260;
+  for (const mode of ["easy", "hard"]) {
+    const sel = DIFF_MODE === mode;
+    softShadow(sel ? 8 : 0, 0.15);
+    if (mode === "easy") {
+      ctx.fillStyle = sel ? "rgba(102,187,106,0.95)" : "rgba(255,255,255,0.1)";
+    } else {
+      ctx.fillStyle = sel ? "rgba(255,112,67,0.95)" : "rgba(255,255,255,0.1)";
+    }
+    roundRect(dx, dy, dw, 40, 12);
+    ctx.fill();
+    clearShadow();
+    if (sel) {
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.lineWidth = 1.5;
+      roundRect(dx, dy, dw, 40, 12);
+      ctx.stroke();
+    }
+    ctx.fillStyle = sel ? "#1A1A1A" : "#ECEFF1";
+    ctx.font = "bold 14px system-ui";
+    ctx.fillText(mode === "easy" ? "Easy" : "Hard", dx + dw / 2, dy + 18);
+    ctx.font = "9px system-ui";
+    ctx.globalAlpha = 0.7;
+    ctx.fillText(mode === "easy" ? "Forgiving" : "Dense & spicy", dx + dw / 2, dy + 32);
+    ctx.globalAlpha = 1;
+    btn("diff_" + mode, dx, dy, dw, 40, "", "secondary");
+    dx += dw + dg;
+  }
 
   // ── Tune-in radio ──
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "bold 13px system-ui";
-  ctx.fillText("Tune in", W / 2, 258);
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "11px system-ui";
-  ctx.fillText("What are we listening to?", W / 2, 274);
-
-  UI.buttons = [];
+  ctx.fillText("Tune in", W / 2, 324);
   const stations = ["house", "dnb", "riddim", "techno", "silent"];
-  const bw = 62, gap = 5;
+  const bw = 60, gap = 5;
   const totalW = stations.length * bw + (stations.length - 1) * gap;
   let bx = (W - totalW) / 2;
-  const by = 284;
+  const by = 334;
   for (const id of stations) {
     const r = RADIO[id];
     const sel = station === id;
     ctx.fillStyle = sel ? r.color : "rgba(255,255,255,0.1)";
-    roundRect(bx, by, bw, 46, 10); ctx.fill();
+    roundRect(bx, by, bw, 42, 10); ctx.fill();
     if (sel) {
       ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 1.5;
-      roundRect(bx, by, bw, 46, 10); ctx.stroke();
+      roundRect(bx, by, bw, 42, 10); ctx.stroke();
     }
     ctx.fillStyle = sel ? (r.silent ? "#ECEFF1" : "#1A1A1A") : "#ECEFF1";
     ctx.font = "bold 11px system-ui"; ctx.textAlign = "center";
-    ctx.fillText(r.name, bx + bw / 2, by + 20);
-    ctx.font = "7px system-ui";
+    ctx.fillText(r.name, bx + bw / 2, by + 18);
+    ctx.font = "8px system-ui";
     ctx.globalAlpha = 0.65;
-    ctx.fillText(r.silent ? "SFX only" : r.bpm + " BPM", bx + bw / 2, by + 34);
+    ctx.fillText(r.silent ? "SFX" : r.bpm + "", bx + bw / 2, by + 32);
     ctx.globalAlpha = 1;
-    btn("radio_" + id, bx, by, bw, 46, "", "secondary");
+    btn("radio_" + id, bx, by, bw, 42, "", "secondary");
     bx += bw + gap;
   }
-  // Soft radio waveform under chips
-  drawRadioWave(W / 2, 338, W - 80, 12);
-  ctx.fillStyle = RADIO[station].color; ctx.font = "11px system-ui"; ctx.textAlign = "center";
-  ctx.fillText((RADIO[station].silent ? "🔇 " : "♪ ") + RADIO[station].tag, W / 2, 364);
+  drawRadioWave(W / 2, 384, W - 80, 12);
+  ctx.fillStyle = RADIO[station].color; ctx.font = "12px system-ui"; ctx.textAlign = "center";
+  ctx.fillText((RADIO[station].silent ? "🔇 " : "♪ ") + RADIO[station].tag, W / 2, 410);
 
-  const chips = ["❤️ 3 hearts", "⚡ FSD", "🌦️ Weather", "📦 Packages"]; // FSD = Full Self-Delivering
-  let cx = 36;
-  for (const c of chips) {
-    ctx.fillStyle = "rgba(255,255,255,0.08)"; roundRect(cx, 376, 78, 20, 8); ctx.fill();
-    ctx.fillStyle = "#B0BEC5"; ctx.font = "10px system-ui";
-    ctx.fillText(c, cx + 39, 390); cx += 82;
-  }
-
-  btn("play", W / 2 - 110, 412, 220, 48, "Tap to Start", "primary");
-  btn("howto", W / 2 - 110, 468, 220, 38, "How to Play", "secondary");
+  btn("play", W / 2 - 110, 430, 220, 48, "Start Route", "primary");
+  btn("howto", W / 2 - 110, 488, 220, 38, "How to Play", "secondary");
   for (const b of UI.buttons) {
-    if (b.label) drawBtn(b); // radio chips already drawn
+    if (b.label) drawBtn(b);
   }
-  ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.font = "10px system-ui"; ctx.textAlign = "center";
-  ctx.fillText("arrows / A·D steer · drag throw · 1–4 radio · M mute", W / 2, H - 24);
+  ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.font = "11px system-ui"; ctx.textAlign = "center";
+  ctx.fillText("arrows / A·D steer · drag throw · 1–4 radio · M mute", W / 2, H - 22);
 }
 
 function drawHowTo() {
@@ -4791,15 +4989,16 @@ function drawHowTo() {
     ["DROP", "Glowing porch pads. Soft cyan = best target."],
     ["FSD", "Full Self-Delivering (FSD): every 3 drops, assist helps you dodge."],
     ["FLOW", "Clean play fills Flow for score mult + radio juice."],
+    ["DIFF", "Easy is forgiving. Hard is denser, faster, tighter assist."],
     ["HEARTS", "Crashes cost hearts — misses are soft oops."],
     ["RADIO", "House / DnB / Riddim / Techno / Silent (1–4, 0)."],
   ];
-  let y = 92;
+  let y = 88;
   ctx.textAlign = "left";
   for (const [t, b] of lines) {
-    ctx.fillStyle = "#00B0FF"; ctx.font = "bold 12px system-ui"; ctx.fillText(t, 40, y);
-    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui";
-    wrap(b, 40, y + 16, W - 80, 15); y += 52;
+    ctx.fillStyle = "#00B0FF"; ctx.font = "bold 13px system-ui"; ctx.fillText(t, 40, y);
+    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = "13px system-ui";
+    wrap(b, 40, y + 17, W - 80, 16); y += 48;
   }
   UI.buttons = [];
   btn("play", W / 2 - 110, H - 90, 220, 46, "Start Route", "primary");
@@ -4835,15 +5034,52 @@ function drawGate() {
 }
 
 function drawPause() {
-  ctx.fillStyle = "rgba(5,15,30,0.65)"; ctx.fillRect(0, 0, W, H);
-  panel(30, 150, W - 60, 380);
-  ctx.fillStyle = "#fff"; ctx.font = "bold 26px system-ui"; ctx.textAlign = "center";
-  ctx.fillText("Paused", W / 2, 195);
-  ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "13px system-ui";
-  ctx.fillText("Score " + G.score + " · Streak " + G.streak, W / 2, 222);
+  ctx.fillStyle = "rgba(5,15,30,0.72)"; ctx.fillRect(0, 0, W, H);
+  softShadow(18, 0.28);
+  ctx.fillStyle = "rgba(12, 22, 40, 0.94)";
+  roundRect(22, 120, W - 44, 420, 22);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = "rgba(255,153,0,0.4)";
+  ctx.lineWidth = 1.5;
+  roundRect(22.5, 120.5, W - 45, 419, 21.5);
+  ctx.stroke();
 
-  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "bold 12px system-ui";
-  ctx.fillText("Radio", W / 2, 252);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#FF9900";
+  ctx.font = "bold 12px system-ui";
+  ctx.fillText("ROUTE PAUSED", W / 2, 150);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 28px system-ui";
+  ctx.fillText("Paused", W / 2, 184);
+
+  // Live stats row
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  roundRect(44, 200, W - 88, 52, 14);
+  ctx.fill();
+  const stats = [
+    ["SCORE", String(G.score)],
+    ["STREAK", String(G.streak)],
+    ["TIME", `${Math.floor(G.time / 60)}:${String(Math.floor(G.time % 60)).padStart(2, "0")}`],
+  ];
+  let sx = 70;
+  for (const [lab, val] of stats) {
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.font = "bold 9px system-ui";
+    ctx.fillText(lab, sx + 30, 218);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 16px system-ui";
+    ctx.fillText(val, sx + 30, 238);
+    sx += 90;
+  }
+  // Difficulty + hearts chip
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.font = "12px system-ui";
+  ctx.fillText((isHard() ? "Hard" : "Easy") + " · " + "❤".repeat(Math.max(0, G.hearts)), W / 2, 272);
+
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = "bold 13px system-ui";
+  ctx.fillText("Radio", W / 2, 300);
   UI.buttons = [];
   const stations = ["house", "dnb", "riddim", "techno", "silent"];
   const bw = 58, gap = 5;
@@ -4851,61 +5087,122 @@ function drawPause() {
   for (const id of stations) {
     const r = RADIO[id];
     const sel = station === id;
-    ctx.fillStyle = sel ? r.color : "rgba(255,255,255,0.12)";
-    roundRect(bx, 265, bw, 40, 8); ctx.fill();
+    ctx.fillStyle = sel ? r.color : "rgba(255,255,255,0.1)";
+    roundRect(bx, 312, bw, 42, 10); ctx.fill();
+    if (sel) {
+      ctx.strokeStyle = "rgba(255,255,255,0.65)";
+      ctx.lineWidth = 1.5;
+      roundRect(bx, 312, bw, 42, 10);
+      ctx.stroke();
+    }
     ctx.fillStyle = sel && !r.silent ? "#1A1A1A" : "#ECEFF1";
-    ctx.font = "bold 10px system-ui";
-    ctx.fillText(r.name, bx + bw / 2, 290);
-    btn("radio_" + id, bx, 265, bw, 40, "", "secondary");
+    ctx.font = "bold 11px system-ui";
+    ctx.fillText(r.name, bx + bw / 2, 338);
+    btn("radio_" + id, bx, 312, bw, 42, "", "secondary");
     bx += bw + gap;
   }
-  drawRadioWave(W / 2, 312, W - 100, 12);
+  drawRadioWave(W / 2, 364, W - 100, 12);
+  ctx.fillStyle = RADIO[station].color;
+  ctx.font = "12px system-ui";
+  ctx.fillText((RADIO[station].silent ? "🔇 " : "♪ ") + RADIO[station].tag, W / 2, 392);
 
-  btn("resume", W / 2 - 100, 340, 200, 46, "Resume", "primary");
-  btn("menu", W / 2 - 100, 400, 200, 42, "Quit to Title", "secondary");
+  btn("resume", W / 2 - 110, 414, 220, 48, "Resume", "primary");
+  btn("menu", W / 2 - 110, 474, 220, 40, "Quit to Title", "secondary");
   for (const b of UI.buttons) if (b.label) drawBtn(b);
 }
 
 function drawEnd() {
-  ctx.fillStyle = "rgba(5,15,30,0.72)"; ctx.fillRect(0, 0, W, H);
-  panel(22, 48, W - 44, 560);
+  ctx.fillStyle = "rgba(5,15,30,0.74)"; ctx.fillRect(0, 0, W, H);
+  softShadow(18, 0.28);
+  ctx.fillStyle = "rgba(12, 22, 40, 0.94)";
+  roundRect(18, 36, W - 36, H - 58, 22);
+  ctx.fill();
+  clearShadow();
+  const border = G.newHigh ? "rgba(255,213,79,0.65)" : (G.wrecked ? "rgba(255,82,82,0.4)" : "rgba(255,153,0,0.4)");
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 2;
+  roundRect(18.5, 36.5, W - 37, H - 59, 21.5);
+  ctx.stroke();
+
   ctx.textAlign = "center";
-  ctx.fillStyle = G.wrecked ? "#FF5252" : "#FF9900";
-  ctx.font = "bold 14px system-ui";
-  ctx.fillText(G.wrecked ? "ROUTE FAILED" : "ROUTE COMPLETE", W / 2, 82);
-  ctx.fillStyle = "#fff"; ctx.font = "bold 24px system-ui";
-  ctx.fillText(G.wrecked ? "Route failed" : "Route complete!", W / 2, 116);
+  // Single clear headline — no redundant double fail text
   if (G.newHigh) {
-    ctx.fillStyle = "#FFD54F"; ctx.font = "bold 16px system-ui";
-    ctx.fillText("★ NEW HIGH SCORE ★", W / 2, 142);
+    ctx.fillStyle = "#FFD54F";
+    ctx.font = "bold 13px system-ui";
+    ctx.fillText("★ NEW HIGH SCORE ★", W / 2, 66);
+    // Soft gold wash
+    const glow = ctx.createRadialGradient(W / 2, 90, 10, W / 2, 90, 120);
+    glow.addColorStop(0, "rgba(255,213,79,0.18)");
+    glow.addColorStop(1, "rgba(255,213,79,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(W / 2, 90, 120, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = G.wrecked ? "#FF8A80" : "#FFB74D";
+    ctx.font = "bold 12px system-ui";
+    ctx.fillText(G.wrecked ? "ROUTE ENDED" : "ROUTE COMPLETE", W / 2, 66);
   }
 
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 24px system-ui";
+  let headline;
+  if (G.newHigh) headline = "Peak delivery!";
+  else if (G.wrecked && G.score >= 700) headline = "Still a strong Flex";
+  else if (G.wrecked) headline = "Needs a tow";
+  else headline = "Shift complete!";
+  ctx.fillText(headline, W / 2, 98);
+
+  // Score hero
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  roundRect(48, 114, W - 96, 56, 16);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = "bold 10px system-ui";
+  ctx.fillText("SCORE", W / 2, 134);
+  ctx.fillStyle = G.newHigh ? "#FFD54F" : "#fff";
+  ctx.font = "bold 28px system-ui";
+  ctx.fillText(String(G.score), W / 2, 160);
+
+  // Stats grid
   const rows = [
-    ["Score", G.score], ["Deliveries", G.deliveries], ["Best streak", G.bestStreak],
+    ["Deliveries", G.deliveries], ["Best streak", G.bestStreak],
     ["Perfects", G.perfects], ["Threat beans", G.threatBeans],
     ["Peak Flow", Math.round(G.peakFlow || G.flexFlow || 0)],
-    ["Hearts left", Math.max(0, G.hearts)], ["Weather", weatherInfo(G.weather).name],
+    ["Hearts left", Math.max(0, G.hearts)],
+    ["Difficulty", isHard() ? "Hard" : "Easy"],
+    ["Weather", weatherInfo(G.weather).name],
   ];
-  let y = 168;
-  for (const [k, v] of rows) {
-    ctx.textAlign = "left"; ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "13px system-ui";
-    ctx.fillText(k, 50, y);
-    ctx.textAlign = "right"; ctx.fillStyle = "#fff"; ctx.font = "bold 14px system-ui";
-    ctx.fillText(String(v), W - 50, y); y += 26;
+  let y = 188;
+  for (let i = 0; i < rows.length; i++) {
+    const [k, v] = rows[i];
+    if (i % 2 === 0) {
+      ctx.fillStyle = "rgba(255,255,255,0.03)";
+      ctx.fillRect(40, y - 14, W - 80, 28);
+    }
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = "13px system-ui";
+    ctx.fillText(k, 52, y);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 14px system-ui";
+    ctx.fillText(String(v), W - 52, y);
+    y += 28;
   }
+
   ctx.textAlign = "center";
   ctx.fillStyle = "#69F0AE";
-  ctx.font = "bold 17px system-ui";
-  ctx.fillText("Flex Rating: " + grade(), W / 2, y + 10);
+  ctx.font = "bold 16px system-ui";
+  ctx.fillText("Flex Rating: " + grade(), W / 2, y + 8);
 
   UI.buttons = [];
-  btn("again", W / 2 - 110, H - 186, 220, 42, "Another Route", "primary");
-  btn("share_card", W / 2 - 110, H - 136, 220, 42, "Share Card", "primary");
-  btn("share", W / 2 - 110, H - 88, 220, 32, "Share Text", "secondary");
-  btn("menu", W / 2 - 110, H - 50, 220, 30, "Title", "secondary");
+  btn("again", W / 2 - 110, H - 178, 220, 44, "Another Route", "primary");
+  btn("share_card", W / 2 - 110, H - 126, 220, 42, "Share Card", "primary");
+  btn("share", W / 2 - 110, H - 78, 220, 32, "Share Text", "secondary");
+  btn("menu", W / 2 - 110, H - 42, 220, 28, "Title", "secondary");
   for (const b of UI.buttons) drawBtn(b);
-  // Share / unlock toasts on end screen
-  drawToasts(H - 230);
+  drawToasts(H - 220);
 }
 
 function grade() {
