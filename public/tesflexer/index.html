@@ -54,7 +54,7 @@
  * TesFlexer — EV package delivery arcade (top-down vertical scroll)
  * Juicy single-file mobile web game. No external assets.
  *
- * Controls: bottom half drag = steer · top half aim/throw · A/D/←→ · Space throw · P pause · M mute
+ * Controls: on-screen L/R arrows (or A/D/←→) · drag to aim/throw · Space throw · P pause · M mute
  * Radio: 1 House · 2 DnB · 3 Riddim · 4 Techno
  * Full Self-Delivering (FSD): temporary assist after clean deliveries
  *
@@ -553,8 +553,43 @@ const G = {
 
 const keys = {};
 let pointers = new Map();
-let touchSteerId = null, throwAimId = null;
+/** pointerId → 'L' | 'R' for on-screen steer arrows */
+const steerPointers = new Map();
+let throwAimId = null;
 const UI = { buttons: [] };
+
+/** Large soft L/R steer pads — lower third of the road */
+function getSteerButtons() {
+  const bw = 80, bh = 80;
+  const by = H - 102;
+  return {
+    left:  { x: ROAD_L + 6, y: by, w: bw, h: bh },
+    right: { x: ROAD_R - 6 - bw, y: by, w: bw, h: bh },
+  };
+}
+function hitSteerSide(px, py) {
+  const b = getSteerButtons();
+  if (px >= b.left.x && px <= b.left.x + b.left.w && py >= b.left.y && py <= b.left.y + b.left.h) return "L";
+  if (px >= b.right.x && px <= b.right.x + b.right.w && py >= b.right.y && py <= b.right.y + b.right.h) return "R";
+  return null;
+}
+function touchSteerDir() {
+  let d = 0;
+  for (const side of steerPointers.values()) {
+    if (side === "L") d -= 1;
+    if (side === "R") d += 1;
+  }
+  return clamp(d, -1, 1);
+}
+function pauseBtnRect() {
+  return { x: W - 50, y: 12, w: 36, h: 36 };
+}
+function hitPause(px, py) {
+  const r = pauseBtnRect();
+  return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+}
+/** Top HUD occupies this height — aim below it freely */
+const HUD_H = 76;
 
 // ═══════════════════════════════════════════════════════════
 // WEATHER + CONTINUOUS TIME-OF-DAY
@@ -1219,17 +1254,19 @@ function findThreatAssist(ax, ay) {
 }
 
 function clampAim(sx, sy, ax, ay) {
-  const maxD = lerp(195, 260, difficulty() / MAX_DIFF);
-  ay = clamp(ay, 95, CAR_Y - 75);
-  if (ax > ROAD_L + 14 && ax < ROAD_R - 14) {
-    const curb = ax < ROAD_CX ? ROAD_L - 18 : ROAD_R + 18;
-    ax = lerp(ax, curb, 0.32);
+  const maxD = lerp(195, 270, difficulty() / MAX_DIFF);
+  // Allow aiming deep into the road corridor for cones / dogs / HOA
+  ay = clamp(ay, HUD_H + 8, CAR_Y - 36);
+  // Mild curb bias only when aim is deep in the travel lane (not a hard ban)
+  if (ax > ROAD_L + 22 && ax < ROAD_R - 22 && ay < CAR_Y - 100) {
+    const curb = ax < ROAD_CX ? ROAD_L - 10 : ROAD_R + 10;
+    ax = lerp(ax, curb, 0.12);
   }
   let d = dist(sx, sy, ax, ay);
   if (d > maxD) { const k = maxD / d; ax = sx + (ax - sx) * k; ay = sy + (ay - sy) * k; }
-  if (sy - ay > 155) ay = lerp(ay, sy - 145, lerp(0.55, 0.28, difficulty() / MAX_DIFF));
+  if (sy - ay > 175) ay = lerp(ay, sy - 160, lerp(0.45, 0.22, difficulty() / MAX_DIFF));
   // rain: slightly flatter aim band
-  if (G.weather === "rain") ay = lerp(ay, sy - 140, 0.08);
+  if (G.weather === "rain") ay = lerp(ay, sy - 150, 0.06);
   return { x: ax, y: ay };
 }
 
@@ -1294,10 +1331,17 @@ function onDown(e) {
   if (state === ST.PAUSE) { hitUI(p.x, p.y); return; }
   if (state === ST.GATE) { hitGate(p.x, p.y); return; }
   if (state === ST.PLAY) {
-    // pause button
-    if (p.x > W - 52 && p.y < 58) { state = ST.PAUSE; SFX.click(); return; }
-    if (p.y >= H * 0.5) { touchSteerId = id; G.steerTarget = p.x; G.aimPreview = null; }
-    else { throwAimId = id; updateAim(p.x, p.y); }
+    if (hitPause(p.x, p.y)) { state = ST.PAUSE; SFX.click(); return; }
+    // Steer arrows take priority — do not start a throw from on top of them
+    const side = hitSteerSide(p.x, p.y);
+    if (side) {
+      steerPointers.set(id, side);
+      G.aimPreview = null;
+      return;
+    }
+    // Entire playfield is aim/throw (except HUD chrome / steer pads)
+    throwAimId = id;
+    updateAim(p.x, p.y);
   }
 }
 function onMove(e) {
@@ -1305,10 +1349,17 @@ function onMove(e) {
   const id = e.pointerId ?? 0;
   const p = cpos(e);
   pointers.set(id, p);
-  if (state === ST.PLAY && id === touchSteerId) G.steerTarget = p.x;
+  // Finger slid off a steer pad mid-hold → release that side
+  if (state === ST.PLAY && steerPointers.has(id)) {
+    const side = hitSteerSide(p.x, p.y);
+    if (side) steerPointers.set(id, side);
+    else steerPointers.delete(id);
+  }
   if (state === ST.PLAY && id === throwAimId) updateAim(p.x, p.y);
-  if (state === ST.PLAY && e.pointerType === "mouse" && throwAimId == null && touchSteerId == null) {
-    if (p.y < H * 0.5) updateAim(p.x, p.y); else G.aimPreview = null;
+  // Desktop hover preview — full playfield minus steer pads / pause
+  if (state === ST.PLAY && e.pointerType === "mouse" && throwAimId == null && !steerPointers.has(id)) {
+    if (hitSteerSide(p.x, p.y) || hitPause(p.x, p.y) || p.y < 8) G.aimPreview = null;
+    else updateAim(p.x, p.y);
   }
 }
 function onUp(e) {
@@ -1322,16 +1373,16 @@ function onUp(e) {
     throwAimId = null; G.aimPreview = null;
   }
   pointers.delete(id);
-  if (id === touchSteerId) { touchSteerId = null; G.steerTarget = null; }
+  steerPointers.delete(id);
 }
 
 function updateAim(px, py) {
-  if (state !== ST.PLAY || py >= H * 0.5) { G.aimPreview = null; return; }
+  if (state !== ST.PLAY) { G.aimPreview = null; return; }
+  // Aim across nearly the whole screen (road + yards). Tiny top margin for HUD.
+  if (py < HUD_H - 8) { G.aimPreview = null; return; }
   const sx = G.carX, sy = CAR_Y - 18;
   const c = clampAim(sx, sy, px, py);
   const s = stickyAim(c.x, c.y);
-  // Preview landing matches tracking: sticky ends on target; free aims at world point
-  // (flight will scroll free destinations with the world)
   const def = PKG[G.nextPkg] || PKG.standard;
   const d = dist(sx, sy, s.x, s.y);
   const ft = estimateFlight(d, def);
@@ -1368,7 +1419,7 @@ addEventListener("keydown", e => {
     if (e.code === "Digit0" || e.code === "Numpad0") { setStation("silent"); if (state !== ST.TITLE) msg("Silent ride", 1); }
   }
   if (e.code === "KeyP" || e.code === "Escape") {
-    if (state === ST.PLAY) { state = ST.PAUSE; SFX.click(); }
+    if (state === ST.PLAY) { state = ST.PAUSE; steerPointers.clear(); SFX.click(); }
     else if (state === ST.PAUSE) { state = ST.PLAY; SFX.click(); }
   }
   if (state === ST.TITLE && (e.code === "Enter" || e.code === "Space")) { state = ST.PLAY; resetGame(); }
@@ -1411,7 +1462,7 @@ function onBtn(id) {
   if (id === "howto") state = ST.HOWTO;
   if (id === "back" || id === "menu") { stopRadio(); state = ST.TITLE; }
   if (id === "again") { state = ST.PLAY; resetGame(); }
-  if (id === "resume") { state = ST.PLAY; if (!muted) startRadio(); }
+  if (id === "resume") { state = ST.PLAY; steerPointers.clear(); if (!muted) startRadio(); }
   if (id === "share") shareScore();
   if (id === "share_card") shareCard();
 }
@@ -2225,7 +2276,7 @@ function updateCoach(dt, e) {
   if (!G.coachInteractive) {
     if (G.coachPhase === 0 && e > 0.8) {
       G.coachPhase = 1;
-      msg("Bottom = steer · Top = throw", 2.4);
+      msg("Arrows = steer · Drag = throw", 2.4);
     } else if (G.coachPhase === 1 && e > 4) {
       G.coachPhase = 2;
     }
@@ -2233,10 +2284,11 @@ function updateCoach(dt, e) {
   }
   // First-run interactive sequence (non-blocking)
   G.coachT = (G.coachT || 0) + dt;
+  const steered = touchSteerDir() !== 0 || keys.ArrowLeft || keys.ArrowRight || keys.KeyA || keys.KeyD;
   if (G.coachStep === 0 && e > 0.45) {
     G.coachStep = 1;
     G.coachT = 0;
-  } else if (G.coachStep === 1 && (G.coachT > 3.2 || G.steerTarget != null || keys.ArrowLeft || keys.ArrowRight || keys.KeyA || keys.KeyD)) {
+  } else if (G.coachStep === 1 && (G.coachT > 3.2 || steered)) {
     G.coachStep = 2;
     G.coachT = 0;
   } else if (G.coachStep === 2 && (G.coachT > 3.5 || G.deliveries > 0 || G.packages.length > 0)) {
@@ -2348,10 +2400,11 @@ function update(dt) {
   // subtle camera sway + punch recovery
   G.cameraY = lerp(G.cameraY, Math.sin(now() / 700) * 2 + G.carVX * 0.01, 0.1);
 
-  // Steering with weight
+  // Steering — on-screen arrows + keyboard (same weight as legacy free-drag response)
   let inputX = 0;
   if (keys.ArrowLeft || keys.KeyA) inputX -= 1;
   if (keys.ArrowRight || keys.KeyD) inputX += 1;
+  inputX = clamp(inputX + touchSteerDir(), -1, 1);
 
   if (G.fsd > 0) {
     let avoid = 0, best = 1e9;
@@ -2361,11 +2414,9 @@ function update(dt) {
       if (threat < best && Math.abs(dx) < 72) { best = threat; avoid = dx > 0 ? -1 : 1; }
     }
     G.carVX = lerp(G.carVX, avoid * 210 + (ROAD_CX - G.carX) * 0.5, 1 - Math.pow(0.001, dt));
-  } else if (G.steerTarget != null) {
-    G.carVX = lerp(G.carVX, clamp((G.steerTarget - G.carX) * 5.2, -250, 250), 1 - Math.pow(0.0005, dt));
   } else {
     G.carVX = lerp(G.carVX, inputX * 240, 1 - Math.pow(0.001, dt));
-    if (!inputX) G.carVX *= Math.pow(0.08, dt);
+    if (!inputX) G.carVX *= Math.pow(0.08, dt); // release → natural straighten
   }
   // weight: clamp accel feel — slightly heavier lean for premium chassis feel
   G.carX = clamp(G.carX + G.carVX * dt, ROAD_L + 26, ROAD_R - 26);
@@ -2565,7 +2616,11 @@ function draw() {
 
   if (state === ST.TITLE) drawTitle();
   else if (state === ST.HOWTO) drawHowTo();
-  else if (state === ST.PLAY || state === ST.GATE) { drawHUD(); if (state === ST.GATE) drawGate(); }
+  else if (state === ST.PLAY || state === ST.GATE) {
+    drawHUD();
+    if (state === ST.PLAY) drawSteerControls();
+    if (state === ST.GATE) drawGate();
+  }
   else if (state === ST.PAUSE) { drawHUD(); drawPause(); }
   else if (state === ST.END) drawEnd();
 
@@ -4291,129 +4346,234 @@ function drawBtn(b) {
   ctx.textBaseline = "alphabetic";
 }
 
+/**
+ * Premium glass top HUD — full redesign.
+ * Compact hierarchy: primary stats row + utility strip (Flow / FSD / radio / pkg).
+ */
 function drawHUD() {
-  // Lighter top strip — less “heavy panel”
-  softShadow(10, 0.18);
-  ctx.fillStyle = "rgba(16, 28, 46, 0.62)";
-  roundRect(12, 10, W - 24, 48, 14);
+  const hx = 10, hy = 8, hw = W - 20, hh = 68;
+  // Frosted glass panel
+  softShadow(14, 0.22);
+  const glass = ctx.createLinearGradient(hx, hy, hx, hy + hh);
+  glass.addColorStop(0, "rgba(18, 32, 52, 0.88)");
+  glass.addColorStop(1, "rgba(12, 22, 38, 0.82)");
+  ctx.fillStyle = glass;
+  roundRect(hx, hy, hw, hh, 16);
   ctx.fill();
   clearShadow();
+  // Soft top edge highlight
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+  roundRect(hx + 0.5, hy + 0.5, hw - 1, hh - 1, 15.5);
+  ctx.stroke();
+  // Warm accent hairline under top edge
+  ctx.strokeStyle = "rgba(255,153,0,0.28)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(hx + 18, hy + hh - 0.5);
+  ctx.lineTo(hx + hw - 18, hy + hh - 0.5);
+  ctx.stroke();
 
-  // Hearts
+  // ── Row 1: Hearts · Score · Time · Streak · Pause ──
+  const row1 = hy + 18;
+  // Hearts cluster
   for (let i = 0; i < MAX_HEARTS; i++) {
-    ctx.font = "14px system-ui";
-    ctx.globalAlpha = i < G.hearts ? 1 : 0.2;
-    ctx.fillText("❤", 24 + i * 18, 30);
+    const alive = i < G.hearts;
+    ctx.globalAlpha = alive ? 1 : 0.22;
+    ctx.font = "15px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(alive ? "❤️" : "🖤", hx + 12 + i * 20, row1 + 4);
   }
   ctx.globalAlpha = 1;
 
-  // Score / time / streak — single row values, tiny captions
-  ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = "bold 8px system-ui";
-  ctx.fillText("SCORE", 20, 44);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 15px system-ui";
-  ctx.fillText(String(G.score), 52, 46);
-
-  ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = "bold 8px system-ui";
-  ctx.fillText("TIME", W / 2 - 20, 26);
-  ctx.fillStyle = G.time < 15 ? "#FF8A80" : "#fff";
-  ctx.font = "bold 15px system-ui";
-  const m = Math.floor(G.time / 60), s = Math.floor(G.time % 60);
-  ctx.fillText(`${m}:${String(s).padStart(2, "0")}`, W / 2 - 20, 44);
-
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = "bold 8px system-ui";
-  ctx.fillText("STREAK", W / 2 + 48, 26);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 15px system-ui";
-  ctx.fillText(String(G.streak), W / 2 + 48, 44);
-
-  // Pause
-  ctx.fillStyle = "rgba(255,255,255,0.1)";
-  roundRect(W - 46, 16, 26, 26, 8);
+  // Score pill
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  roundRect(hx + 78, hy + 10, 72, 28, 10);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.fillRect(W - 37, 22, 3, 14);
-  ctx.fillRect(W - 30, 22, 3, 14);
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = "bold 7px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("SCORE", hx + 114, hy + 20);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 14px system-ui";
+  ctx.fillText(String(G.score), hx + 114, hy + 34);
+
+  // Time — hero metric center
+  const m = Math.floor(G.time / 60), s = Math.floor(G.time % 60);
+  const timeStr = `${m}:${String(s).padStart(2, "0")}`;
+  const urgent = G.time < 15;
+  ctx.fillStyle = urgent ? "rgba(255,82,82,0.18)" : "rgba(0,176,255,0.12)";
+  roundRect(W / 2 - 40, hy + 8, 80, 32, 12);
+  ctx.fill();
+  if (G.fsd > 0) {
+    ctx.strokeStyle = "rgba(0,229,255,0.55)";
+    ctx.lineWidth = 1.5;
+    roundRect(W / 2 - 40, hy + 8, 80, 32, 12);
+    ctx.stroke();
+  }
+  ctx.fillStyle = urgent ? "#FF8A80" : "#fff";
+  ctx.font = "bold 18px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(timeStr, W / 2, hy + 30);
+
+  // Streak pill
+  ctx.fillStyle = G.streak > 0 ? "rgba(255,153,0,0.16)" : "rgba(255,255,255,0.06)";
+  roundRect(W / 2 + 48, hy + 10, 58, 28, 10);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = "bold 7px system-ui";
+  ctx.fillText("STREAK", W / 2 + 77, hy + 20);
+  ctx.fillStyle = G.streak > 0 ? "#FFB74D" : "#fff";
+  ctx.font = "bold 14px system-ui";
+  ctx.fillText(String(G.streak), W / 2 + 77, hy + 34);
+
+  // Pause button
+  const pr = pauseBtnRect();
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  roundRect(pr.x, pr.y, pr.w, pr.h, 11);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillRect(pr.x + 11, pr.y + 10, 4, 16);
+  ctx.fillRect(pr.x + 20, pr.y + 10, 4, 16);
+
+  // ── Row 2: next pkg · Flow bar · FSD pips · radio ──
+  const row2 = hy + 46;
+  // Next package chip
+  const nd = PKG[G.nextPkg] || PKG.standard;
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  roundRect(hx + 10, row2 - 2, 34, 20, 8);
+  ctx.fill();
+  drawBox(hx + 27, row2 + 8, 0.38, nd);
+
+  // Flex Flow bar (main utility)
+  drawFlowBar(hx + 50, row2 + 3, hw - 168, 10);
 
   // Full Self-Delivering charge pips
+  const fsdX = hx + hw - 108;
   for (let i = 0; i < FSD_NEED; i++) {
-    ctx.fillStyle = i < G.fsdReady ? "rgba(0,176,255,0.95)" : "rgba(255,255,255,0.12)";
+    const on = i < G.fsdReady || G.fsd > 0;
+    if (G.fsd > 0) {
+      ctx.shadowColor = "#00E5FF";
+      ctx.shadowBlur = 6;
+    }
+    ctx.fillStyle = on ? "rgba(0,229,255,0.95)" : "rgba(255,255,255,0.12)";
     ctx.beginPath();
-    ctx.arc(W / 2 - 14 + i * 14, 68, 4, 0, Math.PI * 2);
+    ctx.arc(fsdX + i * 14, row2 + 8, 4.5, 0, Math.PI * 2);
     ctx.fill();
+    clearShadow();
+  }
+  // Tiny FSD label when active
+  if (G.fsd > 0) {
+    ctx.fillStyle = "rgba(0,229,255,0.9)";
+    ctx.font = "bold 7px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(G.fsd.toFixed(0) + "s", fsdX + 42, row2 + 11);
   }
 
-  // Flex Flow bar under top HUD
-  drawFlowBar();
-
-  // Next package — icon only, tiny
-  const nd = PKG[G.nextPkg] || PKG.standard;
-  ctx.fillStyle = "rgba(16,28,46,0.45)";
-  roundRect(12, 62, 36, 22, 8);
+  // Radio chip (subtle)
+  const rcol = RADIO[station]?.color || "#90A4AE";
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  roundRect(hx + hw - 52, row2 - 2, 42, 18, 8);
   ctx.fill();
-  drawBox(30, 73, 0.42, nd);
+  ctx.fillStyle = rcol;
+  ctx.font = "bold 8px system-ui";
+  ctx.textAlign = "center";
+  const rName = RADIO[station]?.silent ? "OFF" : (RADIO[station]?.name || "").slice(0, 4);
+  ctx.fillText((RADIO[station]?.silent ? "🔇" : "♪") + rName, hx + hw - 31, row2 + 11);
 
-  // Weather — tiny, bottom-right of top area when not default sunny
-  if (G.weather !== "sunny") {
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.font = "8px system-ui";
-    ctx.textAlign = "right";
-    ctx.fillText(weatherInfo(G.weather).name, W - 16, 72);
-  }
-
-  // Zone cues — almost invisible chips
+  // Easy / weather micro-chips under HUD
+  let chipY = hy + hh + 6;
   if (elapsed() < EASY_SECS) {
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = 0.65;
     ctx.fillStyle = "rgba(102,187,106,0.55)";
-    roundRect(W / 2 - 22, 88, 44, 12, 6);
+    roundRect(W / 2 - 22, chipY, 44, 12, 6);
     ctx.fill();
     ctx.fillStyle = "#fff";
     ctx.font = "bold 8px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("EASY", W / 2, 97);
+    ctx.fillText("EASY", W / 2, chipY + 9);
     ctx.globalAlpha = 1;
+    chipY += 14;
+  }
+  if (G.weather !== "sunny") {
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.font = "8px system-ui";
+    ctx.textAlign = "right";
+    ctx.fillText(weatherInfo(G.weather).name, W - 16, hy + hh + 12);
   }
 
-  // Short event banner (icon + 2–3 word title)
   drawEventBanner();
-
-  // Bottom meta — very light
-  ctx.globalAlpha = 0.55;
-  ctx.fillStyle = RADIO[station].color;
-  ctx.font = "9px system-ui";
-  ctx.textAlign = "left";
-  ctx.fillText((RADIO[station].silent ? "🔇" : "♪") + " " + RADIO[station].name, 14, H - 12);
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "right";
-  ctx.fillText(META.highScore > 0 ? "Best " + META.highScore : "", W - 14, H - 12);
-  ctx.globalAlpha = 1;
-
-  // Toasts sit below event banner when active (avoid clutter)
-  drawToasts(G.eventBanner ? 140 : 118);
-
-  // Interactive first-run coach overlays
+  drawToasts(G.eventBanner ? hy + hh + 36 : hy + hh + 14);
   drawCoach();
 
-  // Returning players: first-seconds soft tint (skip during interactive coach)
+  // First-seconds coach for returning players
   if (!G.coachInteractive && G.time > ROUTE_TIME - 3.5) {
-    ctx.globalAlpha = 0.1;
-    ctx.fillStyle = "#81D4FA";
-    ctx.fillRect(0, 0, W, H * 0.48);
+    const sb = getSteerButtons();
+    ctx.globalAlpha = 0.12;
     ctx.fillStyle = "#FFCC80";
-    ctx.fillRect(0, H * 0.52, W, H * 0.48);
+    roundRect(sb.left.x, sb.left.y, sb.left.w, sb.left.h, 18);
+    ctx.fill();
+    roundRect(sb.right.x, sb.right.y, sb.right.w, sb.right.h, 18);
+    ctx.fill();
     ctx.globalAlpha = 0.7;
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 12px system-ui";
+    ctx.font = "bold 11px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("throw", W / 2, H * 0.24);
-    ctx.fillText("steer", W / 2, H * 0.72);
+    ctx.fillText("hold arrows to steer · drag anywhere to throw", W / 2, H - 118);
     ctx.globalAlpha = 1;
   }
+}
+
+/** Soft semi-transparent L/R steer arrows on the lower road */
+function drawSteerControls() {
+  const b = getSteerButtons();
+  const dir = touchSteerDir();
+  drawSteerArrow(b.left, "L", dir < 0 || keys.ArrowLeft || keys.KeyA);
+  drawSteerArrow(b.right, "R", dir > 0 || keys.ArrowRight || keys.KeyD);
+}
+
+function drawSteerArrow(r, side, held) {
+  ctx.save();
+  // Soft glass pad
+  softShadow(held ? 12 : 8, held ? 0.22 : 0.14);
+  ctx.globalAlpha = held ? 0.72 : 0.42;
+  const g = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+  g.addColorStop(0, held ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.16)");
+  g.addColorStop(1, held ? "rgba(20,40,60,0.45)" : "rgba(10,22,40,0.38)");
+  ctx.fillStyle = g;
+  roundRect(r.x, r.y, r.w, r.h, 20);
+  ctx.fill();
+  clearShadow();
+  ctx.globalAlpha = held ? 0.9 : 0.55;
+  ctx.strokeStyle = held ? "rgba(0,229,255,0.55)" : "rgba(255,255,255,0.22)";
+  ctx.lineWidth = held ? 2 : 1.4;
+  roundRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 18);
+  ctx.stroke();
+
+  // Chevron
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  ctx.globalAlpha = held ? 0.95 : 0.7;
+  ctx.fillStyle = held ? "#E0F7FA" : "#fff";
+  ctx.beginPath();
+  if (side === "L") {
+    ctx.moveTo(cx + 10, cy - 16);
+    ctx.lineTo(cx - 14, cy);
+    ctx.lineTo(cx + 10, cy + 16);
+    ctx.lineTo(cx + 4, cy + 16);
+    ctx.lineTo(cx - 14, cy);
+    ctx.lineTo(cx + 4, cy - 16);
+  } else {
+    ctx.moveTo(cx - 10, cy - 16);
+    ctx.lineTo(cx + 14, cy);
+    ctx.lineTo(cx - 10, cy + 16);
+    ctx.lineTo(cx - 4, cy + 16);
+    ctx.lineTo(cx + 14, cy);
+    ctx.lineTo(cx - 4, cy - 16);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 function drawToasts(startY) {
@@ -4433,37 +4593,40 @@ function drawToasts(startY) {
   ctx.globalAlpha = 1;
 }
 
-function drawFlowBar() {
+function drawFlowBar(x, y, w, h) {
   const flow = clamp(G.flexFlow || 0, 0, 100);
-  const x = 48, y = 62, w = W - 96, h = 7;
   const col = RADIO[station]?.color || "#FF9900";
-  // Track
-  ctx.fillStyle = "rgba(16,28,46,0.4)";
-  roundRect(x, y, w, h, 4);
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  roundRect(x, y, w, h, h / 2);
   ctx.fill();
-  if (flow <= 0.5) return;
-  const fw = (w - 2) * (flow / 100);
+  if (flow <= 0.5) {
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.font = "bold 7px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("FLOW", x + 6, y + h - 2);
+    return;
+  }
+  const fw = Math.max(h, (w - 2) * (flow / 100));
   const pulse = 0.75 + Math.sin(now() / 180) * 0.25;
-  // Near max: soft cyan edge glow
   if (flow >= 88) {
     ctx.shadowColor = "rgba(0,229,255,0.55)";
-    ctx.shadowBlur = 10 * pulse;
+    ctx.shadowBlur = 8 * pulse;
   } else {
     ctx.shadowColor = col;
-    ctx.shadowBlur = 4 + pulse * 3;
+    ctx.shadowBlur = 3 + pulse * 2;
   }
   const g = ctx.createLinearGradient(x, 0, x + w, 0);
-  g.addColorStop(0, shade(col, 20));
+  g.addColorStop(0, shade(col, 25));
   g.addColorStop(1, col);
   ctx.fillStyle = g;
-  roundRect(x + 1, y + 1, fw, h - 2, 3);
+  roundRect(x + 1, y + 1, fw - 2, h - 2, (h - 2) / 2);
   ctx.fill();
   clearShadow();
-  if (flow >= 92) {
-    ctx.fillStyle = "rgba(0,229,255,0.9)";
+  if (flow >= 90) {
+    ctx.fillStyle = "rgba(0,229,255,0.95)";
     ctx.font = "bold 7px system-ui";
     ctx.textAlign = "right";
-    ctx.fillText("FLOW", x + w, y - 2);
+    ctx.fillText("FLOW", x + w - 4, y - 1);
   }
 }
 
@@ -4477,7 +4640,7 @@ function drawEventBanner() {
   ctx.globalAlpha = a;
   const bw = 148, bh = 28;
   const bx = (W - bw) / 2;
-  const by = 102 + (1 - slide) * -12;
+  const by = HUD_H + 8 + (1 - slide) * -10;
   softShadow(8, 0.2);
   ctx.fillStyle = "rgba(16,28,46,0.78)";
   roundRect(bx, by, bw, bh, 12);
@@ -4499,26 +4662,32 @@ function drawCoach() {
   const pulse = 0.5 + Math.sin(now() / 280) * 0.5;
   ctx.save();
   if (G.coachStep === 1) {
-    // Soft highlight bottom half — drag to steer
-    ctx.fillStyle = `rgba(255,204,128,${0.08 + pulse * 0.06})`;
-    ctx.fillRect(0, H * 0.5, W, H * 0.5);
-    ctx.fillStyle = "rgba(16,28,46,0.72)";
-    roundRect(W / 2 - 70, H * 0.72, 140, 28, 12);
+    // Highlight steer arrows
+    const sb = getSteerButtons();
+    ctx.globalAlpha = 0.15 + pulse * 0.1;
+    ctx.fillStyle = "#FFCC80";
+    roundRect(sb.left.x - 4, sb.left.y - 4, sb.left.w + 8, sb.left.h + 8, 22);
+    ctx.fill();
+    roundRect(sb.right.x - 4, sb.right.y - 4, sb.right.w + 8, sb.right.h + 8, 22);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(16,28,46,0.78)";
+    roundRect(W / 2 - 90, H - 140, 180, 28, 12);
     ctx.fill();
     ctx.fillStyle = "#FFCC80";
     ctx.font = "bold 13px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("Drag to steer", W / 2, H * 0.72 + 18);
+    ctx.fillText("Hold arrows to steer", W / 2, H - 121);
   } else if (G.coachStep === 2) {
-    ctx.fillStyle = `rgba(129,212,250,${0.08 + pulse * 0.06})`;
-    ctx.fillRect(0, 0, W, H * 0.5);
-    ctx.fillStyle = "rgba(16,28,46,0.72)";
-    roundRect(W / 2 - 96, H * 0.22, 192, 28, 12);
+    ctx.fillStyle = `rgba(129,212,250,${0.07 + pulse * 0.05})`;
+    ctx.fillRect(0, HUD_H, W, H - HUD_H - 110);
+    ctx.fillStyle = "rgba(16,28,46,0.78)";
+    roundRect(W / 2 - 110, H * 0.28, 220, 28, 12);
     ctx.fill();
     ctx.fillStyle = "#81D4FA";
     ctx.font = "bold 13px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("Hold & release to throw", W / 2, H * 0.22 + 18);
+    ctx.fillText("Drag anywhere to throw", W / 2, H * 0.28 + 18);
   } else if (G.coachStep === 3) {
     const best = bestStop();
     if (best) {
@@ -4531,13 +4700,13 @@ function drawCoach() {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = "rgba(16,28,46,0.72)";
-    roundRect(W / 2 - 100, 130, 200, 28, 12);
+    ctx.fillStyle = "rgba(16,28,46,0.78)";
+    roundRect(W / 2 - 100, HUD_H + 40, 200, 28, 12);
     ctx.fill();
     ctx.fillStyle = "#4DD0E1";
     ctx.font = "bold 13px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("Aim for the glowing pad", W / 2, 148);
+    ctx.fillText("Aim for the glowing pad", W / 2, HUD_H + 58);
   }
   ctx.restore();
 }
@@ -4608,7 +4777,7 @@ function drawTitle() {
     if (b.label) drawBtn(b); // radio chips already drawn
   }
   ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.font = "10px system-ui"; ctx.textAlign = "center";
-  ctx.fillText("1–4 music · 0 silent · M mute · P pause", W / 2, H - 24);
+  ctx.fillText("arrows / A·D steer · drag throw · 1–4 radio · M mute", W / 2, H - 24);
 }
 
 function drawHowTo() {
@@ -4617,8 +4786,8 @@ function drawHowTo() {
   ctx.fillStyle = "#FF9900"; ctx.font = "bold 22px system-ui"; ctx.textAlign = "center";
   ctx.fillText("How to Play", W / 2, 65);
   const lines = [
-    ["STEER", "Drag bottom half (or A/D)."],
-    ["THROW", "Hold top half to aim; release to throw."],
+    ["STEER", "Hold the on-screen arrows (or A/D / ←→)."],
+    ["THROW", "Drag anywhere on the road or yards; release to throw."],
     ["DROP", "Glowing porch pads. Soft cyan = best target."],
     ["FSD", "Full Self-Delivering (FSD): every 3 drops, assist helps you dodge."],
     ["FLOW", "Clean play fills Flow for score mult + radio juice."],
