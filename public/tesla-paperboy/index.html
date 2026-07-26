@@ -1065,6 +1065,56 @@ function bestStop() {
   return best ? { porch: best, house: bestH } : null;
 }
 
+/** Yard dog position (matches draw/resolve) */
+function getYardDogPos(h) {
+  if (!h || !h.hasDog || h.delivered) return null;
+  const L = layoutHouse(h);
+  const facingRight = h.side === 0;
+  const dx = facingRight ? L.hx + 12 : L.hx + L.hw - 12;
+  const dy = L.driveTop + 18 + Math.sin((h.seed || 1) + now() / 450) * 1.2;
+  return { x: dx, y: dy };
+}
+
+/**
+ * Resolve current world position of a tracked throw target.
+ * Used in flight so packages follow scrolling / moving targets.
+ */
+function getTrackPos(pk) {
+  if (!pk || !pk.trackKind || pk.trackKind === "free") return null;
+  if (pk.trackKind === "porch") {
+    if (!pk.targetHouse || !isActive(pk.targetHouse)) return null;
+    const p = getPorch(pk.targetHouse);
+    return { x: p.cx, y: p.cy };
+  }
+  if (pk.trackKind === "window") {
+    if (!pk.targetHouse || pk.targetHouse.windowBroken) return null;
+    const L = layoutHouse(pk.targetHouse);
+    return { x: L.winX + L.winW / 2, y: L.winY + L.winH / 2 };
+  }
+  if (pk.trackKind === "parked") {
+    if (!pk.targetHouse?.parkedCar) return null;
+    const L = layoutHouse(pk.targetHouse);
+    if (!L.car) return null;
+    return { x: L.car.cx, y: L.car.cy };
+  }
+  if (pk.trackKind === "pirate") {
+    const h = pk.targetHouse;
+    if (!h || h.pirateHit || h.pirateStolen || !isActive(h)) return null;
+    if (h.pirateState === "gone") return null;
+    return { x: h.pirateX || getPorch(h).cx, y: h.pirateY || getPorch(h).cy };
+  }
+  if (pk.trackKind === "dog_yard") {
+    return getYardDogPos(pk.targetHouse);
+  }
+  if (pk.trackKind === "obstacle") {
+    const o = pk.trackObs;
+    if (!o || o.dead || o.hit) return null;
+    if (o.y < -40 || o.y > H + 60) return null;
+    return { x: o.x, y: o.y };
+  }
+  return null;
+}
+
 function findAssist(ax, ay) {
   const R = assistR(), str = aimStrength();
   let best = null, bestH = null, bestD = R;
@@ -1075,12 +1125,96 @@ function findAssist(ax, ay) {
     const d = dist(ax, ay, p.cx, p.cy);
     if (d < bestD) { bestD = d; best = p; bestH = h; }
   }
-  if (!best) return { x: ax, y: ay, snap: false, house: null, porch: null };
-  if (bestD < snapD()) return { x: best.cx, y: best.cy, snap: true, house: bestH, porch: best };
-  const pull = Math.min(1, str * (1 - bestD / R) * 1.25);
+  if (!best) return { x: ax, y: ay, snap: false, house: null, porch: null, trackKind: "free", follow: 0 };
+  if (bestD < snapD()) {
+    return {
+      x: best.cx, y: best.cy, snap: true, house: bestH, porch: best,
+      trackKind: "porch", follow: 0.95, assisted: true,
+    };
+  }
+  // Milder pull than before — keep porch helpful without aimbot feel
+  const pull = Math.min(1, str * (1 - bestD / R) * 1.05);
   return {
     x: lerp(ax, best.cx, pull), y: lerp(ay, best.cy, pull),
-    snap: pull > 0.88, house: bestH, porch: best, assisted: pull > 0.12,
+    snap: pull > 0.9, house: pull > 0.55 ? bestH : null, porch: pull > 0.55 ? best : null,
+    assisted: pull > 0.14,
+    trackKind: pull > 0.55 ? "porch" : "free",
+    follow: pull > 0.55 ? 0.88 : 0,
+  };
+}
+
+/** Mild sticky for threats / breakables — weaker than porch assist */
+function findThreatAssist(ax, ay) {
+  let best = null, bestD = 48;
+  // Road threats
+  for (const o of G.obstacles) {
+    if (o.dead || o.hit) continue;
+    if (o.y < 55 || o.y > CAR_Y - 15) continue;
+    const beanable = o.type === "dog" || o.type === "lady" || o.type === "scooter" ||
+      o.type === "ped" || o.type === "cone" || o.type === "barrier" || o.type === "branch";
+    if (!beanable) continue;
+    // Lady warn: smaller sticky (riskier near porch)
+    const rMul = (o.type === "lady" && o.phase === "warn") ? 0.75 : 1;
+    const d = dist(ax, ay, o.x, o.y) / rMul;
+    if (d < bestD) {
+      bestD = d;
+      best = { trackKind: "obstacle", trackObs: o, x: o.x, y: o.y, house: null, follow: 0.72 };
+    }
+  }
+  // House-attached: windows, parked cars, yard dogs, pirates
+  for (const h of G.houses) {
+    if (h.y < -40 || h.y > H + 80) continue;
+    if (!h.windowBroken) {
+      const L = layoutHouse(h);
+      const wx = L.winX + L.winW / 2, wy = L.winY + L.winH / 2;
+      const d = dist(ax, ay, wx, wy);
+      if (d < bestD && d < 40) {
+        bestD = d;
+        best = { trackKind: "window", house: h, x: wx, y: wy, follow: 0.78 };
+      }
+    }
+    if (h.parkedCar) {
+      const L = layoutHouse(h);
+      if (L.car) {
+        const d = dist(ax, ay, L.car.cx, L.car.cy);
+        if (d < bestD && d < 42) {
+          bestD = d;
+          best = { trackKind: "parked", house: h, x: L.car.cx, y: L.car.cy, follow: 0.75 };
+        }
+      }
+    }
+    if (h.hasPirate && !h.pirateHit && !h.pirateStolen && isActive(h)) {
+      const px = h.pirateX || getPorch(h).cx, py = h.pirateY || getPorch(h).cy;
+      const d = dist(ax, ay, px, py);
+      if (d < bestD && d < 44) {
+        bestD = d;
+        best = { trackKind: "pirate", house: h, x: px, y: py, follow: 0.8 };
+      }
+    }
+    if (h.hasDog && !h.delivered) {
+      const dp = getYardDogPos(h);
+      if (dp) {
+        const d = dist(ax, ay, dp.x, dp.y);
+        if (d < bestD && d < 40) {
+          bestD = d;
+          best = { trackKind: "dog_yard", house: h, x: dp.x, y: dp.y, follow: 0.74 };
+        }
+      }
+    }
+  }
+  if (!best) return null;
+  // Soft pull toward threat — skillful free aim still possible
+  const pull = clamp(1 - bestD / 48, 0.15, 0.55);
+  return {
+    x: lerp(ax, best.x, pull),
+    y: lerp(ay, best.y, pull),
+    snap: bestD < 18,
+    assisted: true,
+    house: best.house || null,
+    trackKind: best.trackKind,
+    trackObs: best.trackObs || null,
+    follow: best.follow,
+    porch: null,
   };
 }
 
@@ -1099,15 +1233,42 @@ function clampAim(sx, sy, ax, ay) {
   return { x: ax, y: ay };
 }
 
+/**
+ * Sticky / assist resolution for aim + throw.
+ * Porches win when near; mild threat assist otherwise; free aim last.
+ */
 function stickyAim(ax, ay) {
   const b = bestStop();
-  if (!b) return findAssist(ax, ay);
-  const p = b.porch;
-  const d = dist(ax, ay, p.cx, p.cy);
-  if (d < snapD() * 1.4 || (Math.abs(ax - p.cx) < 72 && Math.abs(ay - p.cy) < 95)) {
-    return { x: p.cx, y: p.cy, snap: true, house: b.house, porch: p };
+  if (b) {
+    const p = b.porch;
+    const d = dist(ax, ay, p.cx, p.cy);
+    // Slightly tighter snap zone so free aim stays responsive
+    if (d < snapD() * 1.25 || (Math.abs(ax - p.cx) < 62 && Math.abs(ay - p.cy) < 85)) {
+      return {
+        x: p.cx, y: p.cy, snap: true, house: b.house, porch: p,
+        assisted: true, trackKind: "porch", follow: 0.96,
+      };
+    }
   }
-  return findAssist(ax, ay);
+  const porchAssist = findAssist(ax, ay);
+  if (porchAssist.snap || (porchAssist.assisted && porchAssist.trackKind === "porch" && porchAssist.follow >= 0.85)) {
+    return porchAssist;
+  }
+  // Mild threat assist when not strongly porch-locked
+  const threat = findThreatAssist(ax, ay);
+  if (threat && (!porchAssist.assisted || porchAssist.follow < 0.5)) {
+    return threat;
+  }
+  if (porchAssist.assisted) return porchAssist;
+  if (threat) return threat;
+  return { x: ax, y: ay, snap: false, house: null, porch: null, trackKind: "free", follow: 0, assisted: false };
+}
+
+/** Flight duration — capped so long throws fight scroll less */
+function estimateFlight(d, def) {
+  const wi = weatherInfo(G.weather);
+  const mass = def?.mass || 1;
+  return clamp((d / 330) * mass / (wi.throw || 1), 0.28, 0.70);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1169,7 +1330,17 @@ function updateAim(px, py) {
   const sx = G.carX, sy = CAR_Y - 18;
   const c = clampAim(sx, sy, px, py);
   const s = stickyAim(c.x, c.y);
-  G.aimPreview = { x: s.x, y: s.y, snap: !!s.snap, assisted: !!s.assisted || !!s.snap, sx, sy, house: s.house };
+  // Preview landing matches tracking: sticky ends on target; free aims at world point
+  // (flight will scroll free destinations with the world)
+  const def = PKG[G.nextPkg] || PKG.standard;
+  const d = dist(sx, sy, s.x, s.y);
+  const ft = estimateFlight(d, def);
+  const arc = lerp(26, 38, Math.min(d / 220, 1)) * (def.arc || 1) * (G.weather === "rain" ? 0.9 : 1);
+  G.aimPreview = {
+    x: s.x, y: s.y, snap: !!s.snap, assisted: !!s.assisted || !!s.snap,
+    sx, sy, house: s.house, trackKind: s.trackKind || "free",
+    flight: ft, arc,
+  };
 }
 
 canvas.addEventListener("pointerdown", onDown, { passive: false });
@@ -1438,22 +1609,28 @@ function throwPkg(tx, ty) {
   G.throwCD = 0.2;
   const sx = G.carX, sy = CAR_Y - 18;
   const c = clampAim(sx, sy, tx, ty);
-  const s = stickyAim(c.x, c.y);
-  let ax = s.x, ay = s.y, th = s.house;
+  let s = stickyAim(c.x, c.y);
+  // Porch bias when car is near best stop (strong delivery assist, not full aimbot)
   const b = bestStop();
-  if (b && Math.abs(b.porch.cx - G.carX) < 100 && Math.abs(c.x - b.porch.cx) < 95) {
-    ax = b.porch.cx; ay = b.porch.cy; th = b.house;
+  if (b && Math.abs(b.porch.cx - G.carX) < 100 && Math.abs(c.x - b.porch.cx) < 90) {
+    s = {
+      x: b.porch.cx, y: b.porch.cy, snap: true, house: b.house, porch: b.porch,
+      assisted: true, trackKind: "porch", follow: 0.97,
+    };
   }
+  const ax = s.x, ay = s.y;
+  const th = s.house || null;
+  const trackKind = s.trackKind || "free";
+  const follow = s.follow != null ? s.follow : (trackKind === "porch" ? 0.94 : trackKind === "free" ? 0 : 0.72);
 
   const def = PKG[G.nextPkg] || PKG.standard;
-  const wi = weatherInfo(G.weather);
   const d = dist(sx, sy, ax, ay);
-  const flight = clamp((d / 300) * def.mass / wi.throw, 0.34, 0.88);
-  // Max Flow: slightly more consistent arc (less rain flatten / less random spin)
-  let arc = lerp(26, 40, Math.min(d / 220, 1)) * def.arc * (G.weather === "rain" ? 0.9 : 1);
+  const flight = estimateFlight(d, def);
+  // Arc weight by package type; rain slightly flatter; max Flow steadies
+  let arc = lerp(24, 38, Math.min(d / 220, 1)) * def.arc * (G.weather === "rain" ? 0.88 : 1);
   let vr = rand(-10, 10) / def.mass;
   if (G.flowBoostT > 0) {
-    arc = lerp(arc, lerp(30, 36, Math.min(d / 220, 1)) * def.arc, 0.55);
+    arc = lerp(arc, lerp(28, 34, Math.min(d / 220, 1)) * def.arc, 0.55);
     vr *= 0.45;
   }
 
@@ -1462,6 +1639,9 @@ function throwPkg(tx, ty) {
     t: 0, dur: flight,
     arc, rot: rand(0, Math.PI), vr,
     done: false, type: def.id, def, targetHouse: th,
+    trackKind, trackObs: s.trackObs || null, follow,
+    // Free-aim world lock: destination scrolls with the route
+    freeScroll: trackKind === "free",
     trail: [],
   });
   // throw juice (light)
@@ -1469,6 +1649,40 @@ function throwPkg(tx, ty) {
   G.carVX += (sx - ax) * 0.015; // slight recoil weight
   SFX.throw();
   pickNextPackage();
+}
+
+/**
+ * Update package destination toward tracked target (or scroll free aim with world).
+ * Gentle smoothing keeps arcs natural while landing tracks porches / threats.
+ */
+function updatePackageTrack(pk, dt, scrollAmt) {
+  if (pk.done) return;
+  const rem = clamp(1 - pk.t / pk.dur, 0, 1);
+  const pos = getTrackPos(pk);
+  if (pos) {
+    // Small predictive lead from remaining flight + scroll (porches / road threats)
+    const leadK = pk.trackKind === "porch" ? 0.22 : 0.14;
+    const leadY = G.speed * (pk.dur * rem) * leadK;
+    let gx = pos.x, gy = pos.y + leadY;
+    // Sideways lead for moving road threats
+    if (pk.trackKind === "obstacle" && pk.trackObs) {
+      gx += (pk.trackObs.vx || 0) * (pk.dur * rem) * 0.35;
+    }
+    // Stronger follow near the end of flight so final landings stick
+    const baseFollow = pk.follow != null ? pk.follow : 0.85;
+    const follow = clamp(baseFollow + (1 - rem) * 0.12, 0.35, 0.99);
+    // Frame-rate independent smooth chase
+    const k = 1 - Math.pow(1 - follow, dt * 16);
+    pk.tx = lerp(pk.tx, gx, k);
+    pk.ty = lerp(pk.ty, gy, k);
+  } else if (pk.freeScroll || pk.trackKind === "free") {
+    // World scrolls down — keep free landing on the same road/lawn cell
+    pk.ty += scrollAmt;
+    pk.freeScroll = true;
+  } else {
+    // Lost tracked target: soft land at last known, still scroll with world
+    pk.ty += scrollAmt;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2198,9 +2412,10 @@ function update(dt) {
 
   tryLady(e, diff);
 
-  // Packages
+  // Packages — track scrolling / moving targets after world scroll
   for (const pk of G.packages) {
     if (pk.done) continue;
+    updatePackageTrack(pk, dt, scrollAmt);
     pk.t += dt;
     const u = clamp(pk.t / pk.dur, 0, 1);
     const ease = smooth(u);
@@ -2214,7 +2429,17 @@ function update(dt) {
     for (const t of pk.trail) { t.a *= 0.9; t.r = (t.r || 1) * 0.94; }
 
     if (u > 0.12 && u < 0.98 && resolveMidair(pk)) { pk.done = true; continue; }
-    if (u >= 1) { pk.done = true; resolveLand(pk); }
+    if (u >= 1) {
+      // Final snap onto tracked target so landing feels fair
+      const pos = getTrackPos(pk);
+      if (pos && (pk.follow || 0) > 0.7) {
+        pk.x = lerp(pk.x, pos.x, 0.85);
+        pk.y = lerp(pk.y, pos.y, 0.85);
+        pk.tx = pos.x; pk.ty = pos.y;
+      }
+      pk.done = true;
+      resolveLand(pk);
+    }
   }
   G.packages = G.packages.filter(p => !p.done || ((p.fade = (p.fade ?? 0.18) - dt) > 0));
 
@@ -3582,22 +3807,24 @@ function drawAim() {
     ctx.restore();
   }
   if (!G.aimPreview) return;
-  const { x, y, sx, sy, snap, assisted } = G.aimPreview;
-  // Soft arc only — green when locked, cyan when assisted, warm when free
+  const { x, y, sx, sy, snap, assisted, arc: prevArc } = G.aimPreview;
+  // Soft arc — green locked, cyan assisted, warm free. Arc height matches throw feel.
   const col = snap ? "#81C784" : assisted ? "#4DD0E1" : "#FFCC80";
+  const arcH = prevArc != null ? prevArc * 0.85 : 32;
   ctx.save();
   for (let i = 1; i <= 10; i++) {
     const u = i / 11;
     const px = lerp(sx, x, smooth(u));
-    const py = lerp(sy, y, smooth(u)) - Math.sin(u * Math.PI) * 32;
+    // Preview ends on current target pos (tracking follows it in flight)
+    const py = lerp(sy, y, smooth(u)) - Math.sin(u * Math.PI) * arcH;
     ctx.globalAlpha = 0.1 + u * 0.4;
     ctx.fillStyle = col;
     ctx.beginPath();
     ctx.arc(px, py, 2.4 - u * 0.4, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Landing ellipse — no LOCKED/AIM text
-  ctx.globalAlpha = snap ? 0.75 : 0.5;
+  // Landing ellipse on the intended target / world point
+  ctx.globalAlpha = snap ? 0.78 : 0.5;
   ctx.strokeStyle = col;
   ctx.lineWidth = snap ? 2.4 : 1.8;
   ctx.beginPath();
@@ -3923,7 +4150,7 @@ function drawCar() {
   ctx.arc(0, -37, 1.6, 0, Math.PI * 2);
   ctx.fill();
 
-  // Clean TFX plate on rear deck
+  // Clean FLEX plate on rear deck
   softShadow(3, 0.12);
   ctx.fillStyle = "#1A1A1A";
   roundRect(-11, 16, 22, 9, 2);
@@ -3936,7 +4163,7 @@ function drawCar() {
   ctx.fillStyle = "#FF9900";
   ctx.font = "bold 7px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("TFX", 0, 22.5);
+  ctx.fillText("FLEX", 0, 22.5);
 
   // Body outline
   ctx.strokeStyle = "rgba(0,0,0,0.08)";
