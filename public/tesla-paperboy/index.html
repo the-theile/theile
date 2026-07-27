@@ -151,7 +151,8 @@ const EASY_SECS = 30;
 const ROAD_L = 88, ROAD_R = 302;
 const ROAD_CX = (ROAD_L + ROAD_R) / 2;
 const ROAD_W = ROAD_R - ROAD_L;
-const CAR_Y = 555;
+// Car sits higher so it never crowds the bottom control dock (mobile thumb zone)
+const CAR_Y = 488;
 const MAX_DIFF = 0.78;
 const FSD_NEED = 3;
 const FSD_DUR = 10;
@@ -178,6 +179,30 @@ const PKG = {
 };
 const FUNNY_SUBS = ["whoopee", "banana", "chicken", "dno"];
 
+/** Delivery color matching (hard mode): package must match house indicator */
+const DELIVERY_COLORS = [
+  { id: "orange", hex: "#FF9900", label: "ORG" },
+  { id: "blue",   hex: "#42A5F5", label: "BLU" },
+  { id: "green",  hex: "#66BB6A", label: "GRN" },
+  { id: "pink",   hex: "#EC407A", label: "PNK" },
+];
+function colorMatchActive() { return isHard(); }
+function pickDeliveryColor() { return pick(DELIVERY_COLORS); }
+
+/** Funny wrong-color delivery lines (Hard mode) */
+const WRONG_COLOR_LINES = [
+  "Wrong color — Karen noticed!",
+  "That box is for the OTHER Florida man!",
+  "Porch said match. You said chaos.",
+  "Customer: 'I ordered green, not vibes.'",
+  "Colorblind Flex? Metrics hate this.",
+  "That's not the package this HOA ordered.",
+  "Amazon says: try the matching one 📦",
+  "Wrong shade. Even the dog is judging.",
+  "Close… if you squint. Hard mode doesn't.",
+  "Pool wants that one. Porch wants THIS one.",
+];
+
 // ═══════════════════════════════════════════════════════════
 // PERSISTENCE
 // ═══════════════════════════════════════════════════════════
@@ -185,10 +210,10 @@ function loadMeta() {
   try {
     return Object.assign({
       highScore: 0, bestStreak: 0, games: 0, totalDrops: 0,
-      achievements: {}, station: "house", coachSeen: false, difficulty: "easy",
+      achievements: {}, station: "house", coachSeen: false, colorTipSeen: false, difficulty: "easy",
     }, JSON.parse(localStorage.getItem(LS_KEY) || "{}"));
   } catch {
-    return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "house", coachSeen: false, difficulty: "easy" };
+    return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "house", coachSeen: false, colorTipSeen: false, difficulty: "easy" };
   }
 }
 function saveMeta(m) {
@@ -514,6 +539,14 @@ const SFX = {
   },
   miss() { tone({ freq: 160, dur: 0.14, type: "triangle", gain: 0.04, slide: -50 }); },
   crack() { noise(0.1, 0.05, 2600); tone({ freq: 800, dur: 0.06, type: "square", gain: 0.025, slide: -250 }); },
+  /** Glass shatter — windows & car windshields */
+  glass() {
+    noise(0.12, 0.065, 4800);
+    noise(0.09, 0.04, 7200);
+    tone({ freq: 1600, dur: 0.07, type: "square", gain: 0.022, slide: -900 });
+    tone({ freq: 2400, dur: 0.05, type: "triangle", gain: 0.016, delay: 0.02, slide: -1400 });
+    tone({ freq: 980, dur: 0.08, type: "sine", gain: 0.02, delay: 0.04, slide: -400 });
+  },
   hit() { noise(0.1, 0.055, 500); tone({ freq: 90, dur: 0.14, type: "sawtooth", gain: 0.035, slide: -30 }); },
   heart() { tone({ freq: 300, dur: 0.15, type: "sine", gain: 0.05, slide: -120 }); tone({ freq: 200, dur: 0.2, type: "triangle", gain: 0.04, delay: 0.05 }); },
   fsd() {
@@ -522,6 +555,11 @@ const SFX = {
     tone({ freq: 880, dur: 0.2, type: "triangle", gain: 0.04, delay: 0.14 });
   },
   bark() { tone({ freq: 280, dur: 0.08, type: "square", gain: 0.035, slide: 80 }); tone({ freq: 220, dur: 0.1, type: "square", gain: 0.03, delay: 0.08 }); },
+  meow() {
+    tone({ freq: 720, dur: 0.14, type: "sine", gain: 0.045, slide: -220 });
+    tone({ freq: 560, dur: 0.16, type: "triangle", gain: 0.032, delay: 0.09, slide: -100 });
+    tone({ freq: 480, dur: 0.1, type: "sine", gain: 0.02, delay: 0.18, slide: -60 });
+  },
   horn() { tone({ freq: 380, dur: 0.18, type: "sawtooth", gain: 0.03 }); tone({ freq: 400, dur: 0.15, type: "sawtooth", gain: 0.025, delay: 0.02 }); },
   splash() { noise(0.16, 0.045, 800); tone({ freq: 200, dur: 0.12, type: "sine", gain: 0.03, slide: -70 }); },
   dismiss() { tone({ freq: 420, dur: 0.08, type: "sine", gain: 0.05, slide: 160 }); tone({ freq: 640, dur: 0.12, type: "triangle", gain: 0.04, delay: 0.05 }); },
@@ -559,7 +597,7 @@ const G = {
   aimPreview: null, coachPhase: 0, wrecked: false, newHigh: false,
   weather: "sunny", // sunny | cloudy | golden | rain
   weatherMult: 1, event: null, eventT: 0,
-  nextPkg: "standard", cameraY: 0, flash: 0, flashColor: null,
+  nextPkg: "standard", nextPkgColor: null, queuePkg: null, cameraY: 0, flash: 0, flashColor: null,
   unlockQueue: [],
   // Visual juice / car polish (no gameplay effect)
   wheelRot: 0, prevSpeed: 95, braking: false, camPunchX: 0, camPunchY: 0,
@@ -569,6 +607,7 @@ const G = {
   eventBanner: null, dogWaveLeft: 0, eventScoreMult: 1, eventFlowMult: 1,
   coachStep: 0, coachT: 0, coachInteractive: false,
   runDiff: "easy",
+  colorIntro: false, colorIntroT: 0,
 };
 
 const keys = {};
@@ -578,20 +617,65 @@ const steerPointers = new Map();
 let throwAimId = null;
 const UI = { buttons: [] };
 
-/** Large soft L/R steer pads — lower third of the road */
+/**
+ * Bottom control dock — car sits well above this (CAR_Y ≈ 488).
+ *
+ * Dock row (never includes FSD):  [◀]  [BIG THROW]  [NEXT]  [▶]
+ * FSD timer floats ABOVE the tray, centered — never behind arrows/NEXT.
+ *
+ * 390×700: safeB=14 · dockH=88 · dockY≈598 · FSD at dockY−32
+ */
+function getControlBar() {
+  const safeB = 14;
+  const dockH = 88;
+  const dockY = H - safeB - dockH;
+  const fsdOn = !!(G.fsd > 0);
+  const rowY = dockY + 14;
+  const ah = 56;
+  const left = { x: 10, y: rowY, w: 52, h: ah };
+  const right = { x: W - 62, y: rowY, w: 52, h: ah };
+  const izL = left.x + left.w + 8;
+  const izR = right.x - 8;
+  const izW = izR - izL;
+  // Center package + NEXT only in the row (FSD is above)
+  const cW = 74, nW = 56;
+  const total = cW + nW + 14;
+  let x = izL + Math.max(0, (izW - total) / 2);
+  const center = { x, y: rowY - 6, w: cW, h: cW };
+  x += cW + 14;
+  const next = { x, y: rowY + 2, w: nW, h: 52 };
+  // FSD pill floats cleanly above the dock tray (gap under the car)
+  const fsd = fsdOn
+    ? { x: W / 2 - 52, y: dockY - 32, w: 104, h: 26 }
+    : null;
+  return { left, right, center, next, fsd, dockY, dockH, safeB, fsdOn };
+}
+/** @deprecated alias — steer hit uses control bar left/right */
 function getSteerButtons() {
-  const bw = 80, bh = 80;
-  const by = H - 102;
-  return {
-    left:  { x: ROAD_L + 6, y: by, w: bw, h: bh },
-    right: { x: ROAD_R - 6 - bw, y: by, w: bw, h: bh },
-  };
+  const b = getControlBar();
+  return { left: b.left, right: b.right };
 }
 function hitSteerSide(px, py) {
-  const b = getSteerButtons();
+  const b = getControlBar();
   if (px >= b.left.x && px <= b.left.x + b.left.w && py >= b.left.y && py <= b.left.y + b.left.h) return "L";
   if (px >= b.right.x && px <= b.right.x + b.right.w && py >= b.right.y && py <= b.right.y + b.right.h) return "R";
   return null;
+}
+function hitCenterThrow(px, py) {
+  const c = getControlBar().center;
+  const cx = c.x + c.w / 2, cy = c.y + c.h / 2, r = c.w / 2;
+  return dist(px, py, cx, cy) <= r;
+}
+function haptic(ms = 10) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
+}
+/** Quick-throw from the big center package button */
+function quickThrowCenter() {
+  if (G.throwCD > 0 || state !== ST.PLAY) return;
+  const b = bestStop();
+  if (b) throwPkg(b.porch.cx, b.porch.cy);
+  else throwPkg(G.carX + rand(-18, 18), CAR_Y - 170);
+  haptic(14);
 }
 function touchSteerDir() {
   let d = 0;
@@ -902,7 +986,8 @@ function resetGame() {
     nextGateIn: rand(48, 62), gateOptions: [], gateCorrect: 0, gateTimer: 0,
     aimPreview: null, coachPhase: 0, wrecked: false, newHigh: false,
     weather, weatherMult: wi.mult, event: null, eventT: 0,
-    nextPkg: "standard", cameraY: 0, flash: 0, flashColor: null, unlockQueue: [],
+    nextPkg: "standard", nextPkgColor: null, queuePkg: null,
+    cameraY: 0, flash: 0, flashColor: null, unlockQueue: [],
     birds: [], rain: [],
     wheelRot: 0, prevSpeed: 92, braking: false, camPunchX: 0, camPunchY: 0,
     gradeWarm: 0, gradeCool: 0, gradeCyan: 0,
@@ -910,6 +995,9 @@ function resetGame() {
     eventBanner: null, dogWaveLeft: 0, eventScoreMult: 1, eventFlowMult: 1,
     coachStep: 0, coachT: 0, coachInteractive: !META.coachSeen,
     runDiff: DIFF_MODE, // lock menu selection for this entire route
+    // Hard-mode color matching intro popup (first time + short reminder)
+    colorIntro: DIFF_MODE === "hard",
+    colorIntroT: 0,
   });
   G.clouds = [];
   for (let i = 0; i < 8; i++) {
@@ -921,30 +1009,56 @@ function resetGame() {
   }
   for (let i = 0; i < 5; i++) spawnHouse(-i * 145 - 50);
   pickNextPackage();
-  msg(wi.name + " · " + (isHard() ? "Hard" : "Easy"), 2.2);
+  msg(wi.name + " · " + (isHard() ? "Hard Chaos" : "Easy Route"), 2.2);
   startBgHum();
   SFX.weather();
 }
 
-function pickNextPackage() {
+function dismissColorIntro() {
+  if (!G.colorIntro) return;
+  G.colorIntro = false;
+  if (!META.colorTipSeen) {
+    META.colorTipSeen = true;
+    saveMeta(META);
+  }
+  SFX.click();
+  haptic(10);
+  msg("Match the porch color tags!", 2.4);
+}
+
+/** Roll one package type + optional hard-mode color (does not advance queue) */
+function rollPackage() {
   const d = difficulty();
   const r = Math.random();
-  // Express rush event: more heavy + funny/weird for risk/reward
+  let id;
   if (G.event === "express_rush") {
-    if (r < 0.12) G.nextPkg = pick(["weird", "banana", "chicken", "dno"]);
-    else if (r < 0.55) G.nextPkg = "heavy";
-    else if (r < 0.72) G.nextPkg = "envelope";
-    else G.nextPkg = "standard";
-    return;
+    if (r < 0.12) id = pick(["weird", "banana", "chicken", "dno"]);
+    else if (r < 0.55) id = "heavy";
+    else if (r < 0.72) id = "envelope";
+    else id = "standard";
+  } else if (r < 0.025) id = "dno";
+  else if (r < 0.05) id = "banana";
+  else if (r < 0.07) id = "chicken";
+  else if (r < 0.11) id = "weird";
+  else if (r < 0.22 + d * 0.08) id = "heavy";
+  else if (r < 0.40) id = "envelope";
+  else id = "standard";
+  return {
+    id,
+    color: colorMatchActive() ? pickDeliveryColor() : null,
+  };
+}
+/** Advance package queue: current ← next, next ← new roll */
+function pickNextPackage() {
+  if (G.queuePkg) {
+    G.nextPkg = G.queuePkg.id;
+    G.nextPkgColor = G.queuePkg.color;
+  } else {
+    const cur = rollPackage();
+    G.nextPkg = cur.id;
+    G.nextPkgColor = cur.color;
   }
-  // Funny specials (small chance)
-  if (r < 0.025) G.nextPkg = "dno";
-  else if (r < 0.05) G.nextPkg = "banana";
-  else if (r < 0.07) G.nextPkg = "chicken";
-  else if (r < 0.11) G.nextPkg = "weird";
-  else if (r < 0.22 + d * 0.08) G.nextPkg = "heavy";
-  else if (r < 0.40) G.nextPkg = "envelope";
-  else G.nextPkg = "standard";
+  G.queuePkg = rollPackage();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -993,10 +1107,13 @@ function spawnHouse(y) {
     porchLight: Math.random() < 0.4,
     ladySpawned: false, dogPhase: 0, seed: rand(0, 1000),
     activeAge: 0,
+    // Hard mode: house needs a matching package color
+    reqColor: needsDelivery && colorMatchActive() ? pickDeliveryColor() : null,
     hasParked,
     parkedCar: hasParked ? {
       color: pick(["#ECEFF1","#E53935","#1E88E5","#43A047","#FB8C00","#37474F","#FAFAFA"]),
       cracked: false, dented: false, w: 28, h: 42,
+      fleeing: false, ox: 0, oy: 0, fvx: 0, fvy: 0, fleeAge: 0, rot: 0,
     } : null,
   };
   G.houses.push(h);
@@ -1005,13 +1122,14 @@ function spawnHouse(y) {
   if (h.hasBush) G.props.push({ type: "bush", x: side === 0 ? rand(16, 48) : rand(W - 48, W - 16), y: y + 28, scale: 1.15 });
   if (h.hasPool) G.props.push({ type: "pool", x: h.poolX, y: y + 6 });
   if (Math.random() < 0.4) G.props.push({ type: "pole", x: side === 0 ? rand(10, 28) : rand(W - 28, W - 10), y: y - 40 });
-  // Breakable roadside hydrants (higher chance for interactivity)
-  if (Math.random() < 0.38) {
+  // Fire hydrants in the open gap BETWEEN houses (along curb), not clustered on driveways
+  if (Math.random() < 0.4) {
     G.props.push({
       type: "hydrant",
-      x: side === 0 ? ROAD_L - 24 : ROAD_R + 14,
-      y: y + 48,
-      broken: false, spray: 0, hitR: 16,
+      x: side === 0 ? ROAD_L - 16 : ROAD_R + 6,
+      y: y + rand(78, 112),
+      broken: false, spray: 0, flood: 0, floodMax: 0, hitR: 16,
+      side,
     });
   }
   // Extra roadside breakables
@@ -1030,6 +1148,24 @@ function spawnHouse(y) {
       y: y + 55,
       broken: false, hitR: 15,
       color: pick(["#546E7A", "#37474F", "#2E7D32"]),
+    });
+  }
+  // Yard ornaments: water fountain + lawn statue (breakable targets)
+  if (Math.random() < 0.16) {
+    G.props.push({
+      type: "fountain",
+      x: side === 0 ? rand(22, 52) : rand(W - 52, W - 22),
+      y: y + rand(38, 72),
+      broken: false, spray: 0, flood: 0, floodMax: 0, hitR: 17,
+      side,
+    });
+  }
+  if (Math.random() < 0.14) {
+    G.props.push({
+      type: "statue",
+      x: side === 0 ? rand(18, 50) : rand(W - 50, W - 18),
+      y: y + rand(32, 68),
+      broken: false, hitR: 15, rot: 0,
     });
   }
 }
@@ -1148,8 +1284,9 @@ function layoutHouse(h) {
     const cw = h.parkedCar.w || 30, ch = h.parkedCar.h || 44;
     // Garage-aligned when present: park under driveway toward yard edge
     const gOff = h.garage ? (h.side === 0 ? -6 : 6) : 0;
-    const cx = hx + hw / 2 + gOff;
-    const cy = driveTop + 28;
+    const ox = h.parkedCar.ox || 0, oy = h.parkedCar.oy || 0;
+    const cx = hx + hw / 2 + gOff + ox;
+    const cy = driveTop + 28 + oy;
     car = { cx, cy, w: cw, h: ch, x: cx - cw / 2, y: cy - ch / 2 };
   }
 
@@ -1429,15 +1566,23 @@ function onDown(e) {
   if (state === ST.PAUSE) { hitUI(p.x, p.y); return; }
   if (state === ST.GATE) { hitGate(p.x, p.y); return; }
   if (state === ST.PLAY) {
+    // Color-match intro modal (Hard) — tap anywhere to dismiss
+    if (G.colorIntro) { dismissColorIntro(); return; }
     if (hitPause(p.x, p.y)) { state = ST.PAUSE; SFX.click(); return; }
-    // Steer arrows take priority — do not start a throw from on top of them
+    // Bottom dock: steer arrows + center package (quick throw) — not drag-aim
     const side = hitSteerSide(p.x, p.y);
     if (side) {
       steerPointers.set(id, side);
       G.aimPreview = null;
+      haptic(8);
       return;
     }
-    // Entire playfield is aim/throw (except HUD chrome / steer pads)
+    if (hitCenterThrow(p.x, p.y)) {
+      G.aimPreview = null;
+      quickThrowCenter();
+      return;
+    }
+    // Entire playfield is aim/throw (except HUD chrome / dock)
     throwAimId = id;
     updateAim(p.x, p.y);
   }
@@ -1454,9 +1599,9 @@ function onMove(e) {
     else steerPointers.delete(id);
   }
   if (state === ST.PLAY && id === throwAimId) updateAim(p.x, p.y);
-  // Desktop hover preview — full playfield minus steer pads / pause
+  // Desktop hover preview — full playfield minus dock / pause
   if (state === ST.PLAY && e.pointerType === "mouse" && throwAimId == null && !steerPointers.has(id)) {
-    if (hitSteerSide(p.x, p.y) || hitPause(p.x, p.y) || p.y < 8) G.aimPreview = null;
+    if (hitSteerSide(p.x, p.y) || hitCenterThrow(p.x, p.y) || hitPause(p.x, p.y) || p.y < 8) G.aimPreview = null;
     else updateAim(p.x, p.y);
   }
 }
@@ -1476,8 +1621,9 @@ function onUp(e) {
 
 function updateAim(px, py) {
   if (state !== ST.PLAY) { G.aimPreview = null; return; }
-  // Aim across nearly the whole screen (road + yards). Tiny top margin for HUD.
+  // Aim across nearly the whole screen (road + yards). Avoid HUD + bottom dock.
   if (py < HUD_H - 8) { G.aimPreview = null; return; }
+  if (py > getControlBar().dockY - 6) { G.aimPreview = null; return; }
   const sx = G.carX, sy = CAR_Y - 18;
   const c = clampAim(sx, sy, px, py);
   const s = stickyAim(c.x, c.y);
@@ -1517,14 +1663,18 @@ addEventListener("keydown", e => {
     if (e.code === "Digit0" || e.code === "Numpad0") { setStation("silent"); if (state !== ST.TITLE) msg("Silent ride", 1); }
   }
   if (e.code === "KeyP" || e.code === "Escape") {
-    if (state === ST.PLAY) { state = ST.PAUSE; steerPointers.clear(); SFX.click(); }
+    if (state === ST.PLAY && G.colorIntro) { dismissColorIntro(); }
+    else if (state === ST.PLAY) { state = ST.PAUSE; steerPointers.clear(); SFX.click(); }
     else if (state === ST.PAUSE) { state = ST.PLAY; SFX.click(); }
   }
   if (state === ST.TITLE && (e.code === "Enter" || e.code === "Space")) { state = ST.PLAY; resetGame(); }
   if (state === ST.PLAY && e.code === "Space") {
-    const b = bestStop();
-    if (b) throwPkg(b.porch.cx, b.porch.cy);
-    else throwPkg(G.carX + rand(-12, 12), CAR_Y - 160);
+    if (G.colorIntro) { dismissColorIntro(); }
+    else {
+      const b = bestStop();
+      if (b) throwPkg(b.porch.cx, b.porch.cy);
+      else throwPkg(G.carX + rand(-12, 12), CAR_Y - 160);
+    }
   }
   if (state === ST.GATE) {
     if (e.code === "Digit1" || e.code === "Numpad1") pickGate(0);
@@ -1553,22 +1703,44 @@ function onBtn(id) {
     setStation(id.slice(6));
     // Preview the station on title/pause
     if (state === ST.TITLE || state === ST.PAUSE || state === ST.HOWTO) startRadio();
+    haptic(8);
     return;
   }
   if (id.startsWith("diff_")) {
     ensureAudio();
     setDifficulty(id.slice(5));
     SFX.click();
+    haptic(8);
     return;
   }
   SFX.click();
+  haptic(12);
   if (id === "play") { state = ST.PLAY; resetGame(); }
   if (id === "howto") state = ST.HOWTO;
   if (id === "back" || id === "menu") { stopRadio(); state = ST.TITLE; }
-  if (id === "again") { state = ST.PLAY; resetGame(); }
+  if (id === "again" || id === "restart") { state = ST.PLAY; resetGame(); }
   if (id === "resume") { state = ST.PLAY; steerPointers.clear(); if (!muted) startRadio(); }
   if (id === "share") shareScore();
   if (id === "share_card") shareCard();
+  if (id === "mute_toggle") {
+    muted = !muted;
+    if (muted) stopRadio();
+    else if (state === ST.TITLE || state === ST.PAUSE || state === ST.PLAY) startRadio();
+  }
+  if (id === "dnb_quick") {
+    ensureAudio();
+    setStation(station === "dnb" ? "house" : "dnb");
+    if (!muted && (state === ST.TITLE || state === ST.PAUSE)) startRadio();
+  }
+  if (id === "change_music") {
+    // Cycle House → DnB → Riddim → Techno → Silent
+    ensureAudio();
+    const order = ["house", "dnb", "riddim", "techno", "silent"];
+    const i = order.indexOf(station);
+    setStation(order[(i + 1) % order.length]);
+    if (!muted) startRadio();
+    msg("♪ " + (RADIO[station]?.name || "Radio"), 1.4);
+  }
 }
 function hitGate(x, y) {
   const bw = 280, bh = 52, bx = (W - bw) / 2;
@@ -1789,18 +1961,20 @@ function throwPkg(tx, ty) {
     vr *= 0.45;
   }
 
+  const pkgColor = G.nextPkgColor || null;
   G.packages.push({
     x: sx, y: sy, sx, sy, tx: ax, ty: ay,
     t: 0, dur: flight,
     arc, rot: rand(0, Math.PI), vr,
     done: false, type: def.id, def, targetHouse: th,
+    pkgColor,
     trackKind, trackObs: s.trackObs || null, follow,
     // Free-aim world lock: destination scrolls with the route
     freeScroll: trackKind === "free",
     trail: [],
   });
   // throw juice (light)
-  burst(sx, sy, def.color, 5, 75);
+  burst(sx, sy, pkgColor?.hex || def.color, 5, 75);
   G.carVX += (sx - ax) * 0.015; // slight recoil weight
   SFX.throw();
   pickNextPackage();
@@ -2033,6 +2207,7 @@ function hitsWindow(pk, h) {
 }
 
 function hitsParked(pk, h) {
+  if (!h.parkedCar || h.parkedCar.fleeing) return false;
   const L = layoutHouse(h);
   if (!L.car) return false;
   const c = L.car;
@@ -2062,6 +2237,7 @@ function hitEntity(pk, o) {
     // Flow from beans — dogs extra
     addFlow(o.type === "dog" ? 16 : o.type === "lady" ? 12 : 10);
     if (o.type === "dog") SFX.bark();
+    if (o.type === "cat") SFX.meow();
     return true;
   }
   // Potholes / wet spots aren't "beanable" — package vanishes
@@ -2080,15 +2256,64 @@ function hitEntity(pk, o) {
   return false;
 }
 
+/** Driveway car reacts to a package hit and peels out of the scene */
+function updateFleeingParked(h, dt) {
+  const pc = h.parkedCar;
+  if (!pc || !pc.fleeing) return;
+  pc.fleeAge = (pc.fleeAge || 0) + dt;
+  // Phase 1: reverse/pull toward road
+  if (pc.fleeAge < 0.4) {
+    pc.ox = (pc.ox || 0) + (pc.fvx || 0) * dt;
+    pc.oy = (pc.oy || 0) + 25 * dt;
+    pc.rot = lerp(pc.rot || 0, h.side === 0 ? 0.35 : -0.35, 0.12);
+  } else {
+    // Phase 2: accelerate up the street and leave
+    pc.fvy = (pc.fvy || -40) - 220 * dt;
+    pc.fvx = lerp(pc.fvx || 0, h.side === 0 ? 50 : -50, 0.08);
+    pc.ox = (pc.ox || 0) + (pc.fvx || 0) * dt;
+    pc.oy = (pc.oy || 0) + (pc.fvy || -120) * dt;
+    pc.rot = lerp(pc.rot || 0, 0, 0.06);
+  }
+  // Exhaust flecks while fleeing
+  if (Math.random() < 0.35) {
+    const L = layoutHouse(h);
+    if (L.car) {
+      G.particles.push({
+        x: L.car.cx - (h.side === 0 ? 8 : -8), y: L.car.cy + 16,
+        vx: rand(-12, 12), vy: rand(10, 30),
+        life: 0.35, max: 0.35, r: rand(2, 4), color: "rgba(120,120,120,0.55)", g: -20,
+      });
+    }
+  }
+  if (pc.fleeAge > 2.4 || Math.abs(pc.oy || 0) > 220 || Math.abs(pc.ox || 0) > 160) {
+    h.parkedCar = null;
+    h.hasParked = false;
+  }
+}
+
 function hitParked(pk, h) {
   const pc = h.parkedCar;
+  if (!pc) return true;
+  if (pc.fleeing) {
+    burst(pk.x, pk.y, "#9E9E9E", 5); SFX.land();
+    return true;
+  }
   if (!pc.cracked) {
     pc.cracked = pc.dented = true;
+    // React and peel out of the driveway
+    pc.fleeing = true;
+    pc.fleeAge = 0;
+    pc.ox = pc.ox || 0;
+    pc.oy = pc.oy || 0;
+    // Pull toward road, then accelerate up-street and leave
+    pc.fvx = h.side === 0 ? 95 : -95;
+    pc.fvy = -40;
+    pc.rot = h.side === 0 ? 0.12 : -0.12;
     G.score = Math.max(0, G.score - 20); G.fails++; G.streak = 0;
     softFlowHit(14);
     burst(pk.x, pk.y, "#B0BEC5", 14); shake(6);
     floatT(pk.x, pk.y, "−20", "rgba(239,154,154,0.9)", 12, 0.55);
-    SFX.crack();
+    SFX.glass(); SFX.horn();
   } else {
     burst(pk.x, pk.y, "#9E9E9E", 6); SFX.land();
   }
@@ -2101,16 +2326,16 @@ function hitWindow(pk, h) {
   softFlowHit(16);
   burst(pk.x, pk.y, "#E1F5FE", 14); shake(6); flash(0.12);
   floatT(pk.x, pk.y, "−25", "rgba(129,212,250,0.9)", 12, 0.55);
-  SFX.crack();
+  SFX.glass();
   return true;
 }
 
-/** Package hits roadside breakables (hydrants spray, bins tip, etc.) */
+/** Package hits roadside breakables (hydrants flood, bins tip, etc.) */
 function hitBreakableProps(pk) {
   for (const p of G.props) {
     if (p.broken || !p.hitR) continue;
-    const px = p.x + (p.type === "hydrant" ? 4 : 0);
-    const py = p.y + (p.type === "hydrant" ? 6 : 0);
+    const px = p.x + (p.type === "hydrant" ? 4 : p.type === "fountain" ? 8 : p.type === "statue" ? 6 : 0);
+    const py = p.y + (p.type === "hydrant" ? 6 : p.type === "fountain" ? 4 : p.type === "statue" ? -4 : 0);
     if (dist(pk.x, pk.y, px, py) > p.hitR) continue;
     p.broken = true;
     G.threatBeans++;
@@ -2118,11 +2343,35 @@ function hitBreakableProps(pk) {
     G.bestStreak = Math.max(G.bestStreak, G.streak);
     let bonus = 28;
     if (p.type === "hydrant") {
-      p.spray = 2.8;
+      // Full street flood — not just a spout
+      p.spray = 3.2;
+      p.flood = 6.2;
+      p.floodMax = 6.2;
       bonus = 40;
-      burst(px, py, "#4FC3F7", 14, 120);
-      floatT(px, py - 12, "GUSH!", "#81D4FA", 16, 0.7);
+      burst(px, py, "#4FC3F7", 18, 140);
+      for (let i = 0; i < budgetN(10); i++) {
+        G.particles.push({
+          x: px, y: py,
+          vx: rand(-90, 90), vy: rand(-20, 50),
+          life: rand(0.5, 1.1), max: 1.1, r: rand(2, 5), color: "#81D4FA", g: 30,
+        });
+      }
+      floatT(px, py - 12, "FLOOD!", "#81D4FA", 16, 0.75);
       SFX.splash();
+    } else if (p.type === "fountain") {
+      p.spray = 2.4;
+      p.flood = 3.5;
+      p.floodMax = 3.5;
+      bonus = 36;
+      burst(px, py, "#4FC3F7", 14, 110);
+      floatT(px, py - 12, "SPLASH!", "#80DEEA", 15, 0.65);
+      SFX.splash();
+    } else if (p.type === "statue") {
+      p.rot = pick([-1.1, 1.1]);
+      bonus = 34;
+      burst(px, py, "#B0BEC5", 12);
+      floatT(px, py - 12, "+" + bonus, "#A5D6A7", 15, 0.6);
+      SFX.crack();
     } else if (p.type === "mailbox_break") {
       bonus = 30;
       burst(px, py, "#90A4AE", 10);
@@ -2169,6 +2418,21 @@ function resolveLand(pk) {
     if (on || near) {
       if (!h.needsDelivery) { oops(); return; }
       if (h.delivered || h.pirateStolen) return;
+
+      // Hard mode: wrong-color package is an incorrect delivery
+      if (colorMatchActive() && h.reqColor && pk.pkgColor && h.reqColor.id !== pk.pkgColor.id) {
+        G.fails++; G.streak = 0;
+        G.score = Math.max(0, G.score - 18);
+        softFlowHit(14);
+        burst(pk.x, pk.y, h.reqColor.hex, 12);
+        burst(pk.x, pk.y, pk.pkgColor.hex, 8);
+        const line = pick(WRONG_COLOR_LINES);
+        floatT(pk.x, pk.y - 14, line, "rgba(255,171,145,0.98)", 12, 1.1);
+        floatT(pk.x, pk.y + 6, `${pk.pkgColor.label} ≠ ${h.reqColor.label}`, h.reqColor.hex, 14, 0.85);
+        msg(line, 2.6);
+        SFX.miss();
+        return;
+      }
 
       // Delivering onto porch while pirate is active = bean bonus + complete delivery
       if (h.hasPirate && !h.pirateHit && (h.pirateState === "active" || h.pirateState === "rush")) {
@@ -2507,6 +2771,15 @@ function update(dt) {
   }
 
   // PLAY
+  // Hard color-intro freezes the route until the player taps Got it
+  if (G.colorIntro) {
+    G.colorIntroT = (G.colorIntroT || 0) + dt;
+    for (const m of G.messages) m.life -= dt;
+    G.messages = G.messages.filter(m => m.life > 0);
+    updateFX(dt);
+    return;
+  }
+
   G.time -= dt;
   if (G.time <= 0) { G.time = 0; endRoute(false); return; }
 
@@ -2576,7 +2849,11 @@ function update(dt) {
   G.carLean = lerp(G.carLean, leanT, 0.12);
 
   // Scroll world
-  for (const h of G.houses) h.y += scrollAmt;
+  for (const h of G.houses) {
+    h.y += scrollAmt;
+    // Parked cars that got hit peel out and leave
+    updateFleeingParked(h, dt);
+  }
   for (const p of G.props) p.y += scrollAmt;
   for (const o of G.obstacles) {
     o.y += scrollAmt; o.anim += dt * 8;
@@ -2669,6 +2946,7 @@ function update(dt) {
   G.houses = G.houses.filter(h => h.y < H + 130);
   for (const p of G.props) {
     if (p.spray > 0) p.spray = Math.max(0, p.spray - dt);
+    if (p.flood > 0) p.flood = Math.max(0, p.flood - dt);
   }
   G.props = G.props.filter(p => p.y < H + 130);
   G.obstacles = G.obstacles.filter(o => !o.dead && o.y < H + 100);
@@ -2707,7 +2985,8 @@ function onCarHit(o) {
     worker: "Flagger waved you off!",
     backhoe: "Construction gear!",
   };
-  if (o.type === "dog" || o.type === "cat" || o.type === "bear") { G.dogIncidents++; SFX.bark(); }
+  if (o.type === "dog" || o.type === "bear") { G.dogIncidents++; SFX.bark(); }
+  if (o.type === "cat") { G.dogIncidents++; SFX.meow(); }
   if (o.type === "car" || o.type === "parked") SFX.horn();
   loseHeart(table[o.type] || "Ouch!");
   const burstCol = (o.type === "pothole" || o.type === "wet") ? "#455A64"
@@ -2796,24 +3075,26 @@ function draw() {
   else if (state === ST.PLAY || state === ST.GATE) {
     drawHUD();
     if (state === ST.PLAY) drawSteerControls();
+    if (state === ST.PLAY && G.colorIntro) drawColorIntro();
     if (state === ST.GATE) drawGate();
   }
   else if (state === ST.PAUSE) { drawHUD(); drawPause(); }
   else if (state === ST.END) drawEnd();
 
-  // achievement toast — larger for mobile
+  // achievement toast — above bottom control dock
   if (G.unlockQueue.length) {
     const a = G.unlockQueue[0];
+    const ty = (state === ST.PLAY ? getControlBar().dockY : H - 24) - 60;
     softShadow(12, 0.22);
     ctx.fillStyle = "rgba(10,22,40,0.92)";
-    roundRect(24, H - 100, W - 48, 52, 14); ctx.fill();
+    roundRect(24, ty, W - 48, 52, 14); ctx.fill();
     clearShadow();
     ctx.strokeStyle = "#FFD54F"; ctx.lineWidth = 2;
-    roundRect(24, H - 100, W - 48, 52, 14); ctx.stroke();
+    roundRect(24, ty, W - 48, 52, 14); ctx.stroke();
     ctx.fillStyle = "#FFD54F"; ctx.font = "bold 15px system-ui"; ctx.textAlign = "center";
-    ctx.fillText("🏆 " + a.title, W / 2, H - 78);
+    ctx.fillText("🏆 " + a.title, W / 2, ty + 22);
     ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.font = "13px system-ui";
-    ctx.fillText(a.desc, W / 2, H - 58);
+    ctx.fillText(a.desc, W / 2, ty + 42);
   }
 }
 
@@ -3191,6 +3472,10 @@ function drawProps() {
       ctx.fillStyle = "#5D4037"; ctx.fillRect(p.x - 12, p.y - 18, 24, 3.5);
     }
     if (p.type === "hydrant") {
+      // Street flood layer (under hydrant body) — spreads across the road
+      if (p.flood > 0) {
+        drawStreetFlood(p);
+      }
       softShadow(5, 0.14);
       ctx.fillStyle = p.broken ? "#B71C1C" : "#E53935";
       roundRect(p.x, p.y, 12, 18, 3); ctx.fill();
@@ -3198,24 +3483,98 @@ function drawProps() {
       ctx.fillRect(p.x - 4, p.y + 5, 20, 5);
       ctx.fillStyle = "#C62828";
       ctx.fillRect(p.x + 3, p.y - 4, 6, 5);
-      // Water gush when hit
+      // Active spout + sheet of water toward the road
       if (p.spray > 0) {
         const t = p.spray;
-        for (let i = 0; i < 8; i++) {
-          const a = -1.2 + i * 0.3 + Math.sin(now() / 80 + i) * 0.1;
-          const len = 18 + t * 14 + (i % 3) * 4;
-          ctx.strokeStyle = `rgba(129,212,250,${0.35 + t * 0.15})`;
-          ctx.lineWidth = 2.2;
+        const roadDir = p.x < ROAD_CX ? 1 : -1;
+        for (let i = 0; i < 10; i++) {
+          const a = -1.0 + i * 0.28 + Math.sin(now() / 80 + i) * 0.12;
+          const len = 22 + t * 16 + (i % 3) * 5;
+          ctx.strokeStyle = `rgba(129,212,250,${0.3 + t * 0.12})`;
+          ctx.lineWidth = 2.4;
           ctx.beginPath();
           ctx.moveTo(p.x + 6, p.y);
           ctx.quadraticCurveTo(
-            p.x + 6 + Math.cos(a) * len * 0.5,
-            p.y - 8 - i * 2,
-            p.x + 6 + Math.cos(a) * len,
-            p.y - 4 + Math.sin(a) * 6
+            p.x + 6 + Math.cos(a) * len * 0.45 + roadDir * 8,
+            p.y - 6 - i * 1.5,
+            p.x + 6 + Math.cos(a) * len * 0.35 + roadDir * (18 + t * 8),
+            p.y + 4 + Math.sin(a) * 10 + i * 1.2
           );
           ctx.stroke();
         }
+      }
+    }
+    if (p.type === "fountain") {
+      if (p.flood > 0) drawStreetFlood(p, 0.55);
+      // Basin
+      softShadow(6, 0.14);
+      ctx.fillStyle = p.broken ? "#78909C" : "#90A4AE";
+      ctx.beginPath();
+      ctx.ellipse(p.x + 8, p.y + 10, 14, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      clearShadow();
+      ctx.fillStyle = p.broken ? "#607D8B" : "#B0BEC5";
+      roundRect(p.x + 4, p.y - 8, 8, 16, 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(p.x + 8, p.y - 10, 5, 0, Math.PI * 2);
+      ctx.fill();
+      // Idle water tint in basin
+      if (!p.broken) {
+        ctx.fillStyle = "rgba(79,195,247,0.45)";
+        ctx.beginPath();
+        ctx.ellipse(p.x + 8, p.y + 9, 10, 3.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (p.spray > 0) {
+        const t = p.spray;
+        for (let i = 0; i < 7; i++) {
+          const a = -Math.PI / 2 + (i - 3) * 0.35 + Math.sin(now() / 90 + i) * 0.1;
+          const len = 14 + t * 12;
+          ctx.strokeStyle = `rgba(129,212,250,${0.4 + t * 0.12})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x + 8, p.y - 10);
+          ctx.lineTo(p.x + 8 + Math.cos(a) * len, p.y - 10 + Math.sin(a) * len);
+          ctx.stroke();
+        }
+      }
+    }
+    if (p.type === "statue") {
+      softShadow(5, 0.14);
+      ctx.save();
+      ctx.translate(p.x + 6, p.y + 4);
+      if (p.broken) ctx.rotate(p.rot || 1.0);
+      // Pedestal
+      ctx.fillStyle = p.broken ? "#78909C" : "#9E9E9E";
+      roundRect(-8, 2, 16, 10, 2);
+      ctx.fill();
+      // Figure
+      ctx.fillStyle = p.broken ? "#90A4AE" : "#B0BEC5";
+      roundRect(-5, -14, 10, 16, 3);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -18, 5, 0, Math.PI * 2);
+      ctx.fill();
+      // Arm raised
+      if (!p.broken) {
+        ctx.strokeStyle = "#B0BEC5";
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(4, -8);
+        ctx.lineTo(10, -16);
+        ctx.stroke();
+      }
+      ctx.restore();
+      clearShadow();
+      if (p.broken) {
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + 2, p.y - 6);
+        ctx.lineTo(p.x + 12, p.y + 4);
+        ctx.stroke();
       }
     }
     if (p.type === "mailbox_break") {
@@ -3256,6 +3615,58 @@ function drawProps() {
       clearShadow();
     }
   }
+}
+
+/** Expanding water flood on the road from a broken hydrant/fountain */
+function drawStreetFlood(p, scale = 1) {
+  const maxT = p.floodMax || 6;
+  const life = clamp(p.flood / maxT, 0, 1);
+  const grow = easeOut(1 - life);
+  const roadDir = p.x < ROAD_CX ? 1 : -1;
+  // Core flood spreads onto the street asphalt
+  const cx = clamp(p.x + roadDir * (28 + grow * 55), ROAD_L + 18, ROAD_R - 18);
+  const cy = p.y + 10;
+  const rw = (36 + grow * 78) * scale;
+  const rh = (14 + grow * 28) * scale;
+  const a = (0.18 + life * 0.28) * (0.7 + 0.3 * scale);
+  ctx.save();
+  // Main sheet of water
+  const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, rw);
+  g.addColorStop(0, `rgba(100,200,255,${a * 1.1})`);
+  g.addColorStop(0.45, `rgba(66,165,245,${a * 0.75})`);
+  g.addColorStop(1, "rgba(33,150,243,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rw, rh, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Wet road sheen (asphalt reflection)
+  ctx.globalAlpha = a * 0.55;
+  ctx.fillStyle = "rgba(180,220,255,0.35)";
+  ctx.beginPath();
+  ctx.ellipse(cx + roadDir * 8, cy + 2, rw * 0.72, rh * 0.55, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Ripple rings
+  ctx.globalAlpha = a * 0.9;
+  for (let i = 0; i < 3; i++) {
+    const pulse = ((now() / 400 + i * 0.33) % 1);
+    ctx.strokeStyle = `rgba(180,230,255,${(1 - pulse) * 0.45})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rw * (0.25 + pulse * 0.65), rh * (0.25 + pulse * 0.65), 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // Foam edge near hydrant
+  ctx.globalAlpha = a;
+  ctx.fillStyle = "rgba(224,247,250,0.5)";
+  for (let i = 0; i < 5; i++) {
+    const fx = p.x + 6 + roadDir * (8 + i * 7) + Math.sin(now() / 120 + i) * 3;
+    const fy = p.y + 6 + (i % 2) * 4;
+    ctx.beginPath();
+    ctx.arc(fx, fy, 2.2 + (i % 2), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 function drawPalm(x, y, sc) {
@@ -3743,40 +4154,61 @@ function drawDrop(h, L) {
   const pulse = 0.5 + Math.sin(now() / 320 + h.number) * 0.5;
   const best = bestStop();
   const isBest = best && best.house === h;
-  // Soft pulsing pad + package icon only — no text
-  const col = isBest ? "rgba(77,208,225,0.95)" : "rgba(255,183,77,0.75)";
+  const req = h.reqColor;
+  // Soft pulsing pad + package icon; hard mode tints by required color
+  const padHex = req ? req.hex : (isBest ? "#4DD0E1" : "#FFB74D");
+  const col = req
+    ? (isBest ? req.hex : req.hex)
+    : (isBest ? "rgba(77,208,225,0.95)" : "rgba(255,183,77,0.75)");
   ctx.save();
   // Outer soft pad wash
-  ctx.globalAlpha = 0.12 + pulse * 0.12;
-  ctx.fillStyle = isBest ? "#4DD0E1" : "#FFB74D";
+  ctx.globalAlpha = 0.14 + pulse * 0.14;
+  ctx.fillStyle = padHex;
   ctx.beginPath();
   ctx.ellipse(gx, gy + 1, 12 + pulse * 1.5, 7.5 + pulse * 0.7, 0, 0, Math.PI * 2);
   ctx.fill();
   // Expanding ring (best target only)
   if (isBest) {
     const ring = (now() / 700) % 1;
-    ctx.globalAlpha = (1 - ring) * 0.35;
-    ctx.strokeStyle = "#4DD0E1";
+    ctx.globalAlpha = (1 - ring) * 0.4;
+    ctx.strokeStyle = req ? req.hex : "#4DD0E1";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.ellipse(gx, gy + 1, 10 + ring * 10, 6 + ring * 6, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
   // Thin ring
-  ctx.globalAlpha = 0.35 + pulse * 0.25;
+  ctx.globalAlpha = 0.4 + pulse * 0.3;
   ctx.strokeStyle = col;
-  ctx.lineWidth = isBest ? 2.2 : 1.4;
+  ctx.lineWidth = isBest ? 2.4 : 1.6;
   ctx.beginPath();
   ctx.ellipse(gx, gy + 1, 11 + pulse * 1.2, 7 + pulse * 0.6, 0, 0, Math.PI * 2);
   ctx.stroke();
-  // Package icon
+  // Package icon (colored on hard)
   ctx.globalAlpha = isBest ? 0.95 : 0.72;
   if (isBest) {
-    ctx.shadowColor = "rgba(77,208,225,0.55)";
+    ctx.shadowColor = req ? req.hex : "rgba(77,208,225,0.55)";
     ctx.shadowBlur = 8;
   }
-  drawBox(gx, gy - 0.5, isBest ? 0.8 : 0.65, PKG.standard);
+  drawBox(gx, gy - 0.5, isBest ? 0.8 : 0.65, PKG.standard, req);
   clearShadow();
+  // Explicit color badge above porch when matching is active
+  if (req) {
+    ctx.globalAlpha = 0.95;
+    softShadow(4, 0.15);
+    ctx.fillStyle = req.hex;
+    roundRect(gx - 14, gy - 22, 28, 12, 5);
+    ctx.fill();
+    clearShadow();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 1;
+    roundRect(gx - 14, gy - 22, 28, 12, 5);
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 8px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(req.label, gx, gy - 13);
+  }
   ctx.restore();
 }
 
@@ -3816,31 +4248,44 @@ function drawParked(h) {
   const L = layoutHouse(h);
   if (!L.car) return;
   const { cx: x, cy: y, w, h: ht } = L.car;
+  const fade = pc.fleeing ? clamp(1 - (pc.fleeAge || 0) / 2.5, 0.15, 1) : 1;
+  ctx.save();
+  ctx.globalAlpha = fade;
+  ctx.translate(x, y);
+  if (pc.fleeing && pc.rot) ctx.rotate(pc.rot);
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.beginPath();
-  ctx.ellipse(x, y + ht * 0.38, w * 0.48, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, ht * 0.38, w * 0.48, 6, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = pc.dented ? shade(pc.color, -25) : pc.color;
-  roundRect(x - w / 2, y - ht / 2, w, ht, 6);
+  roundRect(-w / 2, -ht / 2, w, ht, 6);
   ctx.fill();
   ctx.fillStyle = pc.cracked ? "rgba(80,90,100,0.85)" : "rgba(30,50,70,0.75)";
-  roundRect(x - w / 2 + 4, y - ht / 2 + 8, w - 8, ht * 0.28, 3);
+  roundRect(-w / 2 + 4, -ht / 2 + 8, w - 8, ht * 0.28, 3);
   ctx.fill();
   if (pc.cracked) {
     ctx.strokeStyle = "rgba(200,230,255,0.75)";
     ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(x - 5, y - ht * 0.2);
-    ctx.lineTo(x + 1, y);
-    ctx.lineTo(x + 6, y - ht * 0.15);
+    ctx.moveTo(-5, -ht * 0.2);
+    ctx.lineTo(1, 0);
+    ctx.lineTo(6, -ht * 0.15);
     ctx.stroke();
   }
   // wheels
   ctx.fillStyle = "#212121";
-  roundRect(x - w / 2 - 1, y - ht / 2 + 6, 4, 10, 1);
-  roundRect(x + w / 2 - 3, y - ht / 2 + 6, 4, 10, 1);
-  roundRect(x - w / 2 - 1, y + ht / 2 - 16, 4, 10, 1);
-  roundRect(x + w / 2 - 3, y + ht / 2 - 16, 4, 10, 1);
+  roundRect(-w / 2 - 1, -ht / 2 + 6, 4, 10, 1);
+  roundRect(w / 2 - 3, -ht / 2 + 6, 4, 10, 1);
+  roundRect(-w / 2 - 1, ht / 2 - 16, 4, 10, 1);
+  roundRect(w / 2 - 3, ht / 2 - 16, 4, 10, 1);
+  // Brake lights when peeling out
+  if (pc.fleeing) {
+    ctx.fillStyle = "rgba(239,83,80,0.9)";
+    roundRect(-w / 2 + 3, ht / 2 - 6, 5, 3, 1);
+    roundRect(w / 2 - 8, ht / 2 - 6, 5, 3, 1);
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 function drawObstacles() {
@@ -4265,15 +4710,38 @@ function drawLady(o) {
   for (const [cx, cy] of [[-6,-22],[0,-24],[6,-22]]) { ctx.beginPath(); ctx.arc(cx, cy, 3.2, 0, Math.PI * 2); ctx.fill(); }
   ctx.fillStyle = "#212121";
   ctx.beginPath(); ctx.arc(-3, -15, 1.4, 0, Math.PI * 2); ctx.arc(3, -15, 1.4, 0, Math.PI * 2); ctx.fill();
-  if (o.yellT > 0.7) {
-    ctx.fillStyle = "rgba(255,255,255,0.92)"; roundRect(-22, -50, 44, 16, 6); ctx.fill();
-    ctx.fillStyle = "#AD1457"; ctx.font = "bold 7px system-ui"; ctx.textAlign = "center";
-    ctx.fillText(o.yellText || "I'M FILMING!", 0, -39);
+  // Large readable HOA rant bubble
+  if (o.yellT > 0.45) {
+    const text = o.yellText || "I'M FILMING!";
+    ctx.font = "bold 13px system-ui";
+    const tw = Math.max(88, Math.min(160, ctx.measureText(text).width + 28));
+    const th = 30;
+    const bx = -tw / 2, by = -78;
+    softShadow(8, 0.2);
+    ctx.fillStyle = "rgba(255,255,255,0.97)";
+    roundRect(bx, by, tw, th, 12);
+    ctx.fill();
+    clearShadow();
+    // Speech tail
+    ctx.beginPath();
+    ctx.moveTo(-6, by + th);
+    ctx.lineTo(0, by + th + 10);
+    ctx.lineTo(8, by + th);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(173,20,87,0.35)";
+    ctx.lineWidth = 1.5;
+    roundRect(bx, by, tw, th, 12);
+    ctx.stroke();
+    ctx.fillStyle = "#AD1457";
+    ctx.font = "bold 13px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(text, 0, by + 20);
   }
   ctx.restore();
 }
 
-function drawBox(x, y, s, def) {
+function drawBox(x, y, s, def, pkgColor) {
   def = def || PKG.standard;
   ctx.save();
   ctx.translate(x, y);
@@ -4396,6 +4864,16 @@ function drawBox(x, y, s, def) {
       ctx.fillText("HEAVY", 0, -3);
     }
   }
+  // Hard-mode delivery color stripe (visible on flight + next preview)
+  if (pkgColor && pkgColor.hex) {
+    ctx.fillStyle = pkgColor.hex;
+    roundRect(-10, 5, 20, 5, 1.5);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 0.8;
+    roundRect(-10, 5, 20, 5, 1.5);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -4459,7 +4937,7 @@ function drawPackages() {
       const t = pk.trail[i];
       const k = i / Math.max(1, n - 1);
       ctx.globalAlpha = t.a * 0.38 * (0.35 + k * 0.65);
-      ctx.fillStyle = pk.def?.color || "#FF9900";
+      ctx.fillStyle = pk.pkgColor?.hex || pk.def?.color || "#FF9900";
       const rr = (1.2 + k * 3.2) * (t.r || 1);
       ctx.beginPath();
       ctx.arc(t.x, t.y, rr, 0, Math.PI * 2);
@@ -4477,7 +4955,7 @@ function drawPackages() {
     ctx.save();
     ctx.translate(pk.x, pk.y);
     ctx.rotate(pk.rot);
-    drawBox(0, 0, 1 + arcH * 0.18, pk.def);
+    drawBox(0, 0, 1 + arcH * 0.18, pk.def, pk.pkgColor);
     ctx.restore();
   }
 }
@@ -4781,17 +5259,7 @@ function drawCar() {
   ctx.stroke();
 
   ctx.restore();
-
-  if (G.fsd > 0) {
-    softShadow(8, 0.15);
-    drawPill(G.carX - 48, CAR_Y + 52, 96, 18, "rgba(0,176,255,0.92)", "rgba(255,255,255,0.35)");
-    clearShadow();
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 10px system-ui";
-    ctx.textAlign = "center";
-    // Compact label for Full Self-Delivering (FSD)
-    ctx.fillText("FSD " + G.fsd.toFixed(1) + "s", G.carX, CAR_Y + 64);
-  }
+  // FSD timer lives in the bottom control dock (never on the car)
 }
 
 function drawParticles() {
@@ -4891,14 +5359,71 @@ function panel(x, y, w, h) {
   ctx.strokeStyle = "rgba(255,153,0,0.4)"; ctx.lineWidth = 2; roundRect(x, y, w, h, 16); ctx.stroke();
 }
 function drawBtn(b) {
+  // Juicy Rave Flex buttons — bounce, glow, diagonal shine
+  const pulse = b.style === "primary" ? 1 + Math.sin(now() / 260) * 0.018 : 1;
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  const r = b.h > 50 ? 18 : 14;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(pulse, pulse);
+  ctx.translate(-cx, -cy);
+  if (b.style === "primary") {
+    ctx.shadowColor = "rgba(255,109,0,0.55)";
+    ctx.shadowBlur = 18;
+  } else {
+    softShadow(6, 0.16);
+  }
   const g = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
-  if (b.style === "primary") { g.addColorStop(0, "#FFB74D"); g.addColorStop(1, "#FF9900"); }
-  else { g.addColorStop(0, "#455A64"); g.addColorStop(1, "#263238"); }
-  ctx.fillStyle = g; roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
-  ctx.fillStyle = b.style === "primary" ? "#1A1A1A" : "#ECEFF1";
-  ctx.font = "bold 16px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 1);
+  if (b.style === "primary") {
+    g.addColorStop(0, "#FFD54F");
+    g.addColorStop(0.4, "#FF9800");
+    g.addColorStop(1, "#E53935");
+  } else if (b.style === "danger") {
+    g.addColorStop(0, "#EF9A9A");
+    g.addColorStop(1, "#E53935");
+  } else if (b.style === "ghost" || b.style === "secondary") {
+    g.addColorStop(0, "rgba(38,50,66,0.95)");
+    g.addColorStop(1, "rgba(22,30,42,0.95)");
+  } else {
+    g.addColorStop(0, "#455A64");
+    g.addColorStop(1, "#263238");
+  }
+  ctx.fillStyle = g;
+  roundRect(b.x, b.y, b.w, b.h, r);
+  ctx.fill();
+  clearShadow();
+  // Shine sweep on primary
+  if (b.style === "primary") {
+    const shine = ((now() / 1400) % 1);
+    ctx.save();
+    ctx.beginPath();
+    roundRect(b.x, b.y, b.w, b.h, r);
+    ctx.clip();
+    const sx = b.x - 40 + shine * (b.w + 80);
+    const sg = ctx.createLinearGradient(sx, b.y, sx + 50, b.y + b.h);
+    sg.addColorStop(0, "rgba(255,255,255,0)");
+    sg.addColorStop(0.5, "rgba(255,255,255,0.35)");
+    sg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sg;
+    ctx.fillRect(sx, b.y, 50, b.h);
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 1.5;
+    roundRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, r - 1);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.lineWidth = 1.2;
+    roundRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, r);
+    ctx.stroke();
+  }
+  ctx.fillStyle = b.style === "primary" || b.style === "danger" ? "#1A0A00" : "#F5F7FA";
+  ctx.font = `bold ${b.h >= 52 ? 18 : b.h >= 44 ? 16 : 14}px system-ui`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(b.label, cx, cy + 1);
   ctx.textBaseline = "alphabetic";
+  ctx.restore();
 }
 
 /**
@@ -5088,75 +5613,277 @@ function drawHUD() {
   }
 }
 
-/** Soft semi-transparent L/R steer arrows on the lower road + large next package between them */
-function drawSteerControls() {
-  const b = getSteerButtons();
-  const dir = touchSteerDir();
-  drawSteerArrow(b.left, "L", dir < 0 || keys.ArrowLeft || keys.KeyA);
-  drawSteerArrow(b.right, "R", dir > 0 || keys.ArrowRight || keys.KeyD);
+/**
+ * Bottom control dock — no overlaps.
+ * [◀] [FSD?] [BIG package THROW] [NEXT] [▶]
+ */
+/** Hard-mode popup: introduce color-matching before the route starts */
+function drawColorIntro() {
+  ctx.fillStyle = "rgba(4, 10, 22, 0.72)";
+  ctx.fillRect(0, 0, W, H);
+  const pulse = 1 + Math.sin(now() / 250) * 0.015;
+  const pw = 320, ph = 340;
+  const px = (W - pw) / 2, py = (H - ph) / 2 - 20;
+  ctx.save();
+  ctx.translate(W / 2, H / 2 - 20);
+  ctx.scale(pulse, pulse);
+  ctx.translate(-W / 2, -(H / 2 - 20));
 
-  // Next package preview — large, between arrows
-  const midX = (b.left.x + b.left.w + b.right.x) / 2;
-  const midY = b.left.y + b.left.h / 2;
-  const nd = PKG[G.nextPkg] || PKG.standard;
-  softShadow(10, 0.2);
-  ctx.globalAlpha = 0.88;
-  ctx.fillStyle = "rgba(12, 22, 40, 0.72)";
-  roundRect(midX - 42, midY - 36, 84, 72, 16);
+  softShadow(22, 0.35);
+  ctx.fillStyle = "rgba(14, 24, 44, 0.97)";
+  roundRect(px, py, pw, ph, 22);
   ctx.fill();
   clearShadow();
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = "rgba(255,153,0,0.45)";
-  ctx.lineWidth = 1.5;
-  roundRect(midX - 42, midY - 36, 84, 72, 16);
+  ctx.strokeStyle = "rgba(255,153,0,0.65)";
+  ctx.lineWidth = 2.5;
+  roundRect(px + 0.5, py + 0.5, pw - 1, ph - 1, 21.5);
   ctx.stroke();
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.font = "bold 10px system-ui";
+
   ctx.textAlign = "center";
-  ctx.fillText("NEXT", midX, midY - 22);
-  drawBox(midX, midY + 6, 1.15, nd);
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.font = "bold 9px system-ui";
-  ctx.fillText(nd.label || "Box", midX, midY + 30);
+  ctx.fillStyle = "#FF9900";
+  ctx.font = "bold 12px system-ui";
+  ctx.fillText("⚠ HARD CHAOS RULE", W / 2, py + 32);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 22px system-ui";
+  ctx.fillText("Watch the colors!", W / 2, py + 62);
+
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.font = "13px system-ui";
+  wrap("Packages and porches now have matching color tags. Wrong color = angry customer energy.", W / 2, py + 88, pw - 40, 17);
+
+  // Color swatches row
+  const sw = DELIVERY_COLORS;
+  const sW = 52, gap = 10;
+  let sx = W / 2 - (sw.length * (sW + gap) - gap) / 2;
+  for (const c of sw) {
+    softShadow(6, 0.15);
+    ctx.fillStyle = c.hex;
+    roundRect(sx, py + 140, sW, 36, 10);
+    ctx.fill();
+    clearShadow();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 11px system-ui";
+    ctx.fillText(c.label, sx + sW / 2, py + 163);
+    sx += sW + gap;
+  }
+
+  // Mini diagram: package → porch
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  roundRect(px + 24, py + 192, pw - 48, 64, 12);
+  ctx.fill();
+  drawBox(px + 70, py + 224, 1.1, PKG.standard, DELIVERY_COLORS[1]);
+  ctx.fillStyle = "#4DD0E1";
+  ctx.font = "bold 18px system-ui";
+  ctx.fillText("→", W / 2, py + 230);
+  // Fake porch badge
+  softShadow(4, 0.12);
+  ctx.fillStyle = DELIVERY_COLORS[1].hex;
+  roundRect(W / 2 + 40, py + 208, 56, 40, 10);
+  ctx.fill();
+  clearShadow();
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 12px system-ui";
+  ctx.fillText("PORCH", W / 2 + 68, py + 226);
+  ctx.font = "bold 11px system-ui";
+  ctx.fillText(DELIVERY_COLORS[1].label, W / 2 + 68, py + 242);
+
+  ctx.fillStyle = "rgba(255,183,77,0.95)";
+  ctx.font = "bold 12px system-ui";
+  ctx.fillText("Match THROW color to the porch badge!", W / 2, py + 278);
+
+  // CTA
+  const btnY = py + ph - 52;
+  const g = ctx.createLinearGradient(W / 2 - 90, btnY, W / 2 + 90, btnY + 40);
+  g.addColorStop(0, "#FFD54F");
+  g.addColorStop(1, "#FF6D00");
+  softShadow(10, 0.25);
+  ctx.fillStyle = g;
+  roundRect(W / 2 - 90, btnY, 180, 40, 14);
+  ctx.fill();
+  clearShadow();
+  ctx.fillStyle = "#1A1208";
+  ctx.font = "bold 15px system-ui";
+  ctx.fillText("GOT IT — FLEX!", W / 2, btnY + 26);
+
+  ctx.restore();
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = "11px system-ui";
+  ctx.fillText("tap anywhere to start", W / 2, py + ph + 18);
+}
+
+/**
+ * Bottom control dock — no overlaps.
+ * Row: [◀] [BIG package THROW] [NEXT] [▶]
+ * FSD floats above the tray when active.
+ */
+function drawSteerControls() {
+  const b = getControlBar();
+  const dir = touchSteerDir();
+  const heldL = dir < 0 || keys.ArrowLeft || keys.KeyA;
+  const heldR = dir > 0 || keys.ArrowRight || keys.KeyD;
+
+  // Dock tray (frosted bar, safe-area aware)
+  softShadow(16, 0.22);
+  const trayG = ctx.createLinearGradient(0, b.dockY, 0, b.dockY + b.dockH);
+  trayG.addColorStop(0, "rgba(8, 16, 32, 0.55)");
+  trayG.addColorStop(0.35, "rgba(10, 20, 38, 0.82)");
+  trayG.addColorStop(1, "rgba(6, 12, 24, 0.92)");
+  ctx.fillStyle = trayG;
+  roundRect(6, b.dockY, W - 12, b.dockH + 4, 20);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = "rgba(255,255,255,0.1)";
+  ctx.lineWidth = 1;
+  roundRect(6.5, b.dockY + 0.5, W - 13, b.dockH + 3, 19.5);
+  ctx.stroke();
+  // Top accent hairline
+  ctx.strokeStyle = "rgba(255,153,0,0.35)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(28, b.dockY + 1);
+  ctx.lineTo(W - 28, b.dockY + 1);
+  ctx.stroke();
+
+  drawSteerArrow(b.left, "L", heldL);
+  drawSteerArrow(b.right, "R", heldR);
+
+  // BIG center package / throw button + NEXT (FSD is drawn ABOVE tray, not in this row)
+  drawCenterThrowBtn(b.center);
+  drawNextPkgChip(b.next);
+
+  // FSD pill floats above the dock — never behind arrows / NEXT / center
+  if (b.fsdOn && b.fsd) {
+    const f = b.fsd;
+    const pulse = 0.85 + Math.sin(now() / 140) * 0.15;
+    softShadow(12, 0.28);
+    ctx.shadowColor = `rgba(0,229,255,${0.5 * pulse})`;
+    ctx.shadowBlur = 14 * pulse;
+    const fg = ctx.createLinearGradient(f.x, f.y, f.x + f.w, f.y);
+    fg.addColorStop(0, "#00E5FF");
+    fg.addColorStop(1, "#0091EA");
+    ctx.fillStyle = fg;
+    roundRect(f.x, f.y, f.w, f.h, f.h / 2);
+    ctx.fill();
+    clearShadow();
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 1.2;
+    roundRect(f.x + 0.5, f.y + 0.5, f.w - 1, f.h - 1, f.h / 2);
+    ctx.stroke();
+    ctx.fillStyle = "#003544";
+    ctx.font = "bold 12px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("FSD  " + G.fsd.toFixed(1) + "s", f.x + f.w / 2, f.y + f.h / 2 + 0.5);
+    ctx.textBaseline = "alphabetic";
+  }
+}
+
+function drawCenterThrowBtn(c) {
+  const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+  const nd = PKG[G.nextPkg] || PKG.standard;
+  const nc = G.nextPkgColor;
+  const ready = G.throwCD <= 0;
+  const pulse = ready ? 1 + Math.sin(now() / 220) * 0.03 : 0.97;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(pulse, pulse);
+  // Outer glow when ready
+  if (ready) {
+    ctx.shadowColor = nc?.hex || "#FF9900";
+    ctx.shadowBlur = 16;
+  }
+  const bg = ctx.createRadialGradient(0, -6, 4, 0, 0, c.w / 2);
+  bg.addColorStop(0, "#2A3A52");
+  bg.addColorStop(1, "#121C2C");
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.arc(0, 0, c.w / 2 - 1, 0, Math.PI * 2);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = nc?.hex || (ready ? "rgba(255,153,0,0.9)" : "rgba(255,255,255,0.25)");
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, c.w / 2 - 2, 0, Math.PI * 2);
+  ctx.stroke();
+  // Inner ring
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, c.w / 2 - 8, 0, Math.PI * 2);
+  ctx.stroke();
+  // Package art + label inside circle
+  ctx.fillStyle = ready ? "rgba(255,213,79,0.95)" : "rgba(255,255,255,0.45)";
+  ctx.font = "bold 8px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(ready ? "THROW" : "WAIT", 0, -c.h / 2 + 14);
+  drawBox(0, 2, 1.0, nd, nc);
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = "bold 8px system-ui";
+  ctx.fillText((nd.label || "Box").slice(0, 7).toUpperCase(), 0, c.h / 2 - 11);
+  ctx.restore();
+}
+
+function drawNextPkgChip(r) {
+  // True "next after current" from queue
+  const q = G.queuePkg || { id: G.nextPkg, color: G.nextPkgColor };
+  const nd = PKG[q.id] || PKG.standard;
+  const nc = q.color;
+  softShadow(6, 0.16);
+  ctx.fillStyle = "rgba(12, 22, 40, 0.88)";
+  roundRect(r.x, r.y, r.w, r.h, 12);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = nc ? nc.hex : "rgba(255,183,77,0.55)";
+  ctx.lineWidth = 1.5;
+  roundRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, 11.5);
+  ctx.stroke();
+  const mx = r.x + r.w / 2, my = r.y + r.h / 2;
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = "bold 8px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("NEXT", mx, r.y + 12);
+  drawBox(mx, my + 4, 0.72, nd, nc);
 }
 
 function drawSteerArrow(r, side, held) {
   ctx.save();
-  // Soft glass pad
-  softShadow(held ? 12 : 8, held ? 0.22 : 0.14);
-  ctx.globalAlpha = held ? 0.72 : 0.42;
+  const scale = held ? 0.92 : 1;
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+  ctx.translate(-cx, -cy);
+  softShadow(held ? 10 : 6, held ? 0.22 : 0.14);
+  ctx.globalAlpha = held ? 0.92 : 0.55;
   const g = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
-  g.addColorStop(0, held ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.16)");
-  g.addColorStop(1, held ? "rgba(20,40,60,0.45)" : "rgba(10,22,40,0.38)");
+  g.addColorStop(0, held ? "rgba(0,229,255,0.35)" : "rgba(255,255,255,0.18)");
+  g.addColorStop(1, held ? "rgba(0,100,140,0.55)" : "rgba(10,22,40,0.5)");
   ctx.fillStyle = g;
-  roundRect(r.x, r.y, r.w, r.h, 20);
+  roundRect(r.x, r.y, r.w, r.h, 16);
   ctx.fill();
   clearShadow();
-  ctx.globalAlpha = held ? 0.9 : 0.55;
-  ctx.strokeStyle = held ? "rgba(0,229,255,0.55)" : "rgba(255,255,255,0.22)";
-  ctx.lineWidth = held ? 2 : 1.4;
-  roundRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 18);
+  ctx.globalAlpha = held ? 1 : 0.65;
+  ctx.strokeStyle = held ? "rgba(0,229,255,0.75)" : "rgba(255,255,255,0.28)";
+  ctx.lineWidth = held ? 2.2 : 1.4;
+  roundRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 14);
   ctx.stroke();
 
-  // Chevron
-  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-  ctx.globalAlpha = held ? 0.95 : 0.7;
+  ctx.globalAlpha = held ? 1 : 0.8;
   ctx.fillStyle = held ? "#E0F7FA" : "#fff";
   ctx.beginPath();
   if (side === "L") {
-    ctx.moveTo(cx + 10, cy - 16);
-    ctx.lineTo(cx - 14, cy);
-    ctx.lineTo(cx + 10, cy + 16);
-    ctx.lineTo(cx + 4, cy + 16);
-    ctx.lineTo(cx - 14, cy);
-    ctx.lineTo(cx + 4, cy - 16);
+    ctx.moveTo(cx + 8, cy - 12);
+    ctx.lineTo(cx - 12, cy);
+    ctx.lineTo(cx + 8, cy + 12);
+    ctx.lineTo(cx + 3, cy + 12);
+    ctx.lineTo(cx - 12, cy);
+    ctx.lineTo(cx + 3, cy - 12);
   } else {
-    ctx.moveTo(cx - 10, cy - 16);
-    ctx.lineTo(cx + 14, cy);
-    ctx.lineTo(cx - 10, cy + 16);
-    ctx.lineTo(cx - 4, cy + 16);
-    ctx.lineTo(cx + 14, cy);
-    ctx.lineTo(cx - 4, cy - 16);
+    ctx.moveTo(cx - 8, cy - 12);
+    ctx.lineTo(cx + 12, cy);
+    ctx.lineTo(cx - 8, cy + 12);
+    ctx.lineTo(cx - 3, cy + 12);
+    ctx.lineTo(cx + 12, cy);
+    ctx.lineTo(cx - 3, cy - 12);
   }
   ctx.closePath();
   ctx.fill();
@@ -5345,207 +6072,377 @@ function drawTesFlexerLogo(cx, cy, scale = 1) {
 }
 
 /**
- * Car-radio face UI for station selection (title / pause).
- * Preset buttons + dial + waveform "display".
+ * FLEXX RADIO — neon rave radio strip (title / pause).
+ * Compact: title · cyan track · dots · genre pills.
  */
-function drawCarRadio(cx, top, stations) {
-  const rw = W - 48, rh = 118;
+function drawCarRadio(cx, top, stations, opts = {}) {
+  const inset = opts.inset != null ? opts.inset : 36;
+  const rw = W - inset * 2, rh = opts.h || 108;
   const rx = cx - rw / 2, ry = top;
-  softShadow(12, 0.22);
-  // Radio body
-  const body = ctx.createLinearGradient(rx, ry, rx, ry + rh);
-  body.addColorStop(0, "#3A4550");
-  body.addColorStop(0.5, "#2A333C");
-  body.addColorStop(1, "#1C242C");
-  ctx.fillStyle = body;
+  softShadow(10, 0.2);
+  ctx.fillStyle = "rgba(8, 14, 28, 0.75)";
   roundRect(rx, ry, rw, rh, 14);
   ctx.fill();
   clearShadow();
-  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.strokeStyle = "rgba(0,229,255,0.22)";
   ctx.lineWidth = 1.5;
-  roundRect(rx + 1, ry + 1, rw - 2, rh - 2, 13);
-  ctx.stroke();
-  // Bezel title
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.font = "bold 9px system-ui";
-  ctx.textAlign = "left";
-  ctx.fillText("FLEXX RADIO", rx + 14, ry + 16);
-  // Digital display window
-  ctx.fillStyle = "#0A1620";
-  roundRect(rx + 12, ry + 24, rw - 70, 28, 6);
-  ctx.fill();
-  ctx.fillStyle = RADIO[station]?.color || "#69F0AE";
-  ctx.font = "bold 13px system-ui";
-  ctx.textAlign = "left";
-  ctx.fillText((RADIO[station]?.silent ? "MUTE" : RADIO[station]?.name || "—") +
-    (RADIO[station]?.silent ? "" : "  " + (RADIO[station]?.bpm || "") + " BPM"), rx + 20, ry + 43);
-  // Dial knob
-  const kx = rx + rw - 32, ky = ry + 38;
-  const kg = ctx.createRadialGradient(kx - 3, ky - 3, 2, kx, ky, 16);
-  kg.addColorStop(0, "#90A4AE");
-  kg.addColorStop(1, "#455A64");
-  ctx.fillStyle = kg;
-  ctx.beginPath();
-  ctx.arc(kx, ky, 15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.25)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(kx, ky, 15, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = "#ECEFF1";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(kx, ky);
-  ctx.lineTo(kx + Math.cos(-0.8) * 10, ky + Math.sin(-0.8) * 10);
-  ctx.stroke();
-  // Waveform in display strip
-  drawRadioWave(cx - 10, ry + 56, rw - 90, 10);
-  // Preset buttons
-  const bw = (rw - 28) / stations.length - 4;
-  let bx = rx + 14;
-  const by = ry + 74;
-  for (const id of stations) {
-    const r = RADIO[id];
-    const sel = station === id;
-    ctx.fillStyle = sel ? r.color : "rgba(0,0,0,0.35)";
-    roundRect(bx, by, bw, 32, 6);
-    ctx.fill();
-    if (sel) {
-      ctx.strokeStyle = "rgba(255,255,255,0.7)";
-      ctx.lineWidth = 1.5;
-      roundRect(bx, by, bw, 32, 6);
-      ctx.stroke();
-    }
-    ctx.fillStyle = sel ? (r.silent ? "#ECEFF1" : "#1A1A1A") : "#CFD8DC";
-    ctx.font = "bold 10px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText(r.name, bx + bw / 2, by + 20);
-    btn("radio_" + id, bx, by, bw, 32, "", "secondary");
-    bx += bw + 4;
-  }
-}
-
-function drawTitle() {
-  ctx.fillStyle = "rgba(5,15,30,0.5)"; ctx.fillRect(0, 0, W, H);
-  const prev = G.carX; G.carX = W / 2;
-  ctx.save(); ctx.translate(0, -40); drawCar(); ctx.restore(); G.carX = prev;
-
-  // Prominent logo at top
-  drawTesFlexerLogo(W / 2, 92, 1);
-
-  softShadow(16, 0.25);
-  ctx.fillStyle = "rgba(12, 22, 40, 0.92)";
-  roundRect(14, 128, W - 28, 500, 20);
-  ctx.fill();
-  clearShadow();
-  ctx.strokeStyle = "rgba(255,153,0,0.35)";
-  ctx.lineWidth = 1.5;
-  roundRect(14.5, 128.5, W - 29, 499, 19.5);
+  roundRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1, 13.5);
   ctx.stroke();
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "13px system-ui";
-  ctx.fillText("Throw packages · dodge chaos · ride the radio", W / 2, 152);
-  ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = "14px system-ui";
-  ctx.fillText("High " + META.highScore + " · Streak " + META.bestStreak, W / 2, 174);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 12px system-ui";
+  ctx.fillText("FLEXX RADIO ⭐", cx, ry + 18);
+
+  const st = RADIO[station];
+  const track = st && st.silent
+    ? "Silent · SFX only"
+    : (st ? (st.name + " " + (st.bpm || "") + " BPM") : "—");
+  ctx.fillStyle = "#00E5FF";
+  ctx.font = "bold 14px system-ui";
+  ctx.shadowColor = "rgba(0,229,255,0.55)";
+  ctx.shadowBlur = 8;
+  ctx.fillText(track, cx, ry + 40);
+  clearShadow();
+
+  const n = stations.length;
+  let dx = cx - (n - 1) * 8;
+  for (let i = 0; i < n; i++) {
+    const on = stations[i] === station;
+    ctx.beginPath();
+    ctx.fillStyle = on ? "#00E5FF" : "rgba(255,255,255,0.18)";
+    if (on) { ctx.shadowColor = "#00E5FF"; ctx.shadowBlur = 8; }
+    ctx.arc(dx + i * 16, ry + 54, on ? 4 : 3, 0, Math.PI * 2);
+    ctx.fill();
+    clearShadow();
+  }
+
+  const pad = 8;
+  const bw = (rw - pad * 2 - (n - 1) * 6) / n;
+  let bx = rx + pad;
+  const by = ry + rh - 38;
+  for (const id of stations) {
+    const r = RADIO[id];
+    const sel = station === id;
+    if (sel) {
+      ctx.shadowColor = "rgba(0,229,255,0.55)";
+      ctx.shadowBlur = 10;
+    }
+    ctx.fillStyle = sel ? "rgba(0,229,255,0.18)" : "rgba(255,255,255,0.06)";
+    roundRect(bx, by, bw, 28, 10);
+    ctx.fill();
+    clearShadow();
+    ctx.strokeStyle = sel ? "#00E5FF" : "rgba(255,255,255,0.12)";
+    ctx.lineWidth = sel ? 2 : 1;
+    roundRect(bx + 0.5, by + 0.5, bw - 1, 27, 9.5);
+    ctx.stroke();
+    ctx.fillStyle = sel ? "#00E5FF" : "rgba(255,255,255,0.7)";
+    ctx.font = "bold 10px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(r.name, bx + bw / 2, by + 18);
+    btn("radio_" + id, bx, by, bw, 28, "", "secondary");
+    bx += bw + 6;
+  }
+}
+
+const FLEX_TIPS = [
+  "Pro tip: The dog always knows.",
+  "Pro tip: Never trust a house number that looks too clean.",
+  "If the gate code is 0000, the HOA is already watching.",
+  "Dogs smell fear. And bacon-scented packages.",
+  "Pool deliveries: great for photos, bad for metrics.",
+  "That apartment complex has 14 buildings. All labeled A.",
+  "FSD stands for Full Self-Delivering. Mostly.",
+  "Bathrobe customers tip in energy drinks.",
+  "If lightning hits, the package still counts… somewhere.",
+  "Karen from the HOA has your plate. Wave!",
+];
+const PAUSE_FLAVOR = [
+  "Even FSD needs a coffee break",
+  "The packages can wait… mostly",
+  "HOA is watching",
+  "Bass drop incoming… or not",
+];
+const WIN_LINES = [
+  "Customer left a 5-star and a Gatorade",
+  "Even the dog approved",
+  "Apartment complex survived… barely",
+  "You made the bass proud",
+  "You outran the HOA",
+];
+const FAIL_LINES = [
+  "The customer was not home… or was, and they were mad",
+  "That was not a driveway",
+  "Lightning 1 – Flex 0",
+  "HOA Karen wins this round",
+  "FSD said no. Loudly.",
+];
+const WIN_HEADLINES = ["ROUTE CLEARED!", "FLEX GOD STATUS", "YOU OUTRAN THE HOA"];
+const FAIL_HEADLINES = ["PACKAGE DENIED", "WRONG HOUSE ENERGY", "FSD SAID NO", "YOU GOT FLEXED"];
+
+function tipOfDay() {
+  const d = new Date();
+  const key = d.getFullYear() * 400 + d.getMonth() * 40 + d.getDate();
+  return FLEX_TIPS[key % FLEX_TIPS.length];
+}
+function pauseFlavor() {
+  return PAUSE_FLAVOR[Math.floor(now() / 7000) % PAUSE_FLAVOR.length];
+}
+
+/** Mini white FLEX van + flying package for title wordmark */
+function drawTitleVanIcon(x, y, sc = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+  // Orange glow
+  ctx.shadowColor = "rgba(255,153,0,0.55)";
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = "#F5F5F5";
+  roundRect(-16, -10, 32, 22, 5);
+  ctx.fill();
+  clearShadow();
+  ctx.fillStyle = "#1A2A3A";
+  roundRect(-12, -6, 18, 10, 2);
+  ctx.fill();
+  ctx.fillStyle = "#00E5FF";
+  roundRect(-12, -8, 18, 3, 1);
+  ctx.fill();
+  ctx.fillStyle = "#FF9900";
+  roundRect(-8, 6, 10, 3, 1);
+  ctx.fill();
+  // Package flying off roof
+  const bob = Math.sin(now() / 180) * 3;
+  ctx.save();
+  ctx.translate(14, -16 + bob);
+  ctx.rotate(-0.35 + Math.sin(now() / 220) * 0.1);
+  ctx.fillStyle = "#FF9900";
+  roundRect(-6, -5, 12, 10, 2);
+  ctx.fill();
+  ctx.strokeStyle = "#1A1A1A";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, -5); ctx.lineTo(0, 5);
+  ctx.moveTo(-6, 0); ctx.lineTo(6, 0);
+  ctx.stroke();
+  ctx.restore();
+  // Speed lines
+  ctx.strokeStyle = "rgba(255,153,0,0.55)";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 3; i++) {
+    const oy = -6 + i * 6 + Math.sin(now() / 200 + i) * 1;
+    ctx.beginPath();
+    ctx.moveTo(-28 - i * 4, oy);
+    ctx.lineTo(-18 - i * 2, oy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN MENU — High-Energy Chaos / Rave Flex (Variation 1)
+// ═══════════════════════════════════════════════════════════
+function drawTitle() {
+  // Soft vignette over live Florida street (houses/palms already scrolling)
+  const vig = ctx.createRadialGradient(W / 2, H * 0.38, 50, W / 2, H * 0.5, H * 0.78);
+  vig.addColorStop(0, "rgba(5,12,28,0.12)");
+  vig.addColorStop(0.5, "rgba(5,12,28,0.42)");
+  vig.addColorStop(1, "rgba(4,8,18,0.78)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  // Single centered panel
+  const px = 16, py = 28, pw = W - 32, ph = H - 52;
+  softShadow(22, 0.32);
+  ctx.fillStyle = "rgba(10, 16, 32, 0.92)";
+  roundRect(px, py, pw, ph, 22);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = "rgba(255,153,0,0.4)";
+  ctx.lineWidth = 2;
+  roundRect(px + 0.5, py + 0.5, pw - 1, ph - 1, 21.5);
+  ctx.stroke();
+
+  // ── Title treatment ──
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#FF9900";
+  ctx.font = "bold 11px system-ui";
+  ctx.fillText("DELIVERY ARCADE", W / 2, py + 28);
+
+  // Speed-line motion behind wordmark
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = "#FF6D00";
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  const t = now() / 1000;
+  for (let i = 0; i < 5; i++) {
+    const ly = py + 48 + i * 5;
+    const len = 40 + Math.sin(t * 4 + i) * 12;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 100 - i * 6, ly);
+    ctx.lineTo(W / 2 - 100 - i * 6 + len, ly);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const bounce = Math.sin(now() / 280) * 1.5;
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 34px system-ui";
+  ctx.shadowColor = "rgba(255,153,0,0.35)";
+  ctx.shadowBlur = 12;
+  ctx.fillText("TesFlexer", W / 2 + 8, py + 62 + bounce);
+  clearShadow();
+
+  drawTitleVanIcon(W / 2 - 118, py + 52 + bounce, 1.05);
+
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  ctx.font = "13px system-ui";
+  ctx.fillText("Throw packages. Dodge HOA Karen. Ride the bass.", W / 2, py + 88);
+
+  // ── Stats pills ──
+  const pillW = 148, pillH = 30, pillGap = 10;
+  let pL = W / 2 - pillW - pillGap / 2;
+  const pY = py + 102;
+  softShadow(6, 0.14);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  roundRect(pL, pY, pillW, pillH, 15);
+  ctx.fill();
+  roundRect(pL + pillW + pillGap, pY, pillW, pillH, 15);
+  ctx.fill();
+  clearShadow();
+  ctx.fillStyle = "#FFD54F";
+  ctx.font = "bold 13px system-ui";
+  ctx.fillText("HIGH  " + META.highScore.toLocaleString(), pL + pillW / 2, pY + 20);
+  ctx.fillStyle = "#00E5FF";
+  ctx.fillText("STREAK  " + META.bestStreak + " 🔥", pL + pillW + pillGap + pillW / 2, pY + 20);
 
   UI.buttons = [];
 
-  // Difficulty
-  ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = "bold 14px system-ui";
-  ctx.fillText("Difficulty", W / 2, 198);
-  const dw = 130, dg = 12;
+  // ── Difficulty ──
+  const dY = pY + 48;
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.font = "bold 12px system-ui";
+  ctx.fillText("🔥  DIFFICULTY", W / 2, dY);
+  const dw = 150, dg = 12;
   let dx = (W - (dw * 2 + dg)) / 2;
-  const dy = 208;
+  const dy = dY + 12;
   for (const mode of ["easy", "hard"]) {
     const sel = DIFF_MODE === mode;
-    softShadow(sel ? 8 : 0, 0.15);
-    ctx.fillStyle = mode === "easy"
-      ? (sel ? "rgba(102,187,106,0.95)" : "rgba(255,255,255,0.1)")
-      : (sel ? "rgba(255,112,67,0.95)" : "rgba(255,255,255,0.1)");
-    roundRect(dx, dy, dw, 44, 12);
+    if (sel) {
+      ctx.shadowColor = mode === "easy" ? "rgba(105,240,174,0.55)" : "rgba(255,87,34,0.6)";
+      ctx.shadowBlur = 16;
+    }
+    const mg = ctx.createLinearGradient(dx, dy, dx, dy + 52);
+    if (mode === "easy") {
+      mg.addColorStop(0, sel ? "#B9F6CA" : "rgba(255,255,255,0.08)");
+      mg.addColorStop(1, sel ? "#00E676" : "rgba(255,255,255,0.04)");
+    } else {
+      mg.addColorStop(0, sel ? "#FFAB40" : "rgba(255,255,255,0.08)");
+      mg.addColorStop(1, sel ? "#FF3D00" : "rgba(255,255,255,0.04)");
+    }
+    ctx.fillStyle = mg;
+    roundRect(dx, dy, dw, 52, 14);
     ctx.fill();
     clearShadow();
     if (sel) {
-      ctx.strokeStyle = "rgba(255,255,255,0.75)";
-      ctx.lineWidth = 2;
-      roundRect(dx, dy, dw, 44, 12);
+      ctx.strokeStyle = mode === "easy" ? "#69F0AE" : "#FF6E40";
+      ctx.lineWidth = 2.5;
+      roundRect(dx + 1, dy + 1, dw - 2, 50, 13);
       ctx.stroke();
     }
-    ctx.fillStyle = sel ? "#1A1A1A" : "#ECEFF1";
-    ctx.font = "bold 16px system-ui";
-    ctx.fillText(mode === "easy" ? "Easy" : "Hard", dx + dw / 2, dy + 20);
+    ctx.fillStyle = sel ? "#0A1208" : "rgba(255,255,255,0.85)";
+    ctx.font = "bold 17px system-ui";
+    ctx.fillText(mode === "easy" ? "Easy" : "Hard", dx + dw / 2, dy + 22);
     ctx.font = "11px system-ui";
-    ctx.globalAlpha = 0.75;
-    ctx.fillText(mode === "easy" ? "Forgiving" : "Dense & spicy", dx + dw / 2, dy + 36);
+    ctx.globalAlpha = 0.85;
+    ctx.fillText(mode === "easy" ? "Chill vibes" : "Spicy chaos 🔥", dx + dw / 2, dy + 40);
     ctx.globalAlpha = 1;
-    btn("diff_" + mode, dx, dy, dw, 44, "", "secondary");
+    btn("diff_" + mode, dx, dy, dw, 52, "", "secondary");
     dx += dw + dg;
   }
 
-  // Car radio station selector
-  drawCarRadio(W / 2, 268, ["house", "dnb", "riddim", "techno", "silent"]);
+  // ── Flexx Radio ──
+  drawCarRadio(W / 2, dy + 68, ["house", "dnb", "riddim", "techno"], { inset: 40, h: 104 });
 
-  btn("play", W / 2 - 115, 408, 230, 52, "Start Route", "primary");
-  btn("howto", W / 2 - 115, 472, 230, 42, "How to Play", "secondary");
+  // ── START ROUTE ──
+  const startY = dy + 188;
+  btn("play", W / 2 - 132, startY, 264, 56, "START ROUTE", "primary");
+  // Microtext under start (drawn after button)
+  // ── How to Play ──
+  btn("howto", W / 2 - 110, startY + 72, 220, 42, "How to Play", "secondary");
+
   for (const b of UI.buttons) {
     if (b.label) drawBtn(b);
   }
-  ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.font = "12px system-ui"; ctx.textAlign = "center";
-  ctx.fillText("arrows / A·D steer · drag throw · 1–4 radio · M mute", W / 2, H - 18);
+
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.font = "bold 10px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("LET'S FLEX", W / 2, startY + 64);
+
+  // Bottom tip
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = "11px system-ui";
+  ctx.fillText(tipOfDay(), W / 2, py + ph - 18);
 }
 
 function drawHowTo() {
-  ctx.fillStyle = "rgba(5,15,30,0.8)"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(5,15,30,0.82)"; ctx.fillRect(0, 0, W, H);
   softShadow(16, 0.25);
   ctx.fillStyle = "rgba(12,22,40,0.94)";
   roundRect(14, 24, W - 28, H - 48, 20);
   ctx.fill();
   clearShadow();
-  drawTesFlexerLogo(W / 2, 58, 0.72);
-  ctx.fillStyle = "#fff"; ctx.font = "bold 20px system-ui"; ctx.textAlign = "center";
-  ctx.fillText("How to Play", W / 2, 96);
+  ctx.strokeStyle = "rgba(255,153,0,0.4)";
+  ctx.lineWidth = 1.5;
+  roundRect(14.5, 24.5, W - 29, H - 49, 19.5);
+  ctx.stroke();
+
+  ctx.fillStyle = "#FF9900";
+  ctx.font = "bold 11px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("DELIVERY ARCADE", W / 2, 52);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 22px system-ui";
+  ctx.fillText("How to Play", W / 2, 80);
 
   const steps = [
     { n: "1", icon: "◀▶", title: "Steer", body: "Hold on-screen arrows (or A/D)." },
-    { n: "2", icon: "↗", title: "Throw", body: "Drag anywhere; release to toss." },
+    { n: "2", icon: "↗", title: "Throw", body: "Drag to aim · tap package to toss." },
     { n: "3", icon: "📦", title: "Deliver", body: "Hit glowing porch pads for points." },
     { n: "4", icon: "⚡", title: "FSD", body: "Every 3 drops: Full Self-Delivering." },
     { n: "5", icon: "🔥", title: "Flow", body: "Clean play fills Flow for score mult." },
-    { n: "6", icon: "⚠️", title: "Hard", body: "Hard = denser roads, tighter assist." },
+    { n: "6", icon: "🎨", title: "Hard", body: "Color-match packages to porch tags." },
   ];
-  let y = 118;
+  let y = 100;
   for (const s of steps) {
     softShadow(4, 0.1);
     ctx.fillStyle = "rgba(255,255,255,0.05)";
-    roundRect(28, y, W - 56, 58, 12);
+    roundRect(28, y, W - 56, 56, 12);
     ctx.fill();
     clearShadow();
-    // Number badge
-    ctx.fillStyle = "rgba(0,176,255,0.25)";
+    ctx.fillStyle = "rgba(0,229,255,0.2)";
     ctx.beginPath();
-    ctx.arc(54, y + 29, 16, 0, Math.PI * 2);
+    ctx.arc(54, y + 28, 15, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#4DD0E1";
-    ctx.font = "bold 16px system-ui";
+    ctx.fillStyle = "#00E5FF";
+    ctx.font = "bold 15px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(s.n, 54, y + 35);
-    // Icon
-    ctx.font = "18px system-ui";
-    ctx.fillText(s.icon, 92, y + 35);
-    // Text
+    ctx.fillText(s.n, 54, y + 33);
+    ctx.font = "16px system-ui";
+    ctx.fillText(s.icon, 90, y + 33);
     ctx.textAlign = "left";
     ctx.fillStyle = "#FFB74D";
-    ctx.font = "bold 15px system-ui";
-    ctx.fillText(s.title, 118, y + 26);
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = "14px system-ui";
-    ctx.fillText(s.body, 118, y + 46);
-    y += 64;
+    ctx.font = "bold 14px system-ui";
+    ctx.fillText(s.title, 114, y + 24);
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = "13px system-ui";
+    ctx.fillText(s.body, 114, y + 42);
+    y += 60;
   }
   UI.buttons = [];
-  btn("play", W / 2 - 115, H - 78, 230, 48, "Start Route", "primary");
+  btn("play", W / 2 - 120, H - 78, 240, 50, "START ROUTE", "primary");
   for (const b of UI.buttons) drawBtn(b);
 }
 
@@ -5567,7 +6464,7 @@ function drawGate() {
   ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "13px system-ui";
   ctx.fillText("Which code did they text you?", W / 2, 305);
   ctx.fillStyle = "#FF8A65"; ctx.font = "bold 12px system-ui";
-  ctx.fillText(`Time: ${Math.ceil(G.gateTimer)}s`, W / 2, 326);
+  ctx.fillText("Time: " + Math.ceil(G.gateTimer) + "s", W / 2, 326);
   const bw = 280, bh = 52, bx = (W - bw) / 2; let by = 340;
   for (let i = 0; i < G.gateOptions.length; i++) {
     ctx.fillStyle = "#37474F"; roundRect(bx, by, bw, bh, 10); ctx.fill();
@@ -5577,153 +6474,299 @@ function drawGate() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// PAUSE — van pulled over, rave flex energy
+// ═══════════════════════════════════════════════════════════
 function drawPause() {
-  ctx.fillStyle = "rgba(5,15,30,0.72)"; ctx.fillRect(0, 0, W, H);
-  softShadow(18, 0.28);
-  ctx.fillStyle = "rgba(12, 22, 40, 0.94)";
-  roundRect(22, 120, W - 44, 420, 22);
+  ctx.fillStyle = "rgba(4,10,20,0.5)";
+  ctx.fillRect(0, 0, W, H);
+  const vig = ctx.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.5, H * 0.72);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,0.58)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  const px = 22, py = 100, pw = W - 44, ph = 480;
+  softShadow(24, 0.35);
+  ctx.fillStyle = "rgba(12, 18, 34, 0.96)";
+  roundRect(px, py, pw, ph, 22);
   ctx.fill();
   clearShadow();
-  ctx.strokeStyle = "rgba(255,153,0,0.4)";
-  ctx.lineWidth = 1.5;
-  roundRect(22.5, 120.5, W - 45, 419, 21.5);
+  ctx.strokeStyle = "rgba(255,153,0,0.55)";
+  ctx.lineWidth = 2;
+  roundRect(px + 0.5, py + 0.5, pw - 1, ph - 1, 21.5);
+  ctx.stroke();
+  // Soft orange border glow
+  ctx.strokeStyle = "rgba(255,109,0,0.2)";
+  ctx.lineWidth = 6;
+  roundRect(px - 1, py - 1, pw + 2, ph + 2, 24);
   ctx.stroke();
 
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#FF9900";
-  ctx.font = "bold 12px system-ui";
-  ctx.fillText("ROUTE PAUSED", W / 2, 150);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 28px system-ui";
-  ctx.fillText("Paused", W / 2, 184);
+  // Cone icon
+  ctx.save();
+  ctx.translate(W / 2 - 78, py + 48);
+  ctx.fillStyle = "#FF6D00";
+  ctx.beginPath();
+  ctx.moveTo(0, -16);
+  ctx.lineTo(12, 14);
+  ctx.lineTo(-12, 14);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#FFF8E1";
+  ctx.fillRect(-9, 0, 18, 4);
+  ctx.restore();
 
-  // Live stats row
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 36px system-ui";
+  ctx.shadowColor = "rgba(255,153,0,0.35)";
+  ctx.shadowBlur = 10;
+  ctx.fillText("PAUSED", W / 2 + 10, py + 58);
+  clearShadow();
+
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.font = "14px system-ui";
+  ctx.fillText(pauseFlavor(), W / 2, py + 90);
+
+  // Mini live stats
   ctx.fillStyle = "rgba(255,255,255,0.06)";
-  roundRect(44, 200, W - 88, 52, 14);
+  roundRect(px + 24, py + 110, pw - 48, 44, 12);
   ctx.fill();
   const stats = [
     ["SCORE", String(G.score)],
     ["STREAK", String(G.streak)],
-    ["TIME", `${Math.floor(G.time / 60)}:${String(Math.floor(G.time % 60)).padStart(2, "0")}`],
+    ["TIME", Math.floor(G.time / 60) + ":" + String(Math.floor(G.time % 60)).padStart(2, "0")],
   ];
-  let sx = 70;
+  let sx = px + 48;
   for (const [lab, val] of stats) {
     ctx.fillStyle = "rgba(255,255,255,0.4)";
     ctx.font = "bold 9px system-ui";
-    ctx.fillText(lab, sx + 30, 218);
+    ctx.fillText(lab, sx + 30, py + 126);
     ctx.fillStyle = "#fff";
     ctx.font = "bold 16px system-ui";
-    ctx.fillText(val, sx + 30, 238);
-    sx += 90;
+    ctx.fillText(val, sx + 30, py + 146);
+    sx += 96;
   }
-  // Difficulty + hearts chip
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = "12px system-ui";
-  ctx.fillText((isHard() ? "Hard" : "Easy") + " · " + "❤".repeat(Math.max(0, G.hearts)), W / 2, 272);
 
   UI.buttons = [];
-  drawCarRadio(W / 2, 288, ["house", "dnb", "riddim", "techno", "silent"]);
+  const bx = W / 2 - 125;
+  let by = py + 180;
+  btn("resume", bx, by, 250, 54, "RESUME ROUTE", "primary");
+  by += 66;
+  btn("restart", bx, by, 250, 44, "Restart Route", "secondary");
+  by += 54;
+  btn("change_music", bx, by, 250, 44, "Change Music  ♪ " + (RADIO[station]?.name || ""), "secondary");
+  by += 54;
+  btn("menu", bx, by, 250, 44, "Quit to Menu", "ghost");
 
-  btn("resume", W / 2 - 110, 428, 220, 48, "Resume", "primary");
-  btn("menu", W / 2 - 110, 488, 220, 40, "Quit to Title", "secondary");
   for (const b of UI.buttons) if (b.label) drawBtn(b);
 }
 
+// ═══════════════════════════════════════════════════════════
+// END — Success celebration / Fail still fun
+// ═══════════════════════════════════════════════════════════
 function drawEnd() {
-  ctx.fillStyle = "rgba(5,15,30,0.74)"; ctx.fillRect(0, 0, W, H);
-  // Panel with breathing room from edges / bottom
-  const panelTop = 28, panelH = H - 48;
-  softShadow(18, 0.28);
-  ctx.fillStyle = "rgba(12, 22, 40, 0.95)";
-  roundRect(16, panelTop, W - 32, panelH, 22);
+  const win = !G.wrecked;
+
+  // Vignette
+  ctx.fillStyle = win ? "rgba(6, 20, 16, 0.72)" : "rgba(28, 8, 10, 0.74)";
+  ctx.fillRect(0, 0, W, H);
+  if (!win) {
+    const rv = ctx.createRadialGradient(W / 2, H * 0.4, 20, W / 2, H * 0.5, H * 0.7);
+    rv.addColorStop(0, "rgba(255,60,0,0.08)");
+    rv.addColorStop(1, "rgba(80,0,0,0.35)");
+    ctx.fillStyle = rv;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Confetti + package particles (win)
+  if (win) {
+    for (let i = 0; i < 16; i++) {
+      const tt = (now() / 28 + i * 37) % (H + 50);
+      const x = ((Math.sin(i * 2.1 + now() / 900) * 0.5 + 0.5) * (W - 40)) + 20;
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = ["#FF9900", "#FFD54F", "#00E5FF", "#69F0AE", "#F48FB1"][i % 5];
+      if (i % 4 === 0) {
+        roundRect(x, tt - 20, 7, 9, 1);
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, tt - 20, 5, 8);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  const panelTop = 22, panelH = H - 36;
+  softShadow(20, 0.32);
+  ctx.fillStyle = "rgba(12, 18, 34, 0.96)";
+  roundRect(14, panelTop, W - 28, panelH, 22);
   ctx.fill();
   clearShadow();
-  const border = G.newHigh ? "rgba(255,213,79,0.65)" : (G.wrecked ? "rgba(255,82,82,0.4)" : "rgba(255,153,0,0.4)");
+  const border = G.newHigh ? "rgba(255,213,79,0.8)" : (win ? "rgba(0,229,255,0.45)" : "rgba(255,109,0,0.5)");
   ctx.strokeStyle = border;
-  ctx.lineWidth = 2;
-  roundRect(16.5, panelTop + 0.5, W - 33, panelH - 1, 21.5);
+  ctx.lineWidth = 2.5;
+  roundRect(14.5, panelTop + 0.5, W - 29, panelH - 1, 21.5);
   ctx.stroke();
 
   ctx.textAlign = "center";
-  drawTesFlexerLogo(W / 2, panelTop + 36, 0.55);
+
+  // Van hop / damage
+  const hop = win ? Math.abs(Math.sin(now() / 180)) * 10 : Math.sin(now() / 400) * 2;
+  const prev = G.carX;
+  G.carX = W / 2;
+  ctx.save();
+  ctx.translate(0, panelTop + 22 + hop);
+  if (!win) ctx.rotate(-0.04);
+  ctx.scale(0.52, 0.52);
+  drawCar();
+  ctx.restore();
+  G.carX = prev;
+
+  if (!win) {
+    // Smoke
+    for (let i = 0; i < 5; i++) {
+      const a = (now() / 450 + i * 0.2) % 1;
+      ctx.globalAlpha = (1 - a) * 0.45;
+      ctx.fillStyle = "#90A4AE";
+      ctx.beginPath();
+      ctx.arc(W / 2 + 18 + i * 7, panelTop + 68 - a * 34, 5 + a * 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Package under tire
+    ctx.save();
+    ctx.translate(W / 2 + 22, panelTop + 78);
+    ctx.rotate(0.5);
+    ctx.fillStyle = "#FF9900";
+    roundRect(-8, -6, 16, 12, 2);
+    ctx.fill();
+    ctx.restore();
+    // Angry dog
+    drawDog(W / 2 - 72, panelTop + 76, 1, now() / 90);
+    // Stars
+    ctx.fillStyle = "#FFD54F";
+    ctx.font = "16px system-ui";
+    ctx.fillText("★", W / 2 + 55, panelTop + 48 + Math.sin(now() / 150) * 3);
+    ctx.fillText("✦", W / 2 + 70, panelTop + 60 + Math.cos(now() / 180) * 3);
+  } else {
+    // Burnout skid hint
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(W / 2, panelTop + 88, 28, 5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Headlines
+  let headline, flavor;
+  if (G.newHigh) {
+    headline = "FLEX GOD STATUS";
+    flavor = "Screenshot this. The group chat needs it.";
+  } else if (win) {
+    headline = WIN_HEADLINES[Math.min(WIN_HEADLINES.length - 1, Math.floor(G.score / 700))];
+    flavor = WIN_LINES[(G.deliveries + G.bestStreak) % WIN_LINES.length];
+  } else {
+    headline = FAIL_HEADLINES[(G.fails + G.ladyHits) % FAIL_HEADLINES.length];
+    flavor = FAIL_LINES[Math.floor(G.score / 100) % FAIL_LINES.length];
+  }
 
   if (G.newHigh) {
     ctx.fillStyle = "#FFD54F";
-    ctx.font = "bold 14px system-ui";
-    ctx.fillText("★ NEW HIGH SCORE ★", W / 2, panelTop + 72);
-    const glow = ctx.createRadialGradient(W / 2, panelTop + 90, 8, W / 2, panelTop + 90, 100);
-    glow.addColorStop(0, "rgba(255,213,79,0.2)");
-    glow.addColorStop(1, "rgba(255,213,79,0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(W / 2, panelTop + 90, 100, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.fillStyle = G.wrecked ? "#FF8A80" : "#FFB74D";
-    ctx.font = "bold 13px system-ui";
-    ctx.fillText(G.wrecked ? "ROUTE ENDED" : "ROUTE COMPLETE", W / 2, panelTop + 72);
+    ctx.font = "bold 12px system-ui";
+    ctx.fillText("★ NEW HIGH SCORE ★", W / 2, panelTop + 108);
   }
 
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 22px system-ui";
-  let headline;
-  if (G.newHigh) headline = "Peak delivery!";
-  else if (G.wrecked && G.score >= 700) headline = "Still a strong Flex";
-  else if (G.wrecked) headline = "Needs a tow";
-  else headline = "Shift complete!";
-  ctx.fillText(headline, W / 2, panelTop + 100);
+  ctx.font = "bold 26px system-ui";
+  ctx.shadowColor = win ? "rgba(0,229,255,0.35)" : "rgba(255,80,0,0.35)";
+  ctx.shadowBlur = 10;
+  ctx.fillText(headline, W / 2, panelTop + (G.newHigh ? 136 : 118));
+  clearShadow();
 
-  // Score hero card
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
-  roundRect(44, panelTop + 116, W - 88, 58, 16);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = "bold 11px system-ui";
-  ctx.fillText("SCORE", W / 2, panelTop + 136);
-  ctx.fillStyle = G.newHigh ? "#FFD54F" : "#fff";
-  ctx.font = "bold 30px system-ui";
-  ctx.fillText(String(G.score), W / 2, panelTop + 164);
+  ctx.fillStyle = "rgba(255,255,255,0.72)";
+  ctx.font = "13px system-ui";
+  wrap(flavor, W / 2, panelTop + (G.newHigh ? 160 : 142), W - 56, 16);
 
-  // Compact stats (leave room for buttons)
-  const rows = [
-    ["Deliveries", G.deliveries], ["Best streak", G.bestStreak],
-    ["Perfects", G.perfects], ["Threat beans", G.threatBeans],
-    ["Peak Flow", Math.round(G.peakFlow || G.flexFlow || 0)],
-    ["Difficulty", isHard() ? "Hard" : "Easy"],
-  ];
-  let y = panelTop + 192;
-  for (let i = 0; i < rows.length; i++) {
-    const [k, v] = rows[i];
-    if (i % 2 === 0) {
-      ctx.fillStyle = "rgba(255,255,255,0.03)";
-      ctx.fillRect(36, y - 12, W - 72, 26);
-    }
-    ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.font = "14px system-ui";
-    ctx.fillText(k, 48, y);
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 15px system-ui";
-    ctx.fillText(String(v), W - 48, y);
-    y += 26;
+  if (!win) {
+    ctx.fillStyle = "#FFAB40";
+    ctx.font = "bold 12px system-ui";
+    ctx.fillText(G.score >= 500 ? "Almost had it." : "Dust off. Try again.", W / 2, panelTop + 172);
   }
 
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#69F0AE";
-  ctx.font = "bold 17px system-ui";
-  ctx.fillText("Flex Rating: " + grade(), W / 2, y + 12);
+  // Score + stats card
+  const cardY = panelTop + (win ? 175 : 192);
+  softShadow(10, 0.18);
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  roundRect(36, cardY, W - 72, win ? 168 : 120, 16);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = win ? "rgba(0,229,255,0.3)" : "rgba(255,153,0,0.3)";
+  ctx.lineWidth = 1.5;
+  roundRect(36.5, cardY + 0.5, W - 73, (win ? 168 : 120) - 1, 15.5);
+  ctx.stroke();
 
-  // Buttons with breathing room from panel bottom
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.font = "bold 11px system-ui";
+  ctx.fillText("FINAL SCORE", W / 2, cardY + 22);
+  ctx.fillStyle = G.newHigh ? "#FFD54F" : "#fff";
+  ctx.font = "bold 36px system-ui";
+  ctx.fillText(String(G.score), W / 2, cardY + 58);
+
+  // Compact stats row
+  const timeLeft = Math.max(0, Math.floor(G.time));
+  const elapsedSec = Math.max(0, Math.floor(90 - G.time));
+  const rows = win
+    ? [
+        ["Max Streak", G.bestStreak],
+        ["Packages", G.deliveries],
+        ["Time", elapsedSec + "s"],
+        ["FSD", (G.fsdTriggers || 0) + "×"],
+      ]
+    : [
+        ["Max Streak", G.bestStreak],
+        ["Packages", G.deliveries],
+        ["FSD", (G.fsdTriggers || 0) + "×"],
+      ];
+  const cellW = (W - 96) / rows.length;
+  rows.forEach((row, i) => {
+    const cx = 48 + cellW * i + cellW / 2;
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.font = "bold 9px system-ui";
+    ctx.fillText(row[0], cx, cardY + 84);
+    ctx.fillStyle = i % 2 === 0 ? "#00E5FF" : "#FFB74D";
+    ctx.font = "bold 16px system-ui";
+    ctx.fillText(String(row[1]), cx, cardY + 106);
+  });
+
+  if (win) {
+    ctx.fillStyle = "#69F0AE";
+    ctx.font = "bold 14px system-ui";
+    ctx.fillText("Flex Rating: " + grade(), W / 2, cardY + 140);
+    if (G.bestStreak >= 8) {
+      ctx.fillStyle = "#FFD54F";
+      ctx.font = "bold 11px system-ui";
+      ctx.fillText("🔥 STREAK ENERGY", W / 2, cardY + 158);
+    }
+  } else {
+    ctx.fillStyle = "#FFAB91";
+    ctx.font = "bold 13px system-ui";
+    ctx.fillText("Flex Rating: " + grade(), W / 2, cardY + 108);
+  }
+
   UI.buttons = [];
-  const btnBase = H - 200;
-  btn("again", W / 2 - 115, btnBase, 230, 46, "Another Route", "primary");
-  btn("share_card", W / 2 - 115, btnBase + 54, 230, 44, "Share Card", "primary");
-  btn("share", W / 2 - 115, btnBase + 106, 230, 36, "Share Text", "secondary");
-  btn("menu", W / 2 - 115, btnBase + 150, 230, 32, "Title", "secondary");
+  const btnBase = H - 160;
+  if (win) {
+    btn("again", W / 2 - 125, btnBase, 250, 50, "NEXT ROUTE", "primary");
+    btn("share", W / 2 - 125, btnBase + 58, 250, 42, "Share Score", "secondary");
+    btn("menu", W / 2 - 125, btnBase + 108, 250, 40, "Main Menu", "ghost");
+  } else {
+    btn("again", W / 2 - 125, btnBase + 10, 250, 54, "TRY AGAIN", "primary");
+    btn("menu", W / 2 - 125, btnBase + 76, 250, 44, "Main Menu", "secondary");
+  }
   for (const b of UI.buttons) drawBtn(b);
-  drawToasts(btnBase - 36);
+  drawToasts(btnBase - 28);
 }
+
 
 function grade() {
   if (G.wrecked) return "DNF";
