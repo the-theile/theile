@@ -6201,16 +6201,16 @@ function drawTitleVanIcon(x, y, sc = 1) {
   ctx.translate(x, y);
   ctx.scale(sc, sc);
 
-  // Subtle orange speed lines behind the van
-  ctx.strokeStyle = "rgba(255,153,0,0.5)";
-  ctx.lineWidth = 2;
+  // Stronger orange speed lines behind the van (more motion)
+  ctx.strokeStyle = "#FF6D00";
+  ctx.lineWidth = 2.8;
   ctx.lineCap = "round";
-  for (let i = 0; i < 4; i++) {
-    const oy = -8 + i * 5.5 + Math.sin(now() / 200 + i) * 1.2;
-    ctx.globalAlpha = 0.35 + i * 0.08;
+  for (let i = 0; i < 5; i++) {
+    const oy = -10 + i * 5 + Math.sin(now() / 180 + i) * 1.4;
+    ctx.globalAlpha = 0.55 + i * 0.08;
     ctx.beginPath();
-    ctx.moveTo(-34 - i * 5, oy);
-    ctx.lineTo(-20 - i * 2.5, oy);
+    ctx.moveTo(-42 - i * 6, oy);
+    ctx.lineTo(-18 - i * 2, oy);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
@@ -6312,17 +6312,17 @@ function drawTitleVanIcon(x, y, sc = 1) {
   ctx.ellipse(0, 14, 14, 2.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Package flying off roof + motion lines
+  // Package flying higher off roof + motion lines
   const bob = Math.sin(now() / 180) * 3;
-  const pkgX = 12, pkgY = -18 + bob;
+  const pkgX = 14, pkgY = -30 + bob;
   // Motion lines on package trail
-  ctx.strokeStyle = "rgba(255,200,80,0.65)";
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(255,200,80,0.75)";
+  ctx.lineWidth = 1.6;
   ctx.lineCap = "round";
   for (let i = 0; i < 3; i++) {
     ctx.beginPath();
-    ctx.moveTo(pkgX - 10 - i * 3, pkgY + 4 + i * 2);
-    ctx.lineTo(pkgX - 3 - i, pkgY + 2 + i);
+    ctx.moveTo(pkgX - 12 - i * 3, pkgY + 6 + i * 3);
+    ctx.lineTo(pkgX - 2 - i, pkgY + 3 + i * 1.5);
     ctx.stroke();
   }
   ctx.save();
@@ -6410,7 +6410,7 @@ function drawTitle() {
   ctx.fillText("TesFlexer", W / 2 + 8, py + 62 + bounce);
   clearShadow();
 
-  drawTitleVanIcon(W / 2 - 122, py + 52 + bounce, 1.12);
+  drawTitleVanIcon(W / 2 - 128, py + 52 + bounce, 1.32);
 
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.font = "13px system-ui";
