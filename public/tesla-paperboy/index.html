@@ -548,6 +548,95 @@ const SFX = {
     tone({ freq: 980, dur: 0.08, type: "sine", gain: 0.02, delay: 0.04, slide: -400 });
   },
   hit() { noise(0.1, 0.055, 500); tone({ freq: 90, dur: 0.14, type: "sawtooth", gain: 0.035, slide: -30 }); },
+  /** Type-specific car–obstacle hit SFX; falls back to generic hit() */
+  hitType(type) {
+    const fn = this[type];
+    if (type && typeof fn === "function" && HIT_SFX_TYPES.has(type)) fn.call(this);
+    else this.hit();
+  },
+  // ── Obstacle hits (short, punchy, thematically distinct) ──
+  cone() {
+    // Plastic hollow thud
+    noise(0.06, 0.04, 1400);
+    tone({ freq: 320, dur: 0.07, type: "triangle", gain: 0.04, slide: -90 });
+    tone({ freq: 180, dur: 0.09, type: "sine", gain: 0.03, delay: 0.02, slide: -40 });
+  },
+  pothole() {
+    // Deep asphalt crater thunk
+    noise(0.12, 0.06, 280);
+    tone({ freq: 70, dur: 0.16, type: "sine", gain: 0.05, slide: -25 });
+    tone({ freq: 45, dur: 0.12, type: "triangle", gain: 0.03, delay: 0.03 });
+  },
+  barrier() {
+    // Metallic clank
+    noise(0.05, 0.035, 3200);
+    tone({ freq: 880, dur: 0.05, type: "square", gain: 0.03, slide: -200 });
+    tone({ freq: 520, dur: 0.1, type: "triangle", gain: 0.04, delay: 0.03, slide: -120 });
+    tone({ freq: 1100, dur: 0.04, type: "sine", gain: 0.02, delay: 0.06, slide: -400 });
+  },
+  branch() {
+    // Woody crack / snap
+    noise(0.08, 0.05, 2200);
+    tone({ freq: 420, dur: 0.05, type: "sawtooth", gain: 0.035, slide: -180 });
+    tone({ freq: 190, dur: 0.1, type: "triangle", gain: 0.04, delay: 0.03, slide: -60 });
+  },
+  scooter() {
+    // Light rattle + plastic scrape
+    noise(0.09, 0.04, 1800);
+    tone({ freq: 260, dur: 0.08, type: "sawtooth", gain: 0.03, slide: 80 });
+    tone({ freq: 480, dur: 0.06, type: "triangle", gain: 0.025, delay: 0.04, slide: -100 });
+  },
+  ped() {
+    // Soft body bump / oof
+    noise(0.07, 0.03, 900);
+    tone({ freq: 140, dur: 0.11, type: "sine", gain: 0.04, slide: -30 });
+    tone({ freq: 220, dur: 0.08, type: "triangle", gain: 0.025, delay: 0.05 });
+  },
+  mower() {
+    // Engine sputter grind
+    noise(0.1, 0.045, 700);
+    tone({ freq: 95, dur: 0.12, type: "sawtooth", gain: 0.04, slide: 40 });
+    tone({ freq: 130, dur: 0.1, type: "square", gain: 0.025, delay: 0.04, slide: -50 });
+  },
+  bike() {
+    // Metal frame ping + chain rattle
+    noise(0.06, 0.03, 2400);
+    tone({ freq: 640, dur: 0.06, type: "triangle", gain: 0.035, slide: -150 });
+    tone({ freq: 980, dur: 0.05, type: "sine", gain: 0.025, delay: 0.04, slide: -200 });
+  },
+  trash() {
+    // Hollow plastic bin slam
+    noise(0.1, 0.05, 1100);
+    tone({ freq: 160, dur: 0.1, type: "triangle", gain: 0.045, slide: -50 });
+    tone({ freq: 90, dur: 0.12, type: "sine", gain: 0.03, delay: 0.03, slide: -20 });
+  },
+  robot() {
+    // Electric buzz + servo glitch
+    tone({ freq: 180, dur: 0.08, type: "square", gain: 0.04, slide: 220 });
+    tone({ freq: 720, dur: 0.07, type: "sawtooth", gain: 0.03, delay: 0.04, slide: -300 });
+    noise(0.07, 0.035, 3500);
+    tone({ freq: 240, dur: 0.1, type: "square", gain: 0.025, delay: 0.08, slide: 100 });
+  },
+  worker() {
+    // Clipboard/vest thump + yell-ish blip
+    noise(0.06, 0.035, 1000);
+    tone({ freq: 200, dur: 0.09, type: "triangle", gain: 0.04, slide: -40 });
+    tone({ freq: 540, dur: 0.07, type: "sine", gain: 0.03, delay: 0.05, slide: 80 });
+  },
+  backhoe() {
+    // Heavy industrial metal slam
+    noise(0.14, 0.07, 400);
+    tone({ freq: 55, dur: 0.18, type: "sawtooth", gain: 0.05, slide: -15 });
+    tone({ freq: 120, dur: 0.12, type: "triangle", gain: 0.04, delay: 0.04, slide: -30 });
+    tone({ freq: 40, dur: 0.15, type: "sine", gain: 0.035, delay: 0.06 });
+  },
+  wet() {
+    // Enhanced hydroplane splash/slick
+    noise(0.14, 0.05, 900);
+    noise(0.1, 0.035, 1600);
+    tone({ freq: 220, dur: 0.1, type: "sine", gain: 0.035, slide: -90 });
+    tone({ freq: 140, dur: 0.14, type: "triangle", gain: 0.03, delay: 0.04, slide: -50 });
+  },
   heart() { tone({ freq: 300, dur: 0.15, type: "sine", gain: 0.05, slide: -120 }); tone({ freq: 200, dur: 0.2, type: "triangle", gain: 0.04, delay: 0.05 }); },
   fsd() {
     tone({ freq: 440, dur: 0.1, type: "sine", gain: 0.05, slide: 200 });
@@ -562,6 +651,13 @@ const SFX = {
   },
   horn() { tone({ freq: 380, dur: 0.18, type: "sawtooth", gain: 0.03 }); tone({ freq: 400, dur: 0.15, type: "sawtooth", gain: 0.025, delay: 0.02 }); },
   splash() { noise(0.16, 0.045, 800); tone({ freq: 200, dur: 0.12, type: "sine", gain: 0.03, slide: -70 }); },
+  /** Stronger splash for flood spin-out */
+  splashHard() {
+    noise(0.2, 0.07, 700);
+    noise(0.14, 0.05, 1400);
+    tone({ freq: 180, dur: 0.14, type: "sine", gain: 0.045, slide: -100 });
+    tone({ freq: 90, dur: 0.16, type: "triangle", gain: 0.035, delay: 0.04, slide: -30 });
+  },
   dismiss() { tone({ freq: 420, dur: 0.08, type: "sine", gain: 0.05, slide: 160 }); tone({ freq: 640, dur: 0.12, type: "triangle", gain: 0.04, delay: 0.05 }); },
   lady() {
     tone({ freq: 720, dur: 0.1, type: "sawtooth", gain: 0.04, slide: 260 });
@@ -573,6 +669,11 @@ const SFX = {
   },
   weather() { tone({ freq: 300, dur: 0.2, type: "sine", gain: 0.03, slide: 100 }); },
 };
+/** Obstacle types with dedicated hit SFX (not animal/horn specials) */
+const HIT_SFX_TYPES = new Set([
+  "cone", "pothole", "barrier", "branch", "scooter", "ped",
+  "mower", "bike", "trash", "robot", "worker", "backhoe", "wet",
+]);
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -602,6 +703,8 @@ const G = {
   // Visual juice / car polish (no gameplay effect)
   wheelRot: 0, prevSpeed: 95, braking: false, camPunchX: 0, camPunchY: 0,
   gradeWarm: 0, gradeCool: 0, gradeCyan: 0,
+  // Flood spin-out (hydrant / fountain)
+  spinT: 0, spinDir: 1,
   // Flex Flow + events + coach (prompt 2)
   flexFlow: 0, peakFlow: 0, flowBoostT: 0, flowMaxLatch: false, idleT: 0,
   eventBanner: null, dogWaveLeft: 0, eventScoreMult: 1, eventFlowMult: 1,
@@ -991,6 +1094,7 @@ function resetGame() {
     birds: [], rain: [],
     wheelRot: 0, prevSpeed: 92, braking: false, camPunchX: 0, camPunchY: 0,
     gradeWarm: 0, gradeCool: 0, gradeCyan: 0,
+    spinT: 0, spinDir: 1,
     flexFlow: 0, peakFlow: 0, flowBoostT: 0, flowMaxLatch: false, idleT: 0,
     eventBanner: null, dogWaveLeft: 0, eventScoreMult: 1, eventFlowMult: 1,
     coachStep: 0, coachT: 0, coachInteractive: !META.coachSeen,
@@ -2784,6 +2888,7 @@ function update(dt) {
   if (G.time <= 0) { G.time = 0; endRoute(false); return; }
 
   if (G.invuln > 0) G.invuln -= dt;
+  if (G.spinT > 0) G.spinT = Math.max(0, G.spinT - dt);
   if (G.throwCD > 0) G.throwCD -= dt;
   if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 28);
   if (G.flash > 0) {
@@ -2831,7 +2936,12 @@ function update(dt) {
   if (keys.ArrowRight || keys.KeyD) inputX += 1;
   inputX = clamp(inputX + touchSteerDir(), -1, 1);
 
-  if (G.fsd > 0) {
+  if (G.spinT > 0) {
+    // Flood spin-out: ignore player input, force sideways slide
+    const strength = 0.45 + clamp(G.spinT / 1.0, 0, 1) * 0.85;
+    G.carVX = G.spinDir * 290 * strength + Math.sin(now() / 45) * 70;
+    G.braking = true;
+  } else if (G.fsd > 0) {
     let avoid = 0, best = 1e9;
     for (const o of G.obstacles) {
       if (o.dead || o.y < CAR_Y - 220 || o.y > CAR_Y + 40) continue;
@@ -2943,6 +3053,9 @@ function update(dt) {
     }
   }
 
+  // Hydrant / fountain flood spin-out (collision volume matches drawStreetFlood)
+  checkFloodSpin(car);
+
   G.houses = G.houses.filter(h => h.y < H + 130);
   for (const p of G.props) {
     if (p.spray > 0) p.spray = Math.max(0, p.spray - dt);
@@ -2953,6 +3066,76 @@ function update(dt) {
   updateFX(dt);
   for (const m of G.messages) m.life -= dt;
   G.messages = G.messages.filter(m => m.life > 0);
+}
+
+/** Shared flood ellipse (must match drawStreetFlood) */
+function streetFloodEllipse(p, scale = 1) {
+  const maxT = p.floodMax || 6;
+  const life = clamp(p.flood / maxT, 0, 1);
+  const grow = easeOut(1 - life);
+  const roadDir = p.x < ROAD_CX ? 1 : -1;
+  const cx = clamp(p.x + roadDir * (28 + grow * 55), ROAD_L + 18, ROAD_R - 18);
+  const cy = p.y + 10;
+  const rw = (36 + grow * 78) * scale;
+  const rh = (14 + grow * 28) * scale;
+  return { cx, cy, rw, rh, roadDir, life, grow };
+}
+
+function pointInEllipse(px, py, cx, cy, rw, rh) {
+  if (rw <= 0 || rh <= 0) return false;
+  const dx = (px - cx) / rw;
+  const dy = (py - cy) / rh;
+  return dx * dx + dy * dy <= 1;
+}
+
+function carOverlapsFloodEllipse(car, ell) {
+  // Sample car center + edges so AABB≈ellipse match feels fair
+  const midX = car.x + car.w * 0.5;
+  const midY = car.y + car.h * 0.5;
+  const pts = [
+    [midX, midY],
+    [car.x + 6, midY],
+    [car.x + car.w - 6, midY],
+    [midX, car.y + car.h * 0.3],
+    [midX, car.y + car.h * 0.7],
+  ];
+  return pts.some(([x, y]) => pointInEllipse(x, y, ell.cx, ell.cy, ell.rw, ell.rh));
+}
+
+function checkFloodSpin(car) {
+  if (G.fsd > 0 || G.spinT > 0 || G.invuln > 0) return;
+  for (const p of G.props) {
+    if (!(p.flood > 0) || (p.type !== "hydrant" && p.type !== "fountain")) continue;
+    // Only when flood is near the car vertically
+    if (p.y < CAR_Y - 90 || p.y > CAR_Y + 70) continue;
+    const scale = p.type === "fountain" ? 0.55 : 1;
+    const ell = streetFloodEllipse(p, scale);
+    if (!carOverlapsFloodEllipse(car, ell)) continue;
+
+    // Trigger spin-out
+    G.spinT = rand(0.9, 1.15);
+    G.spinDir = ell.cx >= G.carX ? 1 : -1;
+    shake(12);
+    flash(0.2, "rgba(100,200,255,0.35)");
+    camPunch(7, 4);
+    floatT(G.carX, CAR_Y - 58, "SPIN OUT!", "#81D4FA", 18, 0.95);
+    burst(G.carX, CAR_Y + 20, "#4FC3F7", 16, 120);
+    SFX.splashHard();
+    SFX.hit();
+    // High speed: soft fail; very fast cruise: heart loss (before i-frames)
+    if (G.speed >= 145) {
+      loseHeart(pick(["Hydroplaned!", "Flood took the wheel!", "FSD would have held it…"]));
+    } else if (G.speed >= 115) {
+      oops(pick(["Slick streets!", "Who flooded the block?", "Hold it…"]));
+    } else {
+      msg(pick(["Spin out — ride it out!", "Wet asphalt wins this one."]), 1.6);
+      softFlowHit(10);
+      G.streak = 0;
+    }
+    // Brief i-frames so the same flood pool doesn't re-trigger
+    G.invuln = Math.max(G.invuln, 1.05);
+    return;
+  }
 }
 
 function onCarHit(o) {
@@ -2985,9 +3168,14 @@ function onCarHit(o) {
     worker: "Flagger waved you off!",
     backhoe: "Construction gear!",
   };
-  if (o.type === "dog" || o.type === "bear") { G.dogIncidents++; SFX.bark(); }
-  if (o.type === "cat") { G.dogIncidents++; SFX.meow(); }
-  if (o.type === "car" || o.type === "parked") SFX.horn();
+  // Special-case audio (animals / vehicles)
+  let specialAudio = false;
+  if (o.type === "dog" || o.type === "bear") { G.dogIncidents++; SFX.bark(); specialAudio = true; }
+  else if (o.type === "cat") { G.dogIncidents++; SFX.meow(); specialAudio = true; }
+  else if (o.type === "car" || o.type === "parked") { SFX.horn(); specialAudio = true; }
+  // Type-specific hit SFX (or generic fallback) for everything else
+  if (!specialAudio) SFX.hitType(o.type);
+
   loseHeart(table[o.type] || "Ouch!");
   const burstCol = (o.type === "pothole" || o.type === "wet") ? "#455A64"
     : o.type === "robot" ? "#4DD0E1"
@@ -2996,7 +3184,6 @@ function onCarHit(o) {
     : o.type === "cat" ? "#FFB74D"
     : "#FF7043";
   burst(o.x, o.y, burstCol, 12);
-  SFX.hit();
 }
 
 function startGate() {
@@ -3619,15 +3806,7 @@ function drawProps() {
 
 /** Expanding water flood on the road from a broken hydrant/fountain */
 function drawStreetFlood(p, scale = 1) {
-  const maxT = p.floodMax || 6;
-  const life = clamp(p.flood / maxT, 0, 1);
-  const grow = easeOut(1 - life);
-  const roadDir = p.x < ROAD_CX ? 1 : -1;
-  // Core flood spreads onto the street asphalt
-  const cx = clamp(p.x + roadDir * (28 + grow * 55), ROAD_L + 18, ROAD_R - 18);
-  const cy = p.y + 10;
-  const rw = (36 + grow * 78) * scale;
-  const rh = (14 + grow * 28) * scale;
+  const { cx, cy, rw, rh, roadDir, life } = streetFloodEllipse(p, scale);
   const a = (0.18 + life * 0.28) * (0.7 + 0.3 * scale);
   ctx.save();
   // Main sheet of water
@@ -5008,14 +5187,19 @@ function drawWheel(wx, wy, flip, rot = 0) {
 function drawCar() {
   const x = G.carX, y = CAR_Y;
   const wr = G.wheelRot || 0;
-  const braking = G.braking || G.fsd > 0;
+  const braking = G.braking || G.fsd > 0 || G.spinT > 0;
   const turnL = G.carVX < -55;
   const turnR = G.carVX > 55;
   const blink = Math.floor(now() / 320) % 2 === 0;
 
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(G.carLean || 0);
+  // Lean + flood spin rotation (proportional to remaining spinT)
+  let carRot = G.carLean || 0;
+  if (G.spinT > 0) {
+    carRot += G.spinDir * G.spinT * 3.8;
+  }
+  ctx.rotate(carRot);
 
   // Full Self-Delivering path ghost ahead of car
   if (G.fsd > 0) {
