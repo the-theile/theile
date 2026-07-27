@@ -6168,23 +6168,24 @@ const PAUSE_FLAVOR = [
   "The packages can wait… mostly",
   "HOA is watching",
   "Bass drop incoming… or not",
+  "Don’t let the dog see you pause",
 ];
 const WIN_LINES = [
   "Customer left a 5-star and a Gatorade",
   "Even the dog approved",
   "Apartment complex survived… barely",
   "You made the bass proud",
-  "You outran the HOA",
+  "Bathrobe guy actually tipped",
 ];
 const FAIL_LINES = [
   "The customer was not home… or was, and they were mad",
   "That was not a driveway",
   "Lightning 1 – Flex 0",
-  "HOA Karen wins this round",
-  "FSD said no. Loudly.",
+  "The dog filed a formal complaint",
+  "Wrong house. Classic.",
 ];
-const WIN_HEADLINES = ["ROUTE CLEARED!", "FLEX GOD STATUS", "YOU OUTRAN THE HOA"];
-const FAIL_HEADLINES = ["PACKAGE DENIED", "WRONG HOUSE ENERGY", "FSD SAID NO", "YOU GOT FLEXED"];
+const WIN_HEADLINES = ["ROUTE CLEARED!", "FLEX GOD STATUS", "YOU OUTRAN THE HOA", "PACKAGE DOMINATION"];
+const FAIL_HEADLINES = ["PACKAGE DENIED", "WRONG HOUSE ENERGY", "FSD SAID NO", "YOU GOT FLEXED", "HOA KAREN WINS"];
 
 function tipOfDay() {
   const d = new Date();
@@ -6606,296 +6607,363 @@ function drawGate() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PAUSE — van pulled over, rave flex energy
+// MENU PANEL HELPER — dark rounded card + orange border glow
 // ═══════════════════════════════════════════════════════════
-function drawPause() {
-  ctx.fillStyle = "rgba(4,10,20,0.5)";
-  ctx.fillRect(0, 0, W, H);
-  const vig = ctx.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.5, H * 0.72);
-  vig.addColorStop(0, "rgba(0,0,0,0)");
-  vig.addColorStop(1, "rgba(0,0,0,0.58)");
-  ctx.fillStyle = vig;
-  ctx.fillRect(0, 0, W, H);
-
-  const px = 22, py = 100, pw = W - 44, ph = 480;
+function drawMenuPanel(px, py, pw, ph, borderCol = "rgba(255,153,0,0.55)") {
   softShadow(24, 0.35);
-  ctx.fillStyle = "rgba(12, 18, 34, 0.96)";
+  ctx.fillStyle = "rgba(10, 16, 32, 0.96)";
   roundRect(px, py, pw, ph, 22);
   ctx.fill();
   clearShadow();
-  ctx.strokeStyle = "rgba(255,153,0,0.55)";
-  ctx.lineWidth = 2;
+  // Outer soft glow ring
+  ctx.strokeStyle = borderCol.replace(/[\d.]+\)$/, "0.22)");
+  if (borderCol.startsWith("rgba")) {
+    const m = borderCol.match(/rgba\((\d+),\s*(\d+),\s*(\d+)/);
+    if (m) ctx.strokeStyle = `rgba(${m[1]},${m[2]},${m[3]},0.22)`;
+  }
+  ctx.lineWidth = 7;
+  roundRect(px - 2, py - 2, pw + 4, ph + 4, 24);
+  ctx.stroke();
+  ctx.strokeStyle = borderCol;
+  ctx.lineWidth = 2.2;
   roundRect(px + 0.5, py + 0.5, pw - 1, ph - 1, 21.5);
   ctx.stroke();
-  // Soft orange border glow
-  ctx.strokeStyle = "rgba(255,109,0,0.2)";
-  ctx.lineWidth = 6;
-  roundRect(px - 1, py - 1, pw + 2, ph + 2, 24);
-  ctx.stroke();
+}
 
-  // Cone icon
+/** Mini traffic cone next to PAUSED */
+function drawPauseCone(x, y) {
   ctx.save();
-  ctx.translate(W / 2 - 78, py + 48);
+  ctx.translate(x, y);
+  ctx.shadowColor = "rgba(255,109,0,0.55)";
+  ctx.shadowBlur = 10;
   ctx.fillStyle = "#FF6D00";
   ctx.beginPath();
-  ctx.moveTo(0, -16);
-  ctx.lineTo(12, 14);
-  ctx.lineTo(-12, 14);
+  ctx.moveTo(0, -18);
+  ctx.lineTo(13, 16);
+  ctx.lineTo(-13, 16);
   ctx.closePath();
   ctx.fill();
+  clearShadow();
   ctx.fillStyle = "#FFF8E1";
-  ctx.fillRect(-9, 0, 18, 4);
+  ctx.fillRect(-10, -2, 20, 5);
+  ctx.fillRect(-8, 8, 16, 4);
+  ctx.fillStyle = "#1A1A1A";
+  ctx.fillRect(-14, 15, 28, 4);
   ctx.restore();
+}
 
+// ═══════════════════════════════════════════════════════════
+// PAUSE — high-energy chaotic (matches locked title menu)
+// ═══════════════════════════════════════════════════════════
+function drawPause() {
+  // Soft dark vignette over live gameplay
+  ctx.fillStyle = "rgba(4,10,20,0.48)";
+  ctx.fillRect(0, 0, W, H);
+  const vig = ctx.createRadialGradient(W / 2, H * 0.42, 30, W / 2, H * 0.5, H * 0.75);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(0.55, "rgba(0,0,0,0.28)");
+  vig.addColorStop(1, "rgba(0,0,0,0.62)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  const px = 18, pw = W - 36, ph = 500;
+  const py = Math.max(48, (H - ph) / 2 - 10);
+  drawMenuPanel(px, py, pw, ph, "rgba(255,153,0,0.58)");
+
+  // Title row: cone + PAUSED
+  drawPauseCone(W / 2 - 92, py + 52);
   ctx.textAlign = "center";
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 36px system-ui";
-  ctx.shadowColor = "rgba(255,153,0,0.35)";
-  ctx.shadowBlur = 10;
-  ctx.fillText("PAUSED", W / 2 + 10, py + 58);
+  ctx.font = "bold 40px system-ui";
+  ctx.shadowColor = "rgba(255,153,0,0.5)";
+  ctx.shadowBlur = 16;
+  ctx.fillText("PAUSED", W / 2 + 14, py + 62);
   clearShadow();
 
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  // Rotating flavor
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.font = "14px system-ui";
-  ctx.fillText(pauseFlavor(), W / 2, py + 90);
+  ctx.fillText(pauseFlavor(), W / 2, py + 98);
 
-  // Mini live stats
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
-  roundRect(px + 24, py + 110, pw - 48, 44, 12);
-  ctx.fill();
-  const stats = [
-    ["SCORE", String(G.score)],
-    ["STREAK", String(G.streak)],
-    ["TIME", Math.floor(G.time / 60) + ":" + String(Math.floor(G.time % 60)).padStart(2, "0")],
-  ];
-  let sx = px + 48;
-  for (const [lab, val] of stats) {
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.font = "bold 9px system-ui";
-    ctx.fillText(lab, sx + 30, py + 126);
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 16px system-ui";
-    ctx.fillText(val, sx + 30, py + 146);
-    sx += 96;
-  }
+  // Accent divider
+  ctx.strokeStyle = "rgba(255,153,0,0.28)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(px + 40, py + 118);
+  ctx.lineTo(px + pw - 40, py + 118);
+  ctx.stroke();
 
+  // Stacked thumb-friendly buttons
   UI.buttons = [];
-  const bx = W / 2 - 125;
-  let by = py + 180;
-  btn("resume", bx, by, 250, 54, "RESUME ROUTE", "primary");
-  by += 66;
-  btn("restart", bx, by, 250, 44, "Restart Route", "secondary");
-  by += 54;
-  btn("change_music", bx, by, 250, 44, "Change Music  ♪ " + (RADIO[station]?.name || ""), "secondary");
-  by += 54;
-  btn("menu", bx, by, 250, 44, "Quit to Menu", "ghost");
+  const bw = 268, bx = W / 2 - bw / 2;
+  let by = py + 142;
+  btn("resume", bx, by, bw, 58, "RESUME ROUTE", "primary");
+  by += 74;
+  btn("restart", bx, by, bw, 50, "Restart Route", "secondary");
+  by += 62;
+  btn("change_music", bx, by, bw, 50, "Change Music  ♪ " + (RADIO[station]?.name || ""), "secondary");
+  by += 62;
+  btn("menu", bx, by, bw, 50, "Quit to Menu", "secondary");
 
   for (const b of UI.buttons) if (b.label) drawBtn(b);
 }
 
 // ═══════════════════════════════════════════════════════════
-// END — Success celebration / Fail still fun
+// END — Success celebration / Fail still fun (same language)
 // ═══════════════════════════════════════════════════════════
 function drawEnd() {
   const win = !G.wrecked;
 
-  // Vignette
-  ctx.fillStyle = win ? "rgba(6, 20, 16, 0.72)" : "rgba(28, 8, 10, 0.74)";
+  // Base wash + vignette
+  ctx.fillStyle = win ? "rgba(8, 14, 28, 0.78)" : "rgba(22, 8, 12, 0.8)";
   ctx.fillRect(0, 0, W, H);
-  if (!win) {
-    const rv = ctx.createRadialGradient(W / 2, H * 0.4, 20, W / 2, H * 0.5, H * 0.7);
-    rv.addColorStop(0, "rgba(255,60,0,0.08)");
-    rv.addColorStop(1, "rgba(80,0,0,0.35)");
-    ctx.fillStyle = rv;
-    ctx.fillRect(0, 0, W, H);
-  }
-
-  // Confetti + package particles (win)
+  const rv = ctx.createRadialGradient(W / 2, H * 0.35, 20, W / 2, H * 0.5, H * 0.78);
   if (win) {
-    for (let i = 0; i < 16; i++) {
-      const tt = (now() / 28 + i * 37) % (H + 50);
-      const x = ((Math.sin(i * 2.1 + now() / 900) * 0.5 + 0.5) * (W - 40)) + 20;
-      ctx.globalAlpha = 0.6;
-      ctx.fillStyle = ["#FF9900", "#FFD54F", "#00E5FF", "#69F0AE", "#F48FB1"][i % 5];
-      if (i % 4 === 0) {
-        roundRect(x, tt - 20, 7, 9, 1);
+    rv.addColorStop(0, "rgba(255,153,0,0.1)");
+    rv.addColorStop(0.45, "rgba(0,0,0,0.15)");
+    rv.addColorStop(1, "rgba(0,0,0,0.55)");
+  } else {
+    rv.addColorStop(0, "rgba(255,60,0,0.14)");
+    rv.addColorStop(0.5, "rgba(80,10,0,0.2)");
+    rv.addColorStop(1, "rgba(40,0,0,0.5)");
+  }
+  ctx.fillStyle = rv;
+  ctx.fillRect(0, 0, W, H);
+
+  // Confetti + flying packages (win only)
+  if (win) {
+    for (let i = 0; i < 22; i++) {
+      const tt = (now() / 26 + i * 41) % (H + 60);
+      const x = ((Math.sin(i * 2.3 + now() / 850) * 0.5 + 0.5) * (W - 36)) + 18;
+      const bob = Math.sin(now() / 200 + i) * 3;
+      ctx.globalAlpha = 0.55 + (i % 3) * 0.1;
+      ctx.fillStyle = ["#FF9900", "#FFD54F", "#00E5FF", "#69F0AE", "#FF6D00", "#F48FB1"][i % 6];
+      if (i % 5 === 0) {
+        // Mini package
+        roundRect(x, tt - 22 + bob, 9, 11, 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 4.5, tt - 22 + bob);
+        ctx.lineTo(x + 4.5, tt - 11 + bob);
+        ctx.moveTo(x, tt - 16.5 + bob);
+        ctx.lineTo(x + 9, tt - 16.5 + bob);
+        ctx.stroke();
+      } else if (i % 3 === 0) {
+        ctx.beginPath();
+        ctx.arc(x, tt - 18 + bob, 3.5, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        ctx.fillRect(x, tt - 20, 5, 8);
+        ctx.save();
+        ctx.translate(x, tt - 18 + bob);
+        ctx.rotate((now() / 400 + i) % (Math.PI * 2));
+        ctx.fillRect(-3, -5, 6, 10);
+        ctx.restore();
       }
     }
     ctx.globalAlpha = 1;
-  }
-
-  const panelTop = 22, panelH = H - 36;
-  softShadow(20, 0.32);
-  ctx.fillStyle = "rgba(12, 18, 34, 0.96)";
-  roundRect(14, panelTop, W - 28, panelH, 22);
-  ctx.fill();
-  clearShadow();
-  const border = G.newHigh ? "rgba(255,213,79,0.8)" : (win ? "rgba(0,229,255,0.45)" : "rgba(255,109,0,0.5)");
-  ctx.strokeStyle = border;
-  ctx.lineWidth = 2.5;
-  roundRect(14.5, panelTop + 0.5, W - 29, panelH - 1, 21.5);
-  ctx.stroke();
-
-  ctx.textAlign = "center";
-
-  // Van hop / damage
-  const hop = win ? Math.abs(Math.sin(now() / 180)) * 10 : Math.sin(now() / 400) * 2;
-  const prev = G.carX;
-  G.carX = W / 2;
-  ctx.save();
-  ctx.translate(0, panelTop + 22 + hop);
-  if (!win) ctx.rotate(-0.04);
-  ctx.scale(0.52, 0.52);
-  drawCar();
-  ctx.restore();
-  G.carX = prev;
-
-  if (!win) {
-    // Smoke
-    for (let i = 0; i < 5; i++) {
-      const a = (now() / 450 + i * 0.2) % 1;
-      ctx.globalAlpha = (1 - a) * 0.45;
-      ctx.fillStyle = "#90A4AE";
+    // Soft golden particle glow orbs
+    for (let i = 0; i < 8; i++) {
+      const a = (now() / 1800 + i / 8) * Math.PI * 2;
+      const gx = W / 2 + Math.cos(a) * (70 + (i % 3) * 18);
+      const gy = 120 + Math.sin(a * 1.3) * 40 + Math.sin(now() / 300 + i) * 8;
+      ctx.globalAlpha = 0.12 + (i % 2) * 0.06;
+      ctx.fillStyle = i % 2 ? "#FFD54F" : "#FF9900";
       ctx.beginPath();
-      ctx.arc(W / 2 + 18 + i * 7, panelTop + 68 - a * 34, 5 + a * 9, 0, Math.PI * 2);
+      ctx.arc(gx, gy, 10 + (i % 3) * 4, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
-    // Package under tire
-    ctx.save();
-    ctx.translate(W / 2 + 22, panelTop + 78);
-    ctx.rotate(0.5);
-    ctx.fillStyle = "#FF9900";
-    roundRect(-8, -6, 16, 12, 2);
-    ctx.fill();
-    ctx.restore();
-    // Angry dog
-    drawDog(W / 2 - 72, panelTop + 76, 1, now() / 90);
-    // Stars
-    ctx.fillStyle = "#FFD54F";
-    ctx.font = "16px system-ui";
-    ctx.fillText("★", W / 2 + 55, panelTop + 48 + Math.sin(now() / 150) * 3);
-    ctx.fillText("✦", W / 2 + 70, panelTop + 60 + Math.cos(now() / 180) * 3);
-  } else {
-    // Burnout skid hint
-    ctx.strokeStyle = "rgba(255,255,255,0.12)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(W / 2, panelTop + 88, 28, 5, 0, 0, Math.PI * 2);
-    ctx.stroke();
   }
 
-  // Headlines
+  const px = 14, py = 18, pw = W - 28, ph = H - 32;
+  const borderCol = G.newHigh
+    ? "rgba(255,213,79,0.75)"
+    : (win ? "rgba(255,153,0,0.55)" : "rgba(255,87,34,0.55)");
+  drawMenuPanel(px, py, pw, ph, borderCol);
+
+  ctx.textAlign = "center";
+
+  // ── Van showcase ──
+  const hop = win ? Math.abs(Math.sin(now() / 170)) * 11 : Math.sin(now() / 380) * 2;
+  if (win) {
+    // Speed lines behind celebrating van
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = "#FF6D00";
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
+    for (let i = 0; i < 5; i++) {
+      const ly = py + 48 + hop + i * 5;
+      const len = 28 + Math.sin(now() / 200 + i) * 10;
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - 70 - i * 4, ly);
+      ctx.lineTo(W / 2 - 70 - i * 4 + len, ly);
+      ctx.stroke();
+    }
+    ctx.restore();
+    drawTitleVanIcon(W / 2, py + 58 + hop, 1.45);
+    // Burnout skid
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(W / 2, py + 86 + hop * 0.3, 32, 5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    // Wrecked van (tilted) + package under tire + angry dog + stars
+    ctx.save();
+    ctx.translate(W / 2 + 8, py + 58 + hop);
+    ctx.rotate(-0.18);
+    drawTitleVanIcon(0, 0, 1.25);
+    ctx.restore();
+    // Smoke puffs
+    for (let i = 0; i < 6; i++) {
+      const a = (now() / 480 + i * 0.18) % 1;
+      ctx.globalAlpha = (1 - a) * 0.42;
+      ctx.fillStyle = "#90A4AE";
+      ctx.beginPath();
+      ctx.arc(W / 2 + 28 + i * 6, py + 42 - a * 36, 5 + a * 10, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Package crushed under tire
+    ctx.save();
+    ctx.translate(W / 2 + 26, py + 88);
+    ctx.rotate(0.55);
+    ctx.shadowColor = "rgba(255,153,0,0.4)";
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = "#FF9900";
+    roundRect(-9, -5, 18, 11, 2);
+    ctx.fill();
+    clearShadow();
+    ctx.strokeStyle = "#1A1A1A";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -5); ctx.lineTo(0, 6);
+    ctx.moveTo(-9, 0); ctx.lineTo(9, 0);
+    ctx.stroke();
+    ctx.restore();
+    // Tiny angry dog
+    drawDog(W / 2 - 78, py + 82, 1.05, now() / 90);
+    // Cartoon stars
+    ctx.fillStyle = "#FFD54F";
+    ctx.font = "bold 18px system-ui";
+    ctx.shadowColor = "rgba(255,213,79,0.5)";
+    ctx.shadowBlur = 8;
+    ctx.fillText("★", W / 2 + 58, py + 40 + Math.sin(now() / 150) * 4);
+    ctx.fillText("✦", W / 2 + 78, py + 56 + Math.cos(now() / 170) * 3);
+    ctx.font = "14px system-ui";
+    ctx.fillText("✧", W / 2 + 48, py + 58 + Math.sin(now() / 200) * 3);
+    clearShadow();
+  }
+
+  // Headlines + flavor
   let headline, flavor;
   if (G.newHigh) {
     headline = "FLEX GOD STATUS";
     flavor = "Screenshot this. The group chat needs it.";
   } else if (win) {
-    headline = WIN_HEADLINES[Math.min(WIN_HEADLINES.length - 1, Math.floor(G.score / 700))];
+    headline = WIN_HEADLINES[Math.min(WIN_HEADLINES.length - 1, Math.floor(G.score / 600))];
     flavor = WIN_LINES[(G.deliveries + G.bestStreak) % WIN_LINES.length];
   } else {
     headline = FAIL_HEADLINES[(G.fails + G.ladyHits) % FAIL_HEADLINES.length];
     flavor = FAIL_LINES[Math.floor(G.score / 100) % FAIL_LINES.length];
   }
 
+  let yHead = py + 118;
   if (G.newHigh) {
     ctx.fillStyle = "#FFD54F";
     ctx.font = "bold 12px system-ui";
-    ctx.fillText("★ NEW HIGH SCORE ★", W / 2, panelTop + 108);
+    ctx.shadowColor = "rgba(255,213,79,0.55)";
+    ctx.shadowBlur = 10;
+    ctx.fillText("★ NEW HIGH SCORE ★", W / 2, yHead);
+    clearShadow();
+    yHead += 26;
   }
 
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 26px system-ui";
-  ctx.shadowColor = win ? "rgba(0,229,255,0.35)" : "rgba(255,80,0,0.35)";
-  ctx.shadowBlur = 10;
-  ctx.fillText(headline, W / 2, panelTop + (G.newHigh ? 136 : 118));
+  ctx.font = win ? "bold 28px system-ui" : "bold 26px system-ui";
+  ctx.shadowColor = win ? "rgba(255,153,0,0.55)" : "rgba(255,80,0,0.5)";
+  ctx.shadowBlur = 14;
+  ctx.fillText(headline, W / 2, yHead);
+  // Second pass for outer glow
+  ctx.shadowBlur = 6;
+  ctx.fillText(headline, W / 2, yHead);
   clearShadow();
 
-  ctx.fillStyle = "rgba(255,255,255,0.72)";
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
   ctx.font = "13px system-ui";
-  wrap(flavor, W / 2, panelTop + (G.newHigh ? 160 : 142), W - 56, 16);
+  const flavorY = yHead + 26;
+  wrap(flavor, W / 2, flavorY, W - 64, 17);
 
-  if (!win) {
-    ctx.fillStyle = "#FFAB40";
-    ctx.font = "bold 12px system-ui";
-    ctx.fillText(G.score >= 500 ? "Almost had it." : "Dust off. Try again.", W / 2, panelTop + 172);
-  }
-
-  // Score + stats card
-  const cardY = panelTop + (win ? 175 : 192);
-  softShadow(10, 0.18);
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
-  roundRect(36, cardY, W - 72, win ? 168 : 120, 16);
+  // Stats card
+  const elapsedSec = Math.max(0, Math.floor(ROUTE_TIME - G.time));
+  const fsdSecs = (G.fsdTriggers || 0) * FSD_DUR;
+  const cardY = flavorY + 36;
+  const cardH = win ? 148 : 110;
+  softShadow(12, 0.2);
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  roundRect(32, cardY, W - 64, cardH, 16);
   ctx.fill();
   clearShadow();
-  ctx.strokeStyle = win ? "rgba(0,229,255,0.3)" : "rgba(255,153,0,0.3)";
-  ctx.lineWidth = 1.5;
-  roundRect(36.5, cardY + 0.5, W - 73, (win ? 168 : 120) - 1, 15.5);
+  ctx.strokeStyle = win ? "rgba(0,229,255,0.35)" : "rgba(255,153,0,0.35)";
+  ctx.lineWidth = 1.6;
+  roundRect(32.5, cardY + 0.5, W - 65, cardH - 1, 15.5);
   ctx.stroke();
 
+  // Score always prominent
   ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = "bold 11px system-ui";
-  ctx.fillText("FINAL SCORE", W / 2, cardY + 22);
+  ctx.font = "bold 10px system-ui";
+  ctx.fillText(win ? "SCORE" : "FINAL SCORE", W / 2, cardY + 20);
   ctx.fillStyle = G.newHigh ? "#FFD54F" : "#fff";
-  ctx.font = "bold 36px system-ui";
-  ctx.fillText(String(G.score), W / 2, cardY + 58);
-
-  // Compact stats row
-  const timeLeft = Math.max(0, Math.floor(G.time));
-  const elapsedSec = Math.max(0, Math.floor(90 - G.time));
-  const rows = win
-    ? [
-        ["Max Streak", G.bestStreak],
-        ["Packages", G.deliveries],
-        ["Time", elapsedSec + "s"],
-        ["FSD", (G.fsdTriggers || 0) + "×"],
-      ]
-    : [
-        ["Max Streak", G.bestStreak],
-        ["Packages", G.deliveries],
-        ["FSD", (G.fsdTriggers || 0) + "×"],
-      ];
-  const cellW = (W - 96) / rows.length;
-  rows.forEach((row, i) => {
-    const cx = 48 + cellW * i + cellW / 2;
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.font = "bold 9px system-ui";
-    ctx.fillText(row[0], cx, cardY + 84);
-    ctx.fillStyle = i % 2 === 0 ? "#00E5FF" : "#FFB74D";
-    ctx.font = "bold 16px system-ui";
-    ctx.fillText(String(row[1]), cx, cardY + 106);
-  });
+  ctx.font = "bold 38px system-ui";
+  ctx.shadowColor = G.newHigh ? "rgba(255,213,79,0.45)" : "rgba(255,153,0,0.25)";
+  ctx.shadowBlur = 10;
+  ctx.fillText(String(G.score), W / 2, cardY + 56);
+  clearShadow();
 
   if (win) {
+    // Score · Max Streak · Packages · Time · FSD Time
+    const rows = [
+      ["STREAK", String(G.bestStreak)],
+      ["PKGS", String(G.deliveries)],
+      ["TIME", elapsedSec + "s"],
+      ["FSD", fsdSecs + "s"],
+    ];
+    const cellW = (W - 88) / rows.length;
+    rows.forEach((row, i) => {
+      const cx = 44 + cellW * i + cellW / 2;
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.font = "bold 9px system-ui";
+      ctx.fillText(row[0], cx, cardY + 84);
+      ctx.fillStyle = i % 2 === 0 ? "#00E5FF" : "#FFB74D";
+      ctx.font = "bold 16px system-ui";
+      ctx.fillText(row[1], cx, cardY + 106);
+    });
     ctx.fillStyle = "#69F0AE";
-    ctx.font = "bold 14px system-ui";
-    ctx.fillText("Flex Rating: " + grade(), W / 2, cardY + 140);
-    if (G.bestStreak >= 8) {
-      ctx.fillStyle = "#FFD54F";
-      ctx.font = "bold 11px system-ui";
-      ctx.fillText("🔥 STREAK ENERGY", W / 2, cardY + 158);
-    }
+    ctx.font = "bold 13px system-ui";
+    ctx.fillText("Flex Rating: " + grade(), W / 2, cardY + 132);
   } else {
     ctx.fillStyle = "#FFAB91";
     ctx.font = "bold 13px system-ui";
-    ctx.fillText("Flex Rating: " + grade(), W / 2, cardY + 108);
+    ctx.fillText("Flex Rating: " + grade(), W / 2, cardY + 88);
   }
 
+  // Buttons
   UI.buttons = [];
-  const btnBase = H - 160;
+  const bw = 268, bx = W / 2 - bw / 2;
+  const btnBase = Math.min(H - 168, cardY + cardH + 22);
   if (win) {
-    btn("again", W / 2 - 125, btnBase, 250, 50, "NEXT ROUTE", "primary");
-    btn("share", W / 2 - 125, btnBase + 58, 250, 42, "Share Score", "secondary");
-    btn("menu", W / 2 - 125, btnBase + 108, 250, 40, "Main Menu", "ghost");
+    btn("again", bx, btnBase, bw, 54, "NEXT ROUTE", "primary");
+    btn("share", bx, btnBase + 64, bw, 46, "Share Score", "secondary");
+    btn("menu", bx, btnBase + 120, bw, 44, "Main Menu", "secondary");
   } else {
-    btn("again", W / 2 - 125, btnBase + 10, 250, 54, "TRY AGAIN", "primary");
-    btn("menu", W / 2 - 125, btnBase + 76, 250, 44, "Main Menu", "secondary");
+    btn("again", bx, btnBase + 8, bw, 56, "TRY AGAIN", "primary");
+    btn("menu", bx, btnBase + 76, bw, 48, "Main Menu", "secondary");
   }
   for (const b of UI.buttons) drawBtn(b);
-  drawToasts(btnBase - 28);
+  drawToasts(btnBase - 24);
 }
 
 
