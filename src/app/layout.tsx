@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: "%s · Theile",
   },
   description:
-    "Theile Riordan — Implementation Manager at Inteum Company. Projects including Dictabird and RaveFAM.",
+    "Theile Riordan — Implementation Manager at Inteum Company. Projects including TesFlexer and RaveFAM.",
 };
 
 export const viewport: Viewport = {
