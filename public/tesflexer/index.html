@@ -211,9 +211,10 @@ function loadMeta() {
     return Object.assign({
       highScore: 0, bestStreak: 0, games: 0, totalDrops: 0,
       achievements: {}, station: "dnb", coachSeen: false, colorTipSeen: false, difficulty: "hard",
+      vehicle: "flex",
     }, JSON.parse(localStorage.getItem(LS_KEY) || "{}"));
   } catch {
-    return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "dnb", coachSeen: false, colorTipSeen: false, difficulty: "hard" };
+    return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "dnb", coachSeen: false, colorTipSeen: false, difficulty: "hard", vehicle: "flex" };
   }
 }
 function saveMeta(m) {
@@ -234,6 +235,35 @@ function setDifficulty(mode) {
   DIFF_MODE = mode === "hard" ? "hard" : "easy";
   META.difficulty = DIFF_MODE;
   saveMeta(META);
+}
+
+// ── Garage / vehicle selection ──
+const VEHICLES = {
+  flex: {
+    id: "flex",
+    name: "Model Flex",
+    tag: "Smooth operator",
+  },
+  cyberflex: {
+    id: "cyberflex",
+    name: "CyberFlex",
+    tag: "Built different",
+  },
+};
+let VEHICLE = (META.vehicle && VEHICLES[META.vehicle]) ? META.vehicle : "flex";
+function setVehicle(id) {
+  if (!VEHICLES[id]) return;
+  VEHICLE = id;
+  META.vehicle = id;
+  saveMeta(META);
+}
+function cycleVehicle() {
+  const ids = Object.keys(VEHICLES);
+  const i = ids.indexOf(VEHICLE);
+  setVehicle(ids[(i + 1) % ids.length]);
+}
+function currentVehicle() {
+  return VEHICLES[VEHICLE] || VEHICLES.flex;
 }
 
 const ACHIEVEMENTS = {
@@ -678,7 +708,7 @@ const HIT_SFX_TYPES = new Set([
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
-const ST = { TITLE: 0, HOWTO: 1, PLAY: 2, PAUSE: 3, GATE: 4, END: 5 };
+const ST = { TITLE: 0, HOWTO: 1, PLAY: 2, PAUSE: 3, GATE: 4, END: 5, GARAGE: 6 };
 let state = ST.TITLE;
 
 const G = {
@@ -1666,7 +1696,7 @@ function onDown(e) {
   const p = cpos(e);
   pointers.set(id, p);
 
-  if (state === ST.TITLE || state === ST.HOWTO || state === ST.END) { hitUI(p.x, p.y); return; }
+  if (state === ST.TITLE || state === ST.HOWTO || state === ST.END || state === ST.GARAGE) { hitUI(p.x, p.y); return; }
   if (state === ST.PAUSE) { hitUI(p.x, p.y); return; }
   if (state === ST.GATE) { hitGate(p.x, p.y); return; }
   if (state === ST.PLAY) {
@@ -1759,12 +1789,17 @@ addEventListener("keydown", e => {
     msg(muted ? "Sound off" : "Tuned to " + RADIO[station].name, 1.4);
   }
   // Station switch: 1 House · 2 DnB · 3 Riddim · 4 Techno · 0 Silent
-  if ((state === ST.PLAY || state === ST.PAUSE || state === ST.TITLE) && state !== ST.GATE && !e.repeat) {
+  if ((state === ST.PLAY || state === ST.PAUSE || state === ST.TITLE || state === ST.GARAGE) && state !== ST.GATE && !e.repeat) {
     if (e.code === "Digit1" || e.code === "Numpad1") { setStation("house"); if (state !== ST.TITLE) msg("House", 1); }
     if (e.code === "Digit2" || e.code === "Numpad2") { setStation("dnb"); if (state !== ST.TITLE) msg("DnB", 1); }
     if (e.code === "Digit3" || e.code === "Numpad3") { setStation("riddim"); if (state !== ST.TITLE) msg("Riddim", 1); }
     if (e.code === "Digit4" || e.code === "Numpad4") { setStation("techno"); if (state !== ST.TITLE) msg("Techno", 1); }
     if (e.code === "Digit0" || e.code === "Numpad0") { setStation("silent"); if (state !== ST.TITLE) msg("Silent ride", 1); }
+    // Quick vehicle swap (mid-session optional)
+    if (e.code === "KeyV") {
+      cycleVehicle();
+      msg(currentVehicle().name + " · " + currentVehicle().tag, 1.4);
+    }
   }
   if (e.code === "KeyP" || e.code === "Escape") {
     if (state === ST.PLAY && G.colorIntro) { dismissColorIntro(); }
@@ -1821,6 +1856,14 @@ function onBtn(id) {
   haptic(12);
   if (id === "play") { state = ST.PLAY; resetGame(); }
   if (id === "howto") state = ST.HOWTO;
+  if (id === "garage") state = ST.GARAGE;
+  if (id === "vehicle_flex") setVehicle("flex");
+  if (id === "vehicle_cyberflex") setVehicle("cyberflex");
+  if (id === "confirm_ride") {
+    setVehicle(VEHICLE);
+    state = ST.TITLE;
+    msg("Riding " + currentVehicle().name, 1.6);
+  }
   if (id === "back" || id === "menu") { stopRadio(); state = ST.TITLE; }
   if (id === "again" || id === "restart") { state = ST.PLAY; resetGame(); }
   if (id === "resume") { state = ST.PLAY; steerPointers.clear(); if (!muted) startRadio(); }
@@ -1844,6 +1887,10 @@ function onBtn(id) {
     setStation(order[(i + 1) % order.length]);
     if (!muted) startRadio();
     msg("♪ " + (RADIO[station]?.name || "Radio"), 1.4);
+  }
+  if (id === "swap_ride") {
+    cycleVehicle();
+    msg(currentVehicle().name + " — " + currentVehicle().tag, 1.5);
   }
 }
 function hitGate(x, y) {
@@ -2842,7 +2889,7 @@ function update(dt) {
     if (r.y > H) { r.y = -10; r.x = rand(-20, W); }
   }
 
-  if (state === ST.TITLE || state === ST.HOWTO) {
+  if (state === ST.TITLE || state === ST.HOWTO || state === ST.GARAGE) {
     G.scroll += 32 * dt; G.roadLines += 32 * dt;
     G.wheelRot = (G.wheelRot + 32 * dt * 0.085) % (Math.PI * 2);
     if (!G.houses.length) for (let i = 0; i < 6; i++) spawnHouse(i * 140 - 80);
@@ -3259,6 +3306,7 @@ function draw() {
 
   if (state === ST.TITLE) drawTitle();
   else if (state === ST.HOWTO) drawHowTo();
+  else if (state === ST.GARAGE) drawGarage();
   else if (state === ST.PLAY || state === ST.GATE) {
     drawHUD();
     if (state === ST.PLAY) drawSteerControls();
@@ -5252,13 +5300,47 @@ function drawCar() {
   clearShadow();
 
   const flash = G.invuln > 0 && Math.floor(now() / 70) % 2;
+  const cyber = VEHICLE === "cyberflex";
 
   // Wheels under body — rotate with speed
-  drawWheel(-22.5, -20, false, wr);
-  drawWheel(22.5, -20, true, wr * 1.02);
-  drawWheel(-22.5, 22, false, wr * 0.98);
-  drawWheel(22.5, 22, true, wr);
+  if (cyber) {
+    drawWheel(-23, -18, false, wr);
+    drawWheel(23, -18, true, wr * 1.02);
+    drawWheel(-23, 24, false, wr * 0.98);
+    drawWheel(23, 24, true, wr);
+  } else {
+    drawWheel(-22.5, -20, false, wr);
+    drawWheel(22.5, -20, true, wr * 1.02);
+    drawWheel(-22.5, 22, false, wr * 0.98);
+    drawWheel(22.5, 22, true, wr);
+  }
 
+  if (cyber) drawCarBodyCyber(flash, braking, turnL, turnR, blink);
+  else drawCarBodyFlex(flash, braking, turnL, turnR, blink);
+
+  ctx.restore();
+  // FSD timer lives in the bottom control dock (never on the car)
+}
+
+/** Shared FLEX plate — black plate, yellow border */
+function drawFlexPlate(y = 16) {
+  softShadow(3, 0.12);
+  ctx.fillStyle = "#1A1A1A";
+  roundRect(-11, y, 22, 9, 2);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = "#FFD600";
+  ctx.lineWidth = 1.4;
+  roundRect(-11, y, 22, 9, 2);
+  ctx.stroke();
+  ctx.fillStyle = "#FFD600";
+  ctx.font = "bold 7px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("FLEX", 0, y + 6.5);
+}
+
+/** Model Flex — clean rounded Tesla-style crossover / delivery */
+function drawCarBodyFlex(flash, braking, turnL, turnR, blink) {
   // Pearl white body — clean modern EV silhouette
   if (flash) {
     ctx.fillStyle = "rgba(255,255,255,0.45)";
@@ -5271,10 +5353,21 @@ function drawCar() {
     ctx.fillStyle = bg;
   }
   softShadow(10, 0.15);
-  // Main body path with softer nose/tail radius
   roundRect(-20, -42, 40, 84, 14);
   ctx.fill();
   clearShadow();
+
+  // Orange side accent stripes
+  ctx.fillStyle = "#FF6D00";
+  roundRect(-19.5, -18, 3.2, 36, 1.5);
+  ctx.fill();
+  roundRect(16.3, -18, 3.2, 36, 1.5);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,213,79,0.55)";
+  roundRect(-19, -16, 1.6, 30, 1);
+  ctx.fill();
+  roundRect(17.4, -16, 1.6, 30, 1);
+  ctx.fill();
 
   // Side sculpt highlight + shade
   ctx.fillStyle = "rgba(255,255,255,0.35)";
@@ -5305,7 +5398,7 @@ function drawCar() {
     ctx.fill();
   }
 
-  // Glasshouse canopy (continuous glass)
+  // Glasshouse canopy
   const glass = ctx.createLinearGradient(-15, -28, 15, 14);
   glass.addColorStop(0, "#0A1628");
   glass.addColorStop(0.35, "#1A2A3A");
@@ -5314,14 +5407,12 @@ function drawCar() {
   ctx.fillStyle = glass;
   roundRect(-15, -28, 30, 40, 9);
   ctx.fill();
-  // Blue sky reflection
   ctx.fillStyle = "rgba(129,212,250,0.32)";
   roundRect(-12, -25, 9, 30, 5);
   ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.1)";
   roundRect(2, -24, 7, 14, 3);
   ctx.fill();
-  // A-pillar edge
   ctx.strokeStyle = "rgba(255,255,255,0.1)";
   ctx.lineWidth = 1;
   roundRect(-15, -28, 30, 40, 9);
@@ -5359,7 +5450,7 @@ function drawCar() {
     ctx.fill();
   }
 
-  // Rear light bar — brighter when braking / Full Self-Delivering
+  // Red continuous taillight bar
   if (braking) {
     ctx.shadowColor = "#FF1744";
     ctx.shadowBlur = 14;
@@ -5374,7 +5465,6 @@ function drawCar() {
   clearShadow();
   ctx.fillStyle = "rgba(255,255,255,0.3)";
   ctx.fillRect(-3, 33, 6, 1.5);
-  // Outer brake lamp ends
   if (braking) {
     ctx.fillStyle = "rgba(255,82,82,0.85)";
     roundRect(-18, 31, 5, 6, 1.5);
@@ -5383,7 +5473,6 @@ function drawCar() {
     ctx.fill();
   }
 
-  // Turn-signal blink when steering hard
   if (turnL && blink) {
     ctx.fillStyle = "#FFB300";
     ctx.shadowColor = "#FFB300";
@@ -5415,35 +5504,243 @@ function drawCar() {
   roundRect(22, -7.5, 4.5, 2.8, 1);
   ctx.fill();
 
-  // Hood sensor nub (generic modern EV — no brand badge)
   ctx.fillStyle = "#90A4AE";
   ctx.beginPath();
   ctx.arc(0, -37, 1.6, 0, Math.PI * 2);
   ctx.fill();
 
-  // Clean FLEX plate on rear deck
-  softShadow(3, 0.12);
-  ctx.fillStyle = "#1A1A1A";
-  roundRect(-11, 16, 22, 9, 2);
-  ctx.fill();
-  clearShadow();
-  ctx.strokeStyle = "#FF9900";
-  ctx.lineWidth = 1.2;
-  roundRect(-11, 16, 22, 9, 2);
-  ctx.stroke();
-  ctx.fillStyle = "#FF9900";
-  ctx.font = "bold 7px system-ui";
-  ctx.textAlign = "center";
-  ctx.fillText("FLEX", 0, 22.5);
+  drawFlexPlate(16);
 
-  // Body outline
   ctx.strokeStyle = "rgba(0,0,0,0.08)";
   ctx.lineWidth = 1.2;
   roundRect(-20, -42, 40, 84, 14);
   ctx.stroke();
+}
 
+/** CyberFlex — angular Cybertruck-inspired delivery vehicle */
+function drawCarBodyCyber(flash, braking, turnL, turnR, blink) {
+  // Angular white exoskeleton
+  if (flash) {
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+  } else {
+    const bg = ctx.createLinearGradient(-22, -44, 22, 44);
+    bg.addColorStop(0, "#FAFAFA");
+    bg.addColorStop(0.4, "#ECEFF1");
+    bg.addColorStop(0.75, "#CFD8DC");
+    bg.addColorStop(1, "#B0BEC5");
+    ctx.fillStyle = bg;
+  }
+  softShadow(10, 0.18);
+  // Sharp geometric hull (trapezoid-ish)
+  ctx.beginPath();
+  ctx.moveTo(-12, -44); // nose point left
+  ctx.lineTo(12, -44);
+  ctx.lineTo(21, -28);
+  ctx.lineTo(22, 30);
+  ctx.lineTo(14, 44);
+  ctx.lineTo(-14, 44);
+  ctx.lineTo(-22, 30);
+  ctx.lineTo(-21, -28);
+  ctx.closePath();
+  ctx.fill();
+  clearShadow();
+
+  // Hard body panel seams (angular)
+  ctx.strokeStyle = "rgba(0,0,0,0.14)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-18, -8); ctx.lineTo(18, -8);
+  ctx.moveTo(-19, 12); ctx.lineTo(19, 12);
+  ctx.moveTo(-10, -44); ctx.lineTo(-16, 0); ctx.lineTo(-10, 44);
+  ctx.moveTo(10, -44); ctx.lineTo(16, 0); ctx.lineTo(10, 44);
+  ctx.stroke();
+
+  // Orange accent chevrons / side armor lines
+  ctx.strokeStyle = "#FF6D00";
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "butt";
+  ctx.beginPath();
+  ctx.moveTo(-20, -14); ctx.lineTo(-20, 18);
+  ctx.moveTo(20, -14); ctx.lineTo(20, 18);
+  ctx.stroke();
+  ctx.strokeStyle = "#FFD54F";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-18.5, -10); ctx.lineTo(-18.5, 14);
+  ctx.moveTo(18.5, -10); ctx.lineTo(18.5, 14);
+  ctx.stroke();
+
+  // Angular glasshouse (faceted)
+  const glass = ctx.createLinearGradient(-14, -30, 14, 10);
+  glass.addColorStop(0, "#0D1B2A");
+  glass.addColorStop(0.5, "#1B2838");
+  glass.addColorStop(1, "#415A77");
+  ctx.fillStyle = glass;
+  ctx.beginPath();
+  ctx.moveTo(-12, -30);
+  ctx.lineTo(12, -30);
+  ctx.lineTo(14, -8);
+  ctx.lineTo(10, 10);
+  ctx.lineTo(-10, 10);
+  ctx.lineTo(-14, -8);
+  ctx.closePath();
+  ctx.fill();
+  // Cool reflection facet
+  ctx.fillStyle = "rgba(0,229,255,0.18)";
+  ctx.beginPath();
+  ctx.moveTo(-10, -28);
+  ctx.lineTo(-2, -28);
+  ctx.lineTo(-4, 6);
+  ctx.lineTo(-12, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-12, -30);
+  ctx.lineTo(12, -30);
+  ctx.lineTo(14, -8);
+  ctx.lineTo(10, 10);
+  ctx.lineTo(-10, 10);
+  ctx.lineTo(-14, -8);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Rear cargo slab
+  ctx.fillStyle = "rgba(0,0,0,0.08)";
+  ctx.beginPath();
+  ctx.moveTo(-12, 14);
+  ctx.lineTo(12, 14);
+  ctx.lineTo(13, 30);
+  ctx.lineTo(-13, 30);
+  ctx.closePath();
+  ctx.fill();
+
+  // Front light strip (thin, aggressive)
+  if (G.fsd > 0) {
+    ctx.shadowColor = "#00E5FF";
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = "#00E5FF";
+  } else {
+    const lg = ctx.createLinearGradient(-14, 0, 14, 0);
+    lg.addColorStop(0, "#90CAF9");
+    lg.addColorStop(0.5, "#FFFFFF");
+    lg.addColorStop(1, "#90CAF9");
+    ctx.fillStyle = lg;
+  }
+  ctx.beginPath();
+  ctx.moveTo(-13, -42);
+  ctx.lineTo(13, -42);
+  ctx.lineTo(14, -38.5);
+  ctx.lineTo(-14, -38.5);
+  ctx.closePath();
+  ctx.fill();
+  clearShadow();
+
+  // Red taillight strip
+  if (braking) {
+    ctx.shadowColor = "#FF1744";
+    ctx.shadowBlur = 16;
+  }
+  const rl = ctx.createLinearGradient(-14, 0, 14, 0);
+  rl.addColorStop(0, braking ? "#FF5252" : "#B71C1C");
+  rl.addColorStop(0.5, braking ? "#FF8A80" : "#FF1744");
+  rl.addColorStop(1, braking ? "#FF5252" : "#B71C1C");
+  ctx.fillStyle = rl;
+  ctx.beginPath();
+  ctx.moveTo(-14, 34);
+  ctx.lineTo(14, 34);
+  ctx.lineTo(13, 39);
+  ctx.lineTo(-13, 39);
+  ctx.closePath();
+  ctx.fill();
+  clearShadow();
+
+  // Turn signals (angular)
+  if (turnL && blink) {
+    ctx.fillStyle = "#FFB300";
+    ctx.shadowColor = "#FFB300";
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(-21, -30); ctx.lineTo(-14, -42); ctx.lineTo(-14, -36); ctx.closePath();
+    ctx.fill();
+    clearShadow();
+  }
+  if (turnR && blink) {
+    ctx.fillStyle = "#FFB300";
+    ctx.shadowColor = "#FFB300";
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(21, -30); ctx.lineTo(14, -42); ctx.lineTo(14, -36); ctx.closePath();
+    ctx.fill();
+    clearShadow();
+  }
+
+  // Side mirrors — sharp stubs
+  softShadow(3, 0.15);
+  ctx.fillStyle = "#CFD8DC";
+  ctx.beginPath();
+  ctx.moveTo(-28, -12); ctx.lineTo(-20, -14); ctx.lineTo(-20, -6); ctx.lineTo(-28, -8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(28, -12); ctx.lineTo(20, -14); ctx.lineTo(20, -6); ctx.lineTo(28, -8);
+  ctx.closePath();
+  ctx.fill();
+  clearShadow();
+
+  // Sensor ridge
+  ctx.fillStyle = "#78909C";
+  ctx.beginPath();
+  ctx.moveTo(-3, -40); ctx.lineTo(3, -40); ctx.lineTo(2, -36); ctx.lineTo(-2, -36);
+  ctx.closePath();
+  ctx.fill();
+
+  drawFlexPlate(18);
+
+  // Outer hard edge
+  ctx.strokeStyle = "rgba(0,0,0,0.16)";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(-12, -44);
+  ctx.lineTo(12, -44);
+  ctx.lineTo(21, -28);
+  ctx.lineTo(22, 30);
+  ctx.lineTo(14, 44);
+  ctx.lineTo(-14, 44);
+  ctx.lineTo(-22, 30);
+  ctx.lineTo(-21, -28);
+  ctx.closePath();
+  ctx.stroke();
+}
+
+/** Top-down vehicle preview for garage cards (no FSD/spin) */
+function drawVehiclePreview(id, x, y, sc = 0.95) {
+  const prev = VEHICLE;
+  VEHICLE = id;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+  // Mini shadow
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.beginPath();
+  ctx.ellipse(0, 40, 22, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (id === "cyberflex") {
+    drawWheel(-23, -18, false, 0.4);
+    drawWheel(23, -18, true, 0.4);
+    drawWheel(-23, 24, false, 0.4);
+    drawWheel(23, 24, true, 0.4);
+    drawCarBodyCyber(false, false, false, false, false);
+  } else {
+    drawWheel(-22.5, -20, false, 0.3);
+    drawWheel(22.5, -20, true, 0.3);
+    drawWheel(-22.5, 22, false, 0.3);
+    drawWheel(22.5, 22, true, 0.3);
+    drawCarBodyFlex(false, false, false, false, false);
+  }
   ctx.restore();
-  // FSD timer lives in the bottom control dock (never on the car)
+  VEHICLE = prev;
 }
 
 function drawParticles() {
@@ -6684,9 +6981,9 @@ function drawTitle() {
   // ── START ROUTE ──
   const startY = dy + 188;
   btn("play", W / 2 - 132, startY, 264, 56, "START ROUTE", "primary");
-  // Microtext under start (drawn after button)
-  // ── How to Play ──
-  btn("howto", W / 2 - 110, startY + 72, 220, 42, "How to Play", "secondary");
+  // Garage + How to Play (side-by-side secondary)
+  btn("garage", W / 2 - 132, startY + 70, 126, 42, "Garage", "secondary");
+  btn("howto", W / 2 + 6, startY + 70, 126, 42, "How to Play", "secondary");
 
   for (const b of UI.buttons) {
     if (b.label) drawBtn(b);
@@ -6695,12 +6992,124 @@ function drawTitle() {
   ctx.fillStyle = "rgba(255,255,255,0.45)";
   ctx.font = "bold 10px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("LET'S FLEX", W / 2, startY + 64);
+  ctx.fillText("LET'S FLEX · " + currentVehicle().name, W / 2, startY + 64);
 
   // Bottom tip
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.font = "11px system-ui";
   ctx.fillText(tipOfDay(), W / 2, py + ph - 18);
+}
+
+// ═══════════════════════════════════════════════════════════
+// GARAGE — Choose Your Ride
+// ═══════════════════════════════════════════════════════════
+function drawGarage() {
+  // Same high-energy dark panel language as title
+  const vig = ctx.createRadialGradient(W / 2, H * 0.4, 40, W / 2, H * 0.5, H * 0.78);
+  vig.addColorStop(0, "rgba(5,12,28,0.18)");
+  vig.addColorStop(0.55, "rgba(5,12,28,0.5)");
+  vig.addColorStop(1, "rgba(4,8,18,0.82)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  const px = 16, py = 28, pw = W - 32, ph = H - 52;
+  drawMenuPanel(px, py, pw, ph, "rgba(255,153,0,0.55)");
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#FF9900";
+  ctx.font = "bold 11px system-ui";
+  ctx.fillText("GARAGE", W / 2, py + 28);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 26px system-ui";
+  ctx.shadowColor = "rgba(255,153,0,0.5)";
+  ctx.shadowBlur = 14;
+  ctx.fillText("CHOOSE YOUR RIDE", W / 2, py + 58);
+  clearShadow();
+
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = "12px system-ui";
+  ctx.fillText("Pick your Flex. HOA won’t know what hit them.", W / 2, py + 80);
+
+  UI.buttons = [];
+  const cardW = 156, cardH = 280, gap = 12;
+  const cards = [
+    { id: "flex", btn: "vehicle_flex" },
+    { id: "cyberflex", btn: "vehicle_cyberflex" },
+  ];
+  const totalW = cardW * 2 + gap;
+  let cx0 = W / 2 - totalW / 2;
+  const cardY = py + 100;
+
+  for (let i = 0; i < cards.length; i++) {
+    const v = VEHICLES[cards[i].id];
+    const sel = VEHICLE === cards[i].id;
+    const cx = cx0 + i * (cardW + gap);
+    const cy = cardY;
+
+    // Card shell
+    if (sel) {
+      ctx.shadowColor = "rgba(255,109,0,0.75)";
+      ctx.shadowBlur = 18;
+    } else {
+      softShadow(10, 0.2);
+    }
+    ctx.fillStyle = sel ? "rgba(255,109,0,0.12)" : "rgba(0,0,0,0.28)";
+    roundRect(cx, cy, cardW, cardH, 16);
+    ctx.fill();
+    clearShadow();
+    ctx.strokeStyle = sel ? "#FF6D00" : "rgba(255,255,255,0.12)";
+    ctx.lineWidth = sel ? 2.8 : 1.2;
+    if (sel) {
+      ctx.shadowColor = "rgba(255,153,0,0.55)";
+      ctx.shadowBlur = 10;
+    }
+    roundRect(cx + 0.5, cy + 0.5, cardW - 1, cardH - 1, 15.5);
+    ctx.stroke();
+    clearShadow();
+
+    // SELECTED badge
+    if (sel) {
+      ctx.fillStyle = "#FF6D00";
+      ctx.shadowColor = "rgba(255,109,0,0.6)";
+      ctx.shadowBlur = 8;
+      roundRect(cx + cardW / 2 - 40, cy + 10, 80, 20, 10);
+      ctx.fill();
+      clearShadow();
+      ctx.fillStyle = "#1A0800";
+      ctx.font = "bold 10px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("SELECTED", cx + cardW / 2, cy + 24);
+    }
+
+    // Vehicle top-down preview
+    drawVehiclePreview(cards[i].id, cx + cardW / 2, cy + 130, 0.92);
+
+    // Name + tagline
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 15px system-ui";
+    ctx.fillText(v.name, cx + cardW / 2, cy + cardH - 48);
+    ctx.fillStyle = sel ? "#FFB74D" : "rgba(255,255,255,0.55)";
+    ctx.font = "12px system-ui";
+    ctx.fillText(v.tag, cx + cardW / 2, cy + cardH - 28);
+
+    btn(cards[i].btn, cx, cy, cardW, cardH, "", "secondary");
+  }
+
+  // CONFIRM + Back
+  const confY = py + ph - 118;
+  btn("confirm_ride", W / 2 - 132, confY, 264, 54, "CONFIRM RIDE", "primary");
+  btn("back", W / 2 - 90, confY + 64, 180, 40, "Back", "secondary");
+
+  for (const b of UI.buttons) {
+    if (b.label) drawBtn(b);
+  }
+
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.font = "10px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("Tip: press V anytime to swap rides", W / 2, py + ph - 14);
 }
 
 function drawHowTo() {
@@ -6881,13 +7290,15 @@ function drawPause() {
   UI.buttons = [];
   const bw = 268, bx = W / 2 - bw / 2;
   let by = py + 142;
-  btn("resume", bx, by, bw, 58, "RESUME ROUTE", "primary");
-  by += 74;
-  btn("restart", bx, by, bw, 50, "Restart Route", "secondary");
-  by += 62;
-  btn("change_music", bx, by, bw, 50, "Change Music  ♪ " + (RADIO[station]?.name || ""), "secondary");
-  by += 62;
-  btn("menu", bx, by, bw, 50, "Quit to Menu", "secondary");
+  btn("resume", bx, by, bw, 56, "RESUME ROUTE", "primary");
+  by += 68;
+  btn("restart", bx, by, bw, 46, "Restart Route", "secondary");
+  by += 56;
+  btn("change_music", bx, by, bw, 46, "Change Music  ♪ " + (RADIO[station]?.name || ""), "secondary");
+  by += 56;
+  btn("swap_ride", bx, by, bw, 46, "Swap Ride · " + currentVehicle().name, "secondary");
+  by += 56;
+  btn("menu", bx, by, bw, 46, "Quit to Menu", "secondary");
 
   for (const b of UI.buttons) if (b.label) drawBtn(b);
 }
