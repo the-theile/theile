@@ -210,10 +210,10 @@ function loadMeta() {
   try {
     return Object.assign({
       highScore: 0, bestStreak: 0, games: 0, totalDrops: 0,
-      achievements: {}, station: "house", coachSeen: false, colorTipSeen: false, difficulty: "easy",
+      achievements: {}, station: "dnb", coachSeen: false, colorTipSeen: false, difficulty: "hard",
     }, JSON.parse(localStorage.getItem(LS_KEY) || "{}"));
   } catch {
-    return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "house", coachSeen: false, colorTipSeen: false, difficulty: "easy" };
+    return { highScore: 0, bestStreak: 0, games: 0, totalDrops: 0, achievements: {}, station: "dnb", coachSeen: false, colorTipSeen: false, difficulty: "hard" };
   }
 }
 function saveMeta(m) {
@@ -260,7 +260,7 @@ const RADIO = {
   techno: { id: "techno", name: "Techno", bpm: 132, tag: "Warehouse night run", color: "#69F0AE", silent: false },
   silent: { id: "silent", name: "Silent", bpm: 0,   tag: "Quiet night ride",      color: "#90A4AE", silent: true },
 };
-let station = (META.station && RADIO[META.station]) ? META.station : "house";
+let station = (META.station && RADIO[META.station]) ? META.station : "dnb";
 
 // Music scheduler state
 const music = {
@@ -5360,7 +5360,7 @@ function panel(x, y, w, h) {
 }
 function drawBtn(b) {
   // Juicy Rave Flex buttons — bounce, glow, diagonal shine
-  const pulse = b.style === "primary" ? 1 + Math.sin(now() / 260) * 0.018 : 1;
+  const pulse = b.style === "primary" ? 1 + Math.sin(now() / 240) * 0.028 : 1;
   const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
   const r = b.h > 50 ? 18 : 14;
   ctx.save();
@@ -5368,15 +5368,16 @@ function drawBtn(b) {
   ctx.scale(pulse, pulse);
   ctx.translate(-cx, -cy);
   if (b.style === "primary") {
-    ctx.shadowColor = "rgba(255,109,0,0.55)";
-    ctx.shadowBlur = 18;
+    ctx.shadowColor = "rgba(255,109,0,0.72)";
+    ctx.shadowBlur = 26;
   } else {
     softShadow(6, 0.16);
   }
   const g = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
   if (b.style === "primary") {
-    g.addColorStop(0, "#FFD54F");
-    g.addColorStop(0.4, "#FF9800");
+    g.addColorStop(0, "#FFE082");
+    g.addColorStop(0.35, "#FF9800");
+    g.addColorStop(0.75, "#FF5722");
     g.addColorStop(1, "#E53935");
   } else if (b.style === "danger") {
     g.addColorStop(0, "#EF9A9A");
@@ -5394,21 +5395,21 @@ function drawBtn(b) {
   clearShadow();
   // Shine sweep on primary
   if (b.style === "primary") {
-    const shine = ((now() / 1400) % 1);
+    const shine = ((now() / 1200) % 1);
     ctx.save();
     ctx.beginPath();
     roundRect(b.x, b.y, b.w, b.h, r);
     ctx.clip();
     const sx = b.x - 40 + shine * (b.w + 80);
-    const sg = ctx.createLinearGradient(sx, b.y, sx + 50, b.y + b.h);
+    const sg = ctx.createLinearGradient(sx, b.y, sx + 56, b.y + b.h);
     sg.addColorStop(0, "rgba(255,255,255,0)");
-    sg.addColorStop(0.5, "rgba(255,255,255,0.35)");
+    sg.addColorStop(0.5, "rgba(255,255,255,0.42)");
     sg.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = sg;
-    ctx.fillRect(sx, b.y, 50, b.h);
+    ctx.fillRect(sx, b.y, 56, b.h);
     ctx.restore();
-    ctx.strokeStyle = "rgba(255,255,255,0.5)";
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(255,255,255,0.58)";
+    ctx.lineWidth = 1.8;
     roundRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, r - 1);
     ctx.stroke();
   } else {
@@ -6099,9 +6100,9 @@ function drawCarRadio(cx, top, stations, opts = {}) {
     ? "Silent · SFX only"
     : (st ? (st.name + " " + (st.bpm || "") + " BPM") : "—");
   ctx.fillStyle = "#00E5FF";
-  ctx.font = "bold 14px system-ui";
-  ctx.shadowColor = "rgba(0,229,255,0.55)";
-  ctx.shadowBlur = 8;
+  ctx.font = "bold 15px system-ui";
+  ctx.shadowColor = "rgba(0,229,255,0.75)";
+  ctx.shadowBlur = 12;
   ctx.fillText(track, cx, ry + 40);
   clearShadow();
 
@@ -6111,8 +6112,8 @@ function drawCarRadio(cx, top, stations, opts = {}) {
     const on = stations[i] === station;
     ctx.beginPath();
     ctx.fillStyle = on ? "#00E5FF" : "rgba(255,255,255,0.18)";
-    if (on) { ctx.shadowColor = "#00E5FF"; ctx.shadowBlur = 8; }
-    ctx.arc(dx + i * 16, ry + 54, on ? 4 : 3, 0, Math.PI * 2);
+    if (on) { ctx.shadowColor = "#00E5FF"; ctx.shadowBlur = 10; }
+    ctx.arc(dx + i * 16, ry + 54, on ? 4.5 : 3, 0, Math.PI * 2);
     ctx.fill();
     clearShadow();
   }
@@ -6125,19 +6126,24 @@ function drawCarRadio(cx, top, stations, opts = {}) {
     const r = RADIO[id];
     const sel = station === id;
     if (sel) {
-      ctx.shadowColor = "rgba(0,229,255,0.55)";
-      ctx.shadowBlur = 10;
+      ctx.shadowColor = "rgba(0,229,255,0.85)";
+      ctx.shadowBlur = 16;
     }
-    ctx.fillStyle = sel ? "rgba(0,229,255,0.18)" : "rgba(255,255,255,0.06)";
+    ctx.fillStyle = sel ? "rgba(0,229,255,0.28)" : "rgba(255,255,255,0.06)";
     roundRect(bx, by, bw, 28, 10);
     ctx.fill();
     clearShadow();
     ctx.strokeStyle = sel ? "#00E5FF" : "rgba(255,255,255,0.12)";
-    ctx.lineWidth = sel ? 2 : 1;
+    ctx.lineWidth = sel ? 2.8 : 1;
+    if (sel) {
+      ctx.shadowColor = "rgba(0,229,255,0.7)";
+      ctx.shadowBlur = 10;
+    }
     roundRect(bx + 0.5, by + 0.5, bw - 1, 27, 9.5);
     ctx.stroke();
+    clearShadow();
     ctx.fillStyle = sel ? "#00E5FF" : "rgba(255,255,255,0.7)";
-    ctx.font = "bold 10px system-ui";
+    ctx.font = sel ? "bold 11px system-ui" : "bold 10px system-ui";
     ctx.textAlign = "center";
     ctx.fillText(r.name, bx + bw / 2, by + 18);
     btn("radio_" + id, bx, by, bw, 28, "", "secondary");
@@ -6189,53 +6195,158 @@ function pauseFlavor() {
   return PAUSE_FLAVOR[Math.floor(now() / 7000) % PAUSE_FLAVOR.length];
 }
 
-/** Mini white FLEX van + flying package for title wordmark */
+/** White Tesla-style delivery van at 3/4 + flying package for title wordmark */
 function drawTitleVanIcon(x, y, sc = 1) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(sc, sc);
-  // Orange glow
+
+  // Subtle orange speed lines behind the van
+  ctx.strokeStyle = "rgba(255,153,0,0.5)";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i++) {
+    const oy = -8 + i * 5.5 + Math.sin(now() / 200 + i) * 1.2;
+    ctx.globalAlpha = 0.35 + i * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(-34 - i * 5, oy);
+    ctx.lineTo(-20 - i * 2.5, oy);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Soft orange plate glow
   ctx.shadowColor = "rgba(255,153,0,0.55)";
-  ctx.shadowBlur = 14;
+  ctx.shadowBlur = 16;
+
+  // --- 3/4 delivery van (rear-left → front-right) ---
+  // Cargo body (main box)
   ctx.fillStyle = "#F5F5F5";
-  roundRect(-16, -10, 32, 22, 5);
+  ctx.beginPath();
+  ctx.moveTo(-18, -4);
+  ctx.lineTo(6, -8);
+  ctx.lineTo(10, 10);
+  ctx.lineTo(-14, 14);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cab (front)
+  ctx.beginPath();
+  ctx.moveTo(6, -8);
+  ctx.lineTo(16, -4);
+  ctx.lineTo(18, 8);
+  ctx.lineTo(10, 10);
+  ctx.closePath();
   ctx.fill();
   clearShadow();
+
+  // Roof lip highlight
+  ctx.strokeStyle = "rgba(255,255,255,0.85)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-17, -3.5);
+  ctx.lineTo(5.5, -7.5);
+  ctx.lineTo(15.5, -3.8);
+  ctx.stroke();
+
+  // Windshield (dark glass)
   ctx.fillStyle = "#1A2A3A";
-  roundRect(-12, -6, 18, 10, 2);
+  ctx.beginPath();
+  ctx.moveTo(7, -5.5);
+  ctx.lineTo(14.5, -2.5);
+  ctx.lineTo(15.2, 2);
+  ctx.lineTo(8, 0.5);
+  ctx.closePath();
   ctx.fill();
+
+  // Side window strip
+  ctx.fillStyle = "#243447";
+  ctx.beginPath();
+  ctx.moveTo(-8, -2);
+  ctx.lineTo(4, -5);
+  ctx.lineTo(5, -1);
+  ctx.lineTo(-7, 1.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cyan light bar (Tesla-style LED)
   ctx.fillStyle = "#00E5FF";
-  roundRect(-12, -8, 18, 3, 1);
+  ctx.shadowColor = "rgba(0,229,255,0.7)";
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  ctx.moveTo(7.2, -5.8);
+  ctx.lineTo(14.8, -2.8);
+  ctx.lineTo(14.6, -1.6);
+  ctx.lineTo(7, -4.6);
+  ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "#FF9900";
-  roundRect(-8, 6, 10, 3, 1);
+  clearShadow();
+
+  // Rear door seam
+  ctx.strokeStyle = "rgba(0,0,0,0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-16, -2);
+  ctx.lineTo(-12, 12);
+  ctx.stroke();
+
+  // Wheels
+  ctx.fillStyle = "#1A1A1A";
+  ctx.beginPath();
+  ctx.ellipse(-8, 13, 4.5, 3.2, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Package flying off roof
+  ctx.beginPath();
+  ctx.ellipse(8, 10.5, 4.5, 3.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#455A64";
+  ctx.beginPath();
+  ctx.ellipse(-8, 13, 2, 1.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(8, 10.5, 2, 1.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Orange underglow accent
+  ctx.fillStyle = "rgba(255,153,0,0.45)";
+  ctx.beginPath();
+  ctx.ellipse(0, 14, 14, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Package flying off roof + motion lines
   const bob = Math.sin(now() / 180) * 3;
+  const pkgX = 12, pkgY = -18 + bob;
+  // Motion lines on package trail
+  ctx.strokeStyle = "rgba(255,200,80,0.65)";
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(pkgX - 10 - i * 3, pkgY + 4 + i * 2);
+    ctx.lineTo(pkgX - 3 - i, pkgY + 2 + i);
+    ctx.stroke();
+  }
   ctx.save();
-  ctx.translate(14, -16 + bob);
-  ctx.rotate(-0.35 + Math.sin(now() / 220) * 0.1);
+  ctx.translate(pkgX, pkgY);
+  ctx.rotate(-0.4 + Math.sin(now() / 220) * 0.12);
+  ctx.shadowColor = "rgba(255,153,0,0.5)";
+  ctx.shadowBlur = 8;
   ctx.fillStyle = "#FF9900";
   roundRect(-6, -5, 12, 10, 2);
   ctx.fill();
+  clearShadow();
   ctx.strokeStyle = "#1A1A1A";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, -5); ctx.lineTo(0, 5);
   ctx.moveTo(-6, 0); ctx.lineTo(6, 0);
   ctx.stroke();
+  // Tape highlight
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.beginPath();
+  ctx.moveTo(-5, 0); ctx.lineTo(5, 0);
+  ctx.stroke();
   ctx.restore();
-  // Speed lines
-  ctx.strokeStyle = "rgba(255,153,0,0.55)";
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  for (let i = 0; i < 3; i++) {
-    const oy = -6 + i * 6 + Math.sin(now() / 200 + i) * 1;
-    ctx.beginPath();
-    ctx.moveTo(-28 - i * 4, oy);
-    ctx.lineTo(-18 - i * 2, oy);
-    ctx.stroke();
-  }
+
   ctx.restore();
 }
 
@@ -6271,7 +6382,7 @@ function drawTitle() {
 
   // Speed-line motion behind wordmark
   ctx.save();
-  ctx.globalAlpha = 0.35;
+  ctx.globalAlpha = 0.4;
   ctx.strokeStyle = "#FF6D00";
   ctx.lineWidth = 2.5;
   ctx.lineCap = "round";
@@ -6287,14 +6398,19 @@ function drawTitle() {
   ctx.restore();
 
   const bounce = Math.sin(now() / 280) * 1.5;
+  // Outer glow pass for presence
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 34px system-ui";
-  ctx.shadowColor = "rgba(255,153,0,0.35)";
-  ctx.shadowBlur = 12;
+  ctx.font = "bold 36px system-ui";
+  ctx.shadowColor = "rgba(255,153,0,0.55)";
+  ctx.shadowBlur = 22;
+  ctx.fillText("TesFlexer", W / 2 + 8, py + 62 + bounce);
+  // Tight core glow
+  ctx.shadowColor = "rgba(255,200,80,0.45)";
+  ctx.shadowBlur = 10;
   ctx.fillText("TesFlexer", W / 2 + 8, py + 62 + bounce);
   clearShadow();
 
-  drawTitleVanIcon(W / 2 - 118, py + 52 + bounce, 1.05);
+  drawTitleVanIcon(W / 2 - 122, py + 52 + bounce, 1.12);
 
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.font = "13px system-ui";
@@ -6319,7 +6435,7 @@ function drawTitle() {
 
   UI.buttons = [];
 
-  // ── Difficulty ──
+  // ── Difficulty (Hard = default high-energy emphasis) ──
   const dY = pY + 48;
   ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.font = "bold 12px system-ui";
@@ -6330,32 +6446,47 @@ function drawTitle() {
   for (const mode of ["easy", "hard"]) {
     const sel = DIFF_MODE === mode;
     if (sel) {
-      ctx.shadowColor = mode === "easy" ? "rgba(105,240,174,0.55)" : "rgba(255,87,34,0.6)";
-      ctx.shadowBlur = 16;
+      if (mode === "hard") {
+        ctx.shadowColor = "rgba(255,61,0,0.85)";
+        ctx.shadowBlur = 24;
+      } else {
+        ctx.shadowColor = "rgba(105,240,174,0.32)";
+        ctx.shadowBlur = 10;
+      }
     }
     const mg = ctx.createLinearGradient(dx, dy, dx, dy + 52);
     if (mode === "easy") {
-      mg.addColorStop(0, sel ? "#B9F6CA" : "rgba(255,255,255,0.08)");
-      mg.addColorStop(1, sel ? "#00E676" : "rgba(255,255,255,0.04)");
+      // Soft green — available but less emphasized
+      mg.addColorStop(0, sel ? "rgba(185,246,202,0.72)" : "rgba(255,255,255,0.08)");
+      mg.addColorStop(1, sel ? "rgba(0,200,120,0.55)" : "rgba(255,255,255,0.04)");
     } else {
-      mg.addColorStop(0, sel ? "#FFAB40" : "rgba(255,255,255,0.08)");
-      mg.addColorStop(1, sel ? "#FF3D00" : "rgba(255,255,255,0.04)");
+      // Strong orange-red glow/fill when selected (default)
+      mg.addColorStop(0, sel ? "#FFB74D" : "rgba(255,255,255,0.08)");
+      mg.addColorStop(0.45, sel ? "#FF6D00" : "rgba(255,255,255,0.06)");
+      mg.addColorStop(1, sel ? "#FF1744" : "rgba(255,255,255,0.04)");
     }
     ctx.fillStyle = mg;
     roundRect(dx, dy, dw, 52, 14);
     ctx.fill();
     clearShadow();
     if (sel) {
-      ctx.strokeStyle = mode === "easy" ? "#69F0AE" : "#FF6E40";
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = mode === "easy" ? "rgba(105,240,174,0.65)" : "#FF6E40";
+      ctx.lineWidth = mode === "hard" ? 3 : 1.8;
+      if (mode === "hard") {
+        ctx.shadowColor = "rgba(255,87,34,0.65)";
+        ctx.shadowBlur = 12;
+      }
       roundRect(dx + 1, dy + 1, dw - 2, 50, 13);
       ctx.stroke();
+      clearShadow();
     }
-    ctx.fillStyle = sel ? "#0A1208" : "rgba(255,255,255,0.85)";
-    ctx.font = "bold 17px system-ui";
+    ctx.fillStyle = sel
+      ? (mode === "hard" ? "#1A0800" : "rgba(10,24,16,0.85)")
+      : "rgba(255,255,255,0.85)";
+    ctx.font = mode === "hard" && sel ? "bold 18px system-ui" : "bold 17px system-ui";
     ctx.fillText(mode === "easy" ? "Easy" : "Hard", dx + dw / 2, dy + 22);
     ctx.font = "11px system-ui";
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = mode === "easy" ? 0.72 : 0.9;
     ctx.fillText(mode === "easy" ? "Chill vibes" : "Spicy chaos 🔥", dx + dw / 2, dy + 40);
     ctx.globalAlpha = 1;
     btn("diff_" + mode, dx, dy, dw, 52, "", "secondary");
