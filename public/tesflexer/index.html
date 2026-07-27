@@ -5714,33 +5714,401 @@ function drawCarBodyCyber(flash, braking, turnL, turnR, blink) {
   ctx.stroke();
 }
 
-/** Top-down vehicle preview for garage cards (no FSD/spin) */
-function drawVehiclePreview(id, x, y, sc = 0.95) {
-  const prev = VEHICLE;
-  VEHICLE = id;
+/**
+ * Garage card vehicle art only — higher-detail showcase top-downs.
+ * (Gameplay cars still use drawCarBodyFlex / drawCarBodyCyber.)
+ */
+function drawVehiclePreview(id, x, y, sc = 1) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(sc, sc);
-  // Mini shadow
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  // Soft ground shadow
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
   ctx.beginPath();
-  ctx.ellipse(0, 40, 22, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 46, 26, 8, 0, 0, Math.PI * 2);
   ctx.fill();
-  if (id === "cyberflex") {
-    drawWheel(-23, -18, false, 0.4);
-    drawWheel(23, -18, true, 0.4);
-    drawWheel(-23, 24, false, 0.4);
-    drawWheel(23, 24, true, 0.4);
-    drawCarBodyCyber(false, false, false, false, false);
-  } else {
-    drawWheel(-22.5, -20, false, 0.3);
-    drawWheel(22.5, -20, true, 0.3);
-    drawWheel(-22.5, 22, false, 0.3);
-    drawWheel(22.5, 22, true, 0.3);
-    drawCarBodyFlex(false, false, false, false, false);
-  }
+  if (id === "cyberflex") drawGarageCyberArt();
+  else drawGarageFlexArt();
   ctx.restore();
-  VEHICLE = prev;
+}
+
+/** Model Flex — polished Tesla-style crossover for garage cards */
+function drawGarageFlexArt() {
+  // Wheels
+  for (const [wx, wy] of [[-24, -22], [24, -22], [-24, 24], [24, 24]]) {
+    ctx.fillStyle = "#111";
+    roundRect(wx - 5, wy - 11, 10, 22, 4);
+    ctx.fill();
+    const rim = ctx.createLinearGradient(wx - 3, wy - 8, wx + 3, wy + 8);
+    rim.addColorStop(0, "#CFD8DC");
+    rim.addColorStop(1, "#607D8B");
+    ctx.fillStyle = rim;
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, 3.4, 7.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#37474F";
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, 1.5, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Pearl body — proper crossover proportions (slightly wider cabin)
+  const body = ctx.createLinearGradient(-22, -48, 22, 48);
+  body.addColorStop(0, "#FFFFFF");
+  body.addColorStop(0.35, "#F7F7F7");
+  body.addColorStop(0.7, "#ECECEC");
+  body.addColorStop(1, "#D6D6D6");
+  ctx.fillStyle = body;
+  softShadow(12, 0.2);
+  roundRect(-22, -46, 44, 92, 16);
+  ctx.fill();
+  clearShadow();
+
+  // Orange side accent stripes (clean dual stripe)
+  ctx.fillStyle = "#FF6D00";
+  roundRect(-21.5, -20, 3.6, 40, 1.5);
+  ctx.fill();
+  roundRect(17.9, -20, 3.6, 40, 1.5);
+  ctx.fill();
+  ctx.fillStyle = "#FFB74D";
+  roundRect(-21, -17, 1.6, 32, 1);
+  ctx.fill();
+  roundRect(19.4, -17, 1.6, 32, 1);
+  ctx.fill();
+
+  // Body highlight / shade
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  roundRect(5, -40, 11, 70, 7);
+  ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.05)";
+  roundRect(-22, -46, 9, 92, 14);
+  ctx.fill();
+
+  // Door seams
+  ctx.strokeStyle = "rgba(0,0,0,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-18, -6); ctx.lineTo(18, -6);
+  ctx.moveTo(-18, 10); ctx.lineTo(18, 10);
+  ctx.stroke();
+
+  // Wheel arches
+  ctx.fillStyle = "rgba(0,0,0,0.1)";
+  for (const [ax, ay] of [[-22, -22], [22, -22], [-22, 24], [22, 24]]) {
+    ctx.beginPath();
+    ctx.ellipse(ax, ay, 4, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Clear panoramic windshield / glasshouse
+  const glass = ctx.createLinearGradient(-16, -32, 16, 12);
+  glass.addColorStop(0, "#0B1524");
+  glass.addColorStop(0.4, "#1A2F45");
+  glass.addColorStop(0.75, "#2E4A62");
+  glass.addColorStop(1, "#3D5A73");
+  ctx.fillStyle = glass;
+  roundRect(-16, -32, 32, 44, 10);
+  ctx.fill();
+  // Sky reflection
+  ctx.fillStyle = "rgba(129,212,250,0.38)";
+  roundRect(-13, -29, 10, 34, 6);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  roundRect(2, -28, 8, 16, 4);
+  ctx.fill();
+  // Pillar line
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1.2;
+  roundRect(-16, -32, 32, 44, 10);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, -30); ctx.lineTo(0, 10);
+  ctx.stroke();
+
+  // Rear deck
+  const deck = ctx.createLinearGradient(0, 14, 0, 36);
+  deck.addColorStop(0, "#F5F5F5");
+  deck.addColorStop(1, "#DEDEDE");
+  ctx.fillStyle = deck;
+  roundRect(-14, 14, 28, 18, 5);
+  ctx.fill();
+
+  // Front LED light bar
+  const fl = ctx.createLinearGradient(-16, 0, 16, 0);
+  fl.addColorStop(0, "#4FC3F7");
+  fl.addColorStop(0.35, "#FFFFFF");
+  fl.addColorStop(0.65, "#E1F5FE");
+  fl.addColorStop(1, "#4FC3F7");
+  ctx.fillStyle = fl;
+  ctx.shadowColor = "rgba(129,212,250,0.55)";
+  ctx.shadowBlur = 8;
+  roundRect(-16, -44, 32, 4.5, 2);
+  ctx.fill();
+  clearShadow();
+  // Amber DRLs
+  ctx.fillStyle = "#FFB74D";
+  roundRect(-16, -43.5, 3.5, 3.5, 1);
+  ctx.fill();
+  roundRect(12.5, -43.5, 3.5, 3.5, 1);
+  ctx.fill();
+
+  // Red continuous taillight bar
+  const tl = ctx.createLinearGradient(-14, 0, 14, 0);
+  tl.addColorStop(0, "#B71C1C");
+  tl.addColorStop(0.5, "#FF1744");
+  tl.addColorStop(1, "#B71C1C");
+  ctx.fillStyle = tl;
+  ctx.shadowColor = "rgba(255,23,68,0.45)";
+  ctx.shadowBlur = 8;
+  roundRect(-14, 36, 28, 4.5, 2);
+  ctx.fill();
+  clearShadow();
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillRect(-3, 37, 6, 1.6);
+
+  // Side mirrors
+  softShadow(3, 0.14);
+  ctx.fillStyle = "#FAFAFA";
+  roundRect(-30, -10, 9, 6, 2);
+  ctx.fill();
+  roundRect(21, -10, 9, 6, 2);
+  ctx.fill();
+  clearShadow();
+  ctx.fillStyle = "#1A2A3A";
+  roundRect(-28.5, -8.5, 5, 3, 1);
+  ctx.fill();
+  roundRect(23.5, -8.5, 5, 3, 1);
+  ctx.fill();
+
+  // Hood sensor
+  ctx.fillStyle = "#90A4AE";
+  ctx.beginPath();
+  ctx.arc(0, -40, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Black / yellow FLEX plate
+  softShadow(3, 0.12);
+  ctx.fillStyle = "#121212";
+  roundRect(-12, 18, 24, 10, 2);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = "#FFD600";
+  ctx.lineWidth = 1.6;
+  roundRect(-12, 18, 24, 10, 2);
+  ctx.stroke();
+  ctx.fillStyle = "#FFD600";
+  ctx.font = "bold 8px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("FLEX", 0, 25.5);
+
+  // Outline
+  ctx.strokeStyle = "rgba(0,0,0,0.1)";
+  ctx.lineWidth = 1.3;
+  roundRect(-22, -46, 44, 92, 16);
+  ctx.stroke();
+}
+
+/** CyberFlex — polished angular Cybertruck art for garage cards */
+function drawGarageCyberArt() {
+  // Angular wheels (blockier)
+  for (const [wx, wy] of [[-24, -20], [24, -20], [-24, 26], [24, 26]]) {
+    ctx.fillStyle = "#0D0D0D";
+    ctx.beginPath();
+    ctx.moveTo(wx - 5, wy - 11);
+    ctx.lineTo(wx + 5, wy - 11);
+    ctx.lineTo(wx + 5.5, wy + 11);
+    ctx.lineTo(wx - 5.5, wy + 11);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#78909C";
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, 3, 6.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#37474F";
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, 1.3, 2.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Stainless / white geometric hull
+  const body = ctx.createLinearGradient(-24, -48, 24, 48);
+  body.addColorStop(0, "#FAFBFC");
+  body.addColorStop(0.35, "#ECEFF1");
+  body.addColorStop(0.7, "#CFD8DC");
+  body.addColorStop(1, "#90A4AE");
+  ctx.fillStyle = body;
+  softShadow(12, 0.22);
+  ctx.beginPath();
+  // Aggressive wedge silhouette (top-down)
+  ctx.moveTo(-10, -48);  // nose L
+  ctx.lineTo(10, -48);   // nose R
+  ctx.lineTo(22, -26);   // front shoulder R
+  ctx.lineTo(24, 28);    // rear shoulder R
+  ctx.lineTo(12, 48);    // rear corner R
+  ctx.lineTo(-12, 48);   // rear corner L
+  ctx.lineTo(-24, 28);   // rear shoulder L
+  ctx.lineTo(-22, -26);  // front shoulder L
+  ctx.closePath();
+  ctx.fill();
+  clearShadow();
+
+  // Hard panel seams
+  ctx.strokeStyle = "rgba(0,0,0,0.16)";
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(-18, -10); ctx.lineTo(18, -10);
+  ctx.moveTo(-20, 12); ctx.lineTo(20, 12);
+  ctx.moveTo(-8, -48); ctx.lineTo(-16, 0); ctx.lineTo(-8, 48);
+  ctx.moveTo(8, -48); ctx.lineTo(16, 0); ctx.lineTo(8, 48);
+  ctx.stroke();
+
+  // Orange side armor rails
+  ctx.strokeStyle = "#FF6D00";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-21.5, -16); ctx.lineTo(-22.5, 18);
+  ctx.moveTo(21.5, -16); ctx.lineTo(22.5, 18);
+  ctx.stroke();
+  ctx.strokeStyle = "#FFD54F";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-19.5, -12); ctx.lineTo(-20.5, 14);
+  ctx.moveTo(19.5, -12); ctx.lineTo(20.5, 14);
+  ctx.stroke();
+
+  // Faceted glasshouse
+  const glass = ctx.createLinearGradient(-14, -34, 14, 12);
+  glass.addColorStop(0, "#0A1628");
+  glass.addColorStop(0.45, "#1B2A3D");
+  glass.addColorStop(1, "#3D5A73");
+  ctx.fillStyle = glass;
+  ctx.beginPath();
+  ctx.moveTo(-11, -34);
+  ctx.lineTo(11, -34);
+  ctx.lineTo(14, -6);
+  ctx.lineTo(9, 12);
+  ctx.lineTo(-9, 12);
+  ctx.lineTo(-14, -6);
+  ctx.closePath();
+  ctx.fill();
+  // Cyan edge reflection
+  ctx.fillStyle = "rgba(0,229,255,0.22)";
+  ctx.beginPath();
+  ctx.moveTo(-9, -32);
+  ctx.lineTo(-1, -32);
+  ctx.lineTo(-3, 8);
+  ctx.lineTo(-12, -4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-11, -34);
+  ctx.lineTo(11, -34);
+  ctx.lineTo(14, -6);
+  ctx.lineTo(9, 12);
+  ctx.lineTo(-9, 12);
+  ctx.lineTo(-14, -6);
+  ctx.closePath();
+  ctx.stroke();
+  // Center spine
+  ctx.beginPath();
+  ctx.moveTo(0, -33); ctx.lineTo(0, 10);
+  ctx.stroke();
+
+  // Rear cargo plane
+  ctx.fillStyle = "rgba(0,0,0,0.1)";
+  ctx.beginPath();
+  ctx.moveTo(-12, 16);
+  ctx.lineTo(12, 16);
+  ctx.lineTo(13, 32);
+  ctx.lineTo(-13, 32);
+  ctx.closePath();
+  ctx.fill();
+
+  // Thin aggressive front light strip
+  const fl = ctx.createLinearGradient(-14, 0, 14, 0);
+  fl.addColorStop(0, "#81D4FA");
+  fl.addColorStop(0.5, "#FFFFFF");
+  fl.addColorStop(1, "#81D4FA");
+  ctx.fillStyle = fl;
+  ctx.shadowColor = "rgba(129,212,250,0.5)";
+  ctx.shadowBlur = 7;
+  ctx.beginPath();
+  ctx.moveTo(-12, -46);
+  ctx.lineTo(12, -46);
+  ctx.lineTo(13.5, -42);
+  ctx.lineTo(-13.5, -42);
+  ctx.closePath();
+  ctx.fill();
+  clearShadow();
+
+  // Red taillight strip
+  const tl = ctx.createLinearGradient(-14, 0, 14, 0);
+  tl.addColorStop(0, "#B71C1C");
+  tl.addColorStop(0.5, "#FF1744");
+  tl.addColorStop(1, "#B71C1C");
+  ctx.fillStyle = tl;
+  ctx.shadowColor = "rgba(255,23,68,0.5)";
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(-13, 38);
+  ctx.lineTo(13, 38);
+  ctx.lineTo(12, 43);
+  ctx.lineTo(-12, 43);
+  ctx.closePath();
+  ctx.fill();
+  clearShadow();
+
+  // Angular mirrors
+  softShadow(3, 0.14);
+  ctx.fillStyle = "#CFD8DC";
+  ctx.beginPath();
+  ctx.moveTo(-30, -14); ctx.lineTo(-21, -16); ctx.lineTo(-21, -6); ctx.lineTo(-30, -8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(30, -14); ctx.lineTo(21, -16); ctx.lineTo(21, -6); ctx.lineTo(30, -8);
+  ctx.closePath();
+  ctx.fill();
+  clearShadow();
+
+  // Sensor ridge
+  ctx.fillStyle = "#607D8B";
+  ctx.beginPath();
+  ctx.moveTo(-3.5, -44); ctx.lineTo(3.5, -44); ctx.lineTo(2.5, -39); ctx.lineTo(-2.5, -39);
+  ctx.closePath();
+  ctx.fill();
+
+  // Black / yellow FLEX plate
+  softShadow(3, 0.12);
+  ctx.fillStyle = "#121212";
+  roundRect(-12, 20, 24, 10, 2);
+  ctx.fill();
+  clearShadow();
+  ctx.strokeStyle = "#FFD600";
+  ctx.lineWidth = 1.6;
+  roundRect(-12, 20, 24, 10, 2);
+  ctx.stroke();
+  ctx.fillStyle = "#FFD600";
+  ctx.font = "bold 8px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("FLEX", 0, 27.5);
+
+  // Outer hard edge
+  ctx.strokeStyle = "rgba(0,0,0,0.2)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-10, -48);
+  ctx.lineTo(10, -48);
+  ctx.lineTo(22, -26);
+  ctx.lineTo(24, 28);
+  ctx.lineTo(12, 48);
+  ctx.lineTo(-12, 48);
+  ctx.lineTo(-24, 28);
+  ctx.lineTo(-22, -26);
+  ctx.closePath();
+  ctx.stroke();
 }
 
 function drawParticles() {
@@ -7082,8 +7450,8 @@ function drawGarage() {
       ctx.fillText("SELECTED", cx + cardW / 2, cy + 24);
     }
 
-    // Vehicle top-down preview
-    drawVehiclePreview(cards[i].id, cx + cardW / 2, cy + 130, 0.92);
+    // Vehicle top-down preview (high-detail garage art)
+    drawVehiclePreview(cards[i].id, cx + cardW / 2, cy + 128, 0.88);
 
     // Name + tagline
     ctx.textAlign = "center";
