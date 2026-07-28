@@ -1004,8 +1004,41 @@
   const STORAGE_KEY = 'petSitterAdventure_v2';
   const FREE_STARTERS = { outfits: ['sweater'], accessories: ['bow', 'collar'] };
 
-  /* Image paths relative to this HTML file */
-  const IMG = {
+  /**
+   * Resolve asset URLs against the game folder.
+   * Important: on theile.me the page is often served as /pet-sitter-adventure
+   * (no trailing slash), so bare "dog.jpg" wrongly becomes /dog.jpg.
+   */
+  function assetBase() {
+    try {
+      let p = (window.location && window.location.pathname) || '/';
+      // file:// or .../index.html → directory of this file
+      if (/\.html?$/i.test(p)) p = p.replace(/[^/]+$/, '');
+      // clean URL without trailing slash: /pet-sitter-adventure → /pet-sitter-adventure/
+      else if (p !== '/' && !p.endsWith('/')) p = p + '/';
+      return p;
+    } catch (e) {
+      return './';
+    }
+  }
+  const ASSET_BASE = assetBase();
+  function assetUrl(file) {
+    if (!file) return ASSET_BASE + 'dog.jpg';
+    if (/^https?:\/\//i.test(file) || file.startsWith('data:')) return file;
+    if (file.startsWith('/')) {
+      // already root-absolute
+      return file;
+    }
+    // strip accidental public/ or ./ prefixes from older saves
+    const name = String(file)
+      .replace(/^\.\//, '')
+      .replace(/^public\/pet-sitter-adventure\//, '')
+      .replace(/^pet-sitter-adventure\//, '');
+    return ASSET_BASE + name;
+  }
+
+  /* Image filenames (resolved via assetUrl at use time) */
+  const IMG_FILES = {
     dog: 'dog.jpg',
     blackdog: 'blackdog.jpg',
     whitefluffydog: 'whitefluffydog.jpg',
@@ -1023,6 +1056,9 @@
     turtle: 'turtle.jpg',
     ferret: 'ferret.jpg',
   };
+  const IMG = Object.fromEntries(
+    Object.entries(IMG_FILES).map(([k, v]) => [k, assetUrl(v)])
+  );
 
   const ANIMALS = {
     cat: {
@@ -1521,14 +1557,15 @@
 
   function resolvePetImg(pet) {
     if (!pet) return IMG.dog;
-    if (pet.img) return pet.img;
+    // Prefer stored path but always normalize through assetUrl
+    if (pet.img) return assetUrl(pet.img);
     const a = ANIMALS[pet.type];
     if (!a) return IMG.dog;
     const breed = (a.breeds || []).find(b => b.id === pet.breed) || a.breeds[0];
-    if (!breed) return a.img || IMG.dog;
+    if (!breed) return assetUrl(a.img || IMG_FILES.dog);
     const colors = colorOptions(breed);
     const col = colors.find(c => c.id === pet.color);
-    return (col && col.img) || breed.img || a.img || IMG.dog;
+    return assetUrl((col && col.img) || breed.img || a.img || IMG_FILES.dog);
   }
 
   function pickBreed(type) {
@@ -1584,6 +1621,16 @@
       `<span class="pa-slot pa-clothes">${slots.clothes || ''}</span>` +
       `<span class="pa-slot pa-neck">${slots.neck || ''}</span>` +
       `<span class="pa-zzz">💤</span>`;
+
+    // If a saved path is stale, retry via type/breed resolution
+    const imgEl = actor.querySelector('.pa-body-img');
+    if (imgEl) {
+      imgEl.addEventListener('error', function onImgErr() {
+        imgEl.removeEventListener('error', onImgErr);
+        const fallback = assetUrl(IMG_FILES[pet.type] || IMG_FILES.dog);
+        if (imgEl.src.indexOf(fallback) === -1) imgEl.src = fallback;
+      });
+    }
 
     actor.addEventListener('click', () => {
       ensureAudio();
