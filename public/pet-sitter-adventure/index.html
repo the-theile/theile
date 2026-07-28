@@ -113,15 +113,36 @@
   .card-soft { background: linear-gradient(145deg, #FFF9FC, #F0F9FF); border: 3px solid #FFE4F0; }
 
   /* Welcome */
-  #screen-welcome { justify-content: center; align-items: center; text-align: center;
-    background: linear-gradient(165deg, #FFE0F0, #E3F2FD, #E8F5E9); }
-  .logo-pets { font-size: 2.8rem; letter-spacing: 4px; margin-bottom: 12px; animation: bounceSoft 2s ease-in-out infinite; }
+  #screen-welcome {
+    justify-content: center; align-items: center; text-align: center;
+    background: linear-gradient(165deg, #FFE0F0, #E3F2FD, #E8F5E9);
+    padding: 16px 16px 24px;
+  }
+  .welcome-hero {
+    width: min(92%, 340px);
+    aspect-ratio: 1248 / 832;
+    object-fit: cover;
+    border-radius: 22px;
+    border: 4px solid #fff;
+    box-shadow: 0 12px 28px rgba(255,107,157,0.28);
+    margin: 0 auto 14px;
+    display: block;
+    background: linear-gradient(145deg, #FFE0F0, #E3F2FD);
+  }
+  .logo-pets {
+    display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;
+    margin: 0 auto 12px; max-width: 320px;
+  }
+  .logo-pets img {
+    width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
+    border: 3px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+  }
   .welcome-title {
-    font-size: 1.8rem;
+    font-size: 1.75rem;
     background: linear-gradient(90deg, var(--pink), var(--purple), var(--sky));
     -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 8px;
   }
-  .welcome-blurb { color: var(--ink-soft); font-weight: 600; max-width: 290px; margin: 0 auto 22px; }
+  .welcome-blurb { color: var(--ink-soft); font-weight: 600; max-width: 300px; margin: 0 auto 18px; font-size: 0.95rem; }
 
   /* Home exterior */
   .home-hero { text-align: center; padding: 8px 0 4px; }
@@ -131,8 +152,8 @@
   }
   .home-sub { color: var(--ink-soft); font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; }
   .house-scene {
-    position: relative; margin: 6px auto 14px; width: 100%; max-width: 340px; aspect-ratio: 1.1;
-    background: linear-gradient(180deg, #87CEEB 0%, #B3E5FC 55%, #A5D6A7 55%, #81C784 100%);
+    position: relative; margin: 6px auto 10px; width: 100%; max-width: 340px; aspect-ratio: 1.15;
+    background: linear-gradient(180deg, #87CEEB 0%, #B3E5FC 52%, #A5D6A7 52%, #81C784 100%);
     border-radius: 24px; border: 4px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden;
   }
   .sun { position: absolute; top: 14px; right: 18px; font-size: 2rem; animation: spinSlow 20s linear infinite; }
@@ -140,11 +161,11 @@
   .cloud { position: absolute; font-size: 1.5rem; animation: floatCloud 8s ease-in-out infinite; }
   .cloud.c1 { top: 20px; left: 20px; } .cloud.c2 { top: 40px; left: 55%; animation-delay: -3s; font-size: 1.2rem; }
   @keyframes floatCloud { 0%,100%{transform:translateX(0)} 50%{transform:translateX(12px)} }
-  .house { position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%); width: 58%; }
-  .roof { width: 100%; height: 52px; background: #E53935; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); margin: 0 auto -2px; }
+  .house { position: absolute; bottom: 28%; left: 50%; transform: translateX(-50%); width: 52%; z-index: 2; }
+  .roof { width: 100%; height: 48px; background: #E53935; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); margin: 0 auto -2px; }
   .house-body {
     background: linear-gradient(180deg, #FFCCBC, #FFAB91); border: 3px solid #E57373;
-    border-radius: 8px 8px 4px 4px; height: 90px; position: relative;
+    border-radius: 8px 8px 4px 4px; height: 84px; position: relative;
   }
   .door {
     position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
@@ -153,28 +174,61 @@
   .door::after { content: ''; position: absolute; right: 4px; top: 50%; width: 5px; height: 5px; background: var(--yellow); border-radius: 50%; }
   .window { position: absolute; top: 16px; width: 22px; height: 22px; background: #BBDEFB; border: 2px solid #5D4037; border-radius: 4px; }
   .window.w1 { left: 12px; } .window.w2 { right: 12px; }
-  .flowers { position: absolute; bottom: 12%; left: 12%; font-size: 1.3rem; }
-  .flowers.f2 { left: auto; right: 12%; }
-  .pet-home-badge { position: absolute; bottom: 22%; right: 18%; font-size: 2rem; animation: bounceSoft 2s ease-in-out infinite; }
+  .flowers { position: absolute; bottom: 18%; left: 8%; font-size: 1.3rem; z-index: 2; }
+  .flowers.f2 { left: auto; right: 8%; }
   @keyframes bounceSoft { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
-  .phone-area { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 5; }
+
+  /* Pets on the lawn — sides only, never covering the phone */
+  .home-pets-row {
+    position: absolute; bottom: 16%; left: 6%; right: 6%;
+    display: flex; gap: 4px; align-items: flex-end; justify-content: space-between;
+    z-index: 3; pointer-events: none;
+  }
+  .home-pets-row .pet-slot {
+    display: flex; gap: 3px; align-items: flex-end; pointer-events: auto;
+  }
+  .home-pets-row .pet-actor { width: 2.6rem; height: 2.6rem; }
+  .home-pets-row .pa-body-img { border-width: 2px; }
+  .home-pets-row .pa-slot { display: none; }
+
+  /* Phone lives OUTSIDE the scene so it can never be covered */
+  .phone-dock {
+    display: flex; flex-direction: column; align-items: center;
+    margin: 0 auto 12px; position: relative; z-index: 30;
+  }
+  .phone-area {
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; z-index: 30;
+  }
   .phone-btn {
-    width: 72px; height: 72px; border-radius: 50%; border: 4px solid white;
-    background: linear-gradient(145deg, #66BB6A, #2E7D32); font-size: 2rem;
+    width: 78px; height: 78px; border-radius: 50%; border: 4px solid white;
+    background: linear-gradient(145deg, #66BB6A, #2E7D32); font-size: 2.1rem;
     box-shadow: 0 6px 0 #1B5E20, 0 8px 20px rgba(0,0,0,0.2); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    position: relative; z-index: 31;
   }
   .phone-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #1B5E20; }
   .phone-btn.ringing {
     animation: ring 0.4s ease-in-out infinite;
     background: linear-gradient(145deg, #FF8A65, #E64A19);
-    box-shadow: 0 6px 0 #BF360C;
+    box-shadow: 0 6px 0 #BF360C, 0 0 0 0 rgba(255,138,101,0.5);
+  }
+  .phone-btn.ringing::after {
+    content: 'RING!';
+    position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    background: #FF5722; color: white; font-size: 0.7rem; font-weight: 900;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    animation: pulse 0.8s ease-in-out infinite;
   }
   @keyframes ring {
     0%,100%{transform:rotate(-8deg) scale(1)} 25%{transform:rotate(8deg) scale(1.05)}
     50%{transform:rotate(-8deg) scale(1.08)} 75%{transform:rotate(8deg) scale(1.05)}
   }
-  .phone-label { text-align: center; font-size: 0.75rem; font-weight: 800; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.4); margin-top: 4px; }
+  .phone-label {
+    text-align: center; font-size: 0.85rem; font-weight: 800; color: var(--ink);
+    margin-top: 6px;
+  }
+  .phone-label.ringing-text { color: #E64A19; animation: pulse 0.8s ease-in-out infinite; }
   .home-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .home-actions .btn { min-height: 54px; }
   .status-card { margin-top: 12px; text-align: center; }
@@ -193,14 +247,6 @@
   }
   .own-pets-list { display: flex; flex-direction: column; gap: 8px; }
   .own-pets-list .own-pet-card { margin-top: 0; }
-  .home-pets-row {
-    position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 4px; align-items: flex-end; z-index: 4;
-    max-width: 85%; flex-wrap: wrap; justify-content: center;
-  }
-  .home-pets-row .pet-actor { width: 2.8rem; height: 2.8rem; }
-  .home-pets-row .pa-body-img { border-width: 2px; }
-  .home-pets-row .pa-slot { display: none; } /* keep house badges clean */
   .pet-count-pill {
     display: inline-block; background: #F3E5F5; color: var(--purple);
     border-radius: 999px; padding: 2px 10px; font-size: 0.78rem; font-weight: 800;
@@ -787,11 +833,12 @@
   <div class="screens">
     <!-- WELCOME -->
     <section class="screen active" id="screen-welcome">
-      <div class="logo-pets" id="welcomePets" style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
+      <img class="welcome-hero" id="welcomeHero" alt="Pet Sitter Adventure" width="1248" height="832" />
+      <div class="logo-pets" id="welcomePets"></div>
       <h1 class="welcome-title">Pet Sitter Adventure</h1>
       <p class="welcome-blurb">Walk pets through your house, feed them yummy food, splash in the tub, and play games that fit each animal!</p>
       <button class="btn btn-pink btn-lg" id="btnStart">Let's Play! 🎉</button>
-      <p style="margin-top:16px;font-size:0.8rem;color:var(--ink-soft);font-weight:600;">Saves automatically · Sound on 🔊</p>
+      <p style="margin-top:16px;font-size:0.8rem;color:var(--ink-soft);font-weight:600;">By Emmi Riordan · Saves automatically</p>
     </section>
 
     <!-- HOME (exterior when idle) -->
@@ -814,10 +861,13 @@
             <div class="door"></div>
           </div>
         </div>
-        <div class="home-pets-row hidden" id="homePetsRow"></div>
+        <div class="home-pets-row hidden" id="homePetsRow" aria-hidden="true"></div>
+      </div>
+      <!-- Phone dock sits BELOW the house art so pets never cover it -->
+      <div class="phone-dock">
         <div class="phone-area">
-          <button class="phone-btn" id="phoneBtn" aria-label="Answer phone">📱</button>
-          <div class="phone-label" id="phoneLabel">Phone</div>
+          <button class="phone-btn" id="phoneBtn" type="button" aria-label="Answer phone">📱</button>
+          <div class="phone-label" id="phoneLabel">Tap phone for jobs</div>
         </div>
       </div>
       <div class="home-actions">
@@ -1816,19 +1866,21 @@
       if (row) {
         row.classList.remove('hidden');
         row.innerHTML = '';
-        // show up to 5 pets on the house lawn
-        state.ownPets.slice(0, 5).forEach(p => {
+        // Split pets to left & right of the house so the phone dock stays clear
+        const shown = state.ownPets.slice(0, 4);
+        const left = document.createElement('div');
+        left.className = 'pet-slot';
+        const right = document.createElement('div');
+        right.className = 'pet-slot';
+        shown.forEach((p, i) => {
           const wrap = document.createElement('div');
           mountPet(wrap, p, { size: 'sm' });
-          // hide accessory clutter on tiny lawn icons already via CSS
-          row.appendChild(wrap.firstChild || wrap);
+          const node = wrap.firstChild || wrap;
+          if (i % 2 === 0) left.appendChild(node);
+          else right.appendChild(node);
         });
-        if (petCount > 5) {
-          const more = document.createElement('div');
-          more.style.cssText = 'font-weight:800;font-size:0.75rem;background:white;border-radius:999px;padding:4px 8px;';
-          more.textContent = '+' + (petCount - 5);
-          row.appendChild(more);
-        }
+        row.appendChild(left);
+        row.appendChild(right);
       }
       if (section) section.classList.remove('hidden');
       if (pill) pill.textContent = String(petCount);
@@ -1848,13 +1900,30 @@
   // ══════════════════════════════════════
   // PHONE / JOBS
   // ══════════════════════════════════════
+  function setPhoneIdle(msg) {
+    const phone = $('phoneBtn');
+    const label = $('phoneLabel');
+    if (phone) phone.classList.remove('ringing');
+    if (label) {
+      label.classList.remove('ringing-text');
+      label.textContent = msg || 'Tap phone for jobs';
+    }
+  }
+
+  function setPhoneRinging() {
+    const phone = $('phoneBtn');
+    const label = $('phoneLabel');
+    if (phone) phone.classList.add('ringing');
+    if (label) {
+      label.classList.add('ringing-text');
+      label.textContent = '📞 RING! Tap to answer!';
+    }
+  }
+
   function scheduleNextCall() {
     state.phoneReady = false;
     state.pendingJob = null;
-    const phone = $('phoneBtn');
-    const label = $('phoneLabel');
-    phone.classList.remove('ringing');
-    label.textContent = 'Phone';
+    setPhoneIdle('Tap phone for jobs');
     if (callTimer) clearTimeout(callTimer);
     if (ringLoop) clearInterval(ringLoop);
     function tryRing() {
@@ -1864,8 +1933,7 @@
       }
       state.phoneReady = true;
       state.pendingJob = generateJob();
-      phone.classList.add('ringing');
-      label.textContent = 'RING!';
+      setPhoneRinging();
       sfx('ring');
       if (ringLoop) clearInterval(ringLoop);
       ringLoop = setInterval(() => {
@@ -1898,6 +1966,7 @@
     }
     sfx('tap');
     if (ringLoop) { clearInterval(ringLoop); ringLoop = null; }
+    setPhoneIdle('On a call…');
     const j = state.pendingJob;
     $('callerAvatar').textContent = j.ownerEmoji;
     $('callerName').textContent = j.owner;
@@ -1913,8 +1982,7 @@
     const j = state.pendingJob;
     state.pendingJob = null;
     state.phoneReady = false;
-    $('phoneBtn').classList.remove('ringing');
-    $('phoneLabel').textContent = 'Busy';
+    setPhoneIdle('Busy — caring for a pet');
     animalSound(j.pet.type);
     startCare('job', j.pet, j.duration.tasks, j);
     toast(`${j.pet.name} is here! 🐾`, 'good');
@@ -3223,16 +3291,24 @@
   if (state.jobsCompleted > 0 || state.ownPets.length > 0 || state.money > 0) {
     $('btnStart').textContent = 'Continue Adventure! 🎉';
   }
-  // Welcome strip of real animal photos
+  // Title screen: OG image hero + animal thumbs
+  const hero = $('welcomeHero');
+  if (hero) {
+    hero.src = assetUrl('og-image.jpg');
+    hero.onerror = function () {
+      // fallback if og-image missing
+      hero.src = assetUrl(IMG_FILES.dog);
+    };
+  }
   const welcome = $('welcomePets');
   if (welcome) {
+    welcome.innerHTML = '';
     ['dog','cat','rabbit','bird','hamster','guineapig','turtle','ferret'].forEach(t => {
       const a = ANIMALS[t];
       if (!a) return;
       const img = document.createElement('img');
       img.src = a.img;
       img.alt = a.name;
-      img.style.cssText = 'width:44px;height:44px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,0.12);';
       img.addEventListener('click', () => { ensureAudio(); animalSound(t); });
       welcome.appendChild(img);
     });
