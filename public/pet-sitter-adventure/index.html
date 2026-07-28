@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#FF6B9D" />
+<title>Pet Sitter Adventure</title>
+<meta name="description" content="A fun kid-friendly pet sitting game! Answer calls, care for animals, and adopt your own pet." />
+<style>
+  :root {
+    --pink: #FF6B9D;
+    --pink-dark: #E84A7F;
+    --coral: #FF8A65;
+    --yellow: #FFD54F;
+    --yellow-dark: #F9A825;
+    --mint: #69F0AE;
+    --mint-dark: #00C853;
+    --sky: #4FC3F7;
+    --sky-dark: #0288D1;
+    --lavender: #B39DDB;
+    --purple: #7E57C2;
+    --cream: #FFF8E7;
+    --peach: #FFE0B2;
+    --white: #FFFFFF;
+    --ink: #3D2C4A;
+    --ink-soft: #6B5B7A;
+    --shadow: 0 6px 0 rgba(0,0,0,0.12);
+    --radius: 20px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: "Segoe UI", system-ui, -apple-system, "Comic Sans MS", "Chalkboard SE", sans-serif;
+    background: linear-gradient(165deg, #FFE0F0 0%, #E3F2FD 45%, #E8F5E9 100%);
+    color: var(--ink);
+    touch-action: manipulation;
+    user-select: none; -webkit-user-select: none;
+  }
+
+  #app {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: var(--safe-top) 0 var(--safe-bot);
+    background: linear-gradient(180deg, #FFF5F8 0%, #F0F7FF 50%, #F5FFF8 100%);
+    box-shadow: 0 0 40px rgba(255,107,157,0.15);
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px 8px;
+    background: linear-gradient(135deg, var(--pink), #FF8E53);
+    color: white;
+    z-index: 50;
+    box-shadow: 0 4px 16px rgba(255,107,157,0.35);
+  }
+  .brand {
+    font-weight: 800; font-size: 0.95rem;
+    letter-spacing: -0.02em;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.1);
+    white-space: nowrap;
+  }
+  .money-pill {
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(255,255,255,0.25);
+    backdrop-filter: blur(8px);
+    border: 2px solid rgba(255,255,255,0.5);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-weight: 800; font-size: 1.05rem;
+  }
+  .money-pill span { font-size: 1.1rem; }
+  .jobs-pill {
+    background: rgba(255,255,255,0.2);
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* ── Screens ── */
+  .screens { flex: 1; position: relative; overflow: hidden; }
+  .screen {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 14px 20px;
+  }
+  .screen.active { display: flex; animation: fadeIn 0.28s ease; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  h1, h2, h3 { font-weight: 800; line-height: 1.2; }
+  h1 { font-size: 1.55rem; }
+  h2 { font-size: 1.3rem; }
+  h3 { font-size: 1.1rem; }
+  p { line-height: 1.45; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: none; border-radius: 16px;
+    padding: 14px 20px;
+    font-size: 1.05rem; font-weight: 800;
+    font-family: inherit;
+    cursor: pointer;
+    color: white;
+    box-shadow: var(--shadow);
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.15s;
+    min-height: 52px;
+    text-align: center;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.12); }
+  .btn:disabled { opacity: 0.45; pointer-events: none; }
+  .btn-pink { background: linear-gradient(180deg, #FF7BAC, var(--pink-dark)); }
+  .btn-sky { background: linear-gradient(180deg, #6DD5FA, var(--sky-dark)); }
+  .btn-mint { background: linear-gradient(180deg, #81F5B5, var(--mint-dark)); }
+  .btn-yellow { background: linear-gradient(180deg, #FFE082, var(--yellow-dark)); color: var(--ink); }
+  .btn-purple { background: linear-gradient(180deg, #C3A6F0, var(--purple)); }
+  .btn-coral { background: linear-gradient(180deg, #FFAB91, #FF5722); }
+  .btn-white {
+    background: white; color: var(--ink);
+    border: 3px solid #F0E6F5;
+    box-shadow: 0 4px 0 #E8D5F0;
+  }
+  .btn-lg { font-size: 1.15rem; padding: 16px 24px; min-height: 58px; border-radius: 18px; }
+  .btn-sm { font-size: 0.9rem; padding: 10px 14px; min-height: 44px; border-radius: 14px; }
+  .btn-block { width: 100%; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-row .btn { flex: 1; min-width: 120px; }
+
+  /* ── Cards ── */
+  .card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(61,44,74,0.08);
+    border: 3px solid #FFF0F5;
+  }
+  .card-soft {
+    background: linear-gradient(145deg, #FFF9FC, #F0F9FF);
+    border: 3px solid #FFE4F0;
+  }
+
+  /* ── Home ── */
+  .home-hero {
+    text-align: center;
+    padding: 8px 0 4px;
+  }
+  .home-hero h1 {
+    background: linear-gradient(90deg, var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 4px;
+  }
+  .home-sub { color: var(--ink-soft); font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; }
+
+  .house-scene {
+    position: relative;
+    margin: 8px auto 16px;
+    width: 100%;
+    max-width: 340px;
+    aspect-ratio: 1.1;
+    background: linear-gradient(180deg, #87CEEB 0%, #B3E5FC 55%, #A5D6A7 55%, #81C784 100%);
+    border-radius: 24px;
+    border: 4px solid white;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+  .sun {
+    position: absolute; top: 14px; right: 18px;
+    font-size: 2rem;
+    animation: spinSlow 20s linear infinite;
+  }
+  @keyframes spinSlow { to { transform: rotate(360deg); } }
+  .cloud {
+    position: absolute; font-size: 1.6rem; opacity: 0.9;
+    animation: floatCloud 8s ease-in-out infinite;
+  }
+  .cloud.c1 { top: 20px; left: 20px; animation-delay: 0s; }
+  .cloud.c2 { top: 40px; left: 55%; animation-delay: -3s; font-size: 1.3rem; }
+  @keyframes floatCloud {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(12px); }
+  }
+  .house {
+    position: absolute;
+    bottom: 18%; left: 50%;
+    transform: translateX(-50%);
+    width: 58%;
+  }
+  .house-body {
+    background: linear-gradient(180deg, #FFCCBC, #FFAB91);
+    border: 3px solid #E57373;
+    border-radius: 8px 8px 4px 4px;
+    height: 90px;
+    position: relative;
+  }
+  .roof {
+    width: 100%;
+    height: 52px;
+    background: #E53935;
+    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    margin: 0 auto -2px;
+    filter: drop-shadow(0 -2px 0 #C62828);
+  }
+  .door {
+    position: absolute; bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 28px; height: 42px;
+    background: #8D6E63;
+    border-radius: 6px 6px 0 0;
+    border: 2px solid #5D4037;
+  }
+  .door::after {
+    content: '';
+    position: absolute; right: 4px; top: 50%;
+    width: 5px; height: 5px;
+    background: var(--yellow);
+    border-radius: 50%;
+  }
+  .window {
+    position: absolute; top: 16px;
+    width: 22px; height: 22px;
+    background: #BBDEFB;
+    border: 2px solid #5D4037;
+    border-radius: 4px;
+  }
+  .window.w1 { left: 12px; }
+  .window.w2 { right: 12px; }
+  .window::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(transparent 48%, #5D4037 48% 52%, transparent 52%),
+                linear-gradient(90deg, transparent 48%, #5D4037 48% 52%, transparent 52%);
+  }
+  .flowers {
+    position: absolute; bottom: 12%; left: 12%;
+    font-size: 1.4rem;
+  }
+  .flowers.f2 { left: auto; right: 12%; }
+  .pet-home-badge {
+    position: absolute;
+    bottom: 22%; right: 18%;
+    font-size: 2rem;
+    animation: bounceSoft 2s ease-in-out infinite;
+    filter: drop-shadow(0 3px 2px rgba(0,0,0,0.15));
+  }
+  @keyframes bounceSoft {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  /* Phone */
+  .phone-area {
+    position: absolute;
+    bottom: 8px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+  }
+  .phone-btn {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    border: 4px solid white;
+    background: linear-gradient(145deg, #66BB6A, #2E7D32);
+    font-size: 2rem;
+    box-shadow: 0 6px 0 #1B5E20, 0 8px 20px rgba(0,0,0,0.2);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s;
+  }
+  .phone-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #1B5E20; }
+  .phone-btn.ringing {
+    animation: ring 0.4s ease-in-out infinite;
+    background: linear-gradient(145deg, #FF8A65, #E64A19);
+    box-shadow: 0 6px 0 #BF360C, 0 0 0 0 rgba(255,138,101,0.5);
+  }
+  @keyframes ring {
+    0%, 100% { transform: rotate(-8deg) scale(1); }
+    25% { transform: rotate(8deg) scale(1.05); }
+    50% { transform: rotate(-8deg) scale(1.08); }
+    75% { transform: rotate(8deg) scale(1.05); }
+  }
+  .phone-label {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    margin-top: 4px;
+  }
+
+  .home-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .home-actions .btn { min-height: 56px; }
+
+  .status-card {
+    margin-top: 12px;
+    text-align: center;
+  }
+  .progress-bar-wrap {
+    background: #FCE4EC;
+    border-radius: 999px;
+    height: 16px;
+    overflow: hidden;
+    margin: 10px 0 6px;
+    border: 2px solid #F8BBD9;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--mint), var(--sky));
+    border-radius: 999px;
+    transition: width 0.5s ease;
+    min-width: 0;
+  }
+  .progress-label { font-size: 0.85rem; font-weight: 700; color: var(--ink-soft); }
+
+  /* ── Call screen ── */
+  .call-ring {
+    text-align: center;
+    padding: 20px 0;
+  }
+  .caller-avatar {
+    width: 110px; height: 110px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, var(--lavender), var(--sky));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 3.5rem;
+    border: 5px solid white;
+    box-shadow: 0 8px 24px rgba(126,87,194,0.3);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+  }
+  .caller-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
+  .caller-msg {
+    background: white;
+    border-radius: 18px;
+    padding: 16px;
+    margin: 16px 0;
+    border: 3px solid #E1BEE7;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    position: relative;
+  }
+  .caller-msg::before {
+    content: '';
+    position: absolute;
+    top: -12px; left: 50%;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-bottom-color: #E1BEE7;
+  }
+  .job-details {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin: 12px 0 20px;
+  }
+  .chip {
+    background: white;
+    border: 2px solid #F0E6F5;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .chip.pay { background: #E8F5E9; border-color: #A5D6A7; color: #2E7D32; }
+
+  /* ── Care screen ── */
+  .pet-stage {
+    text-align: center;
+    padding: 12px;
+    background: linear-gradient(180deg, #E3F2FD, #FFF8E1);
+    border-radius: 24px;
+    border: 4px solid white;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    margin-bottom: 14px;
+    position: relative;
+    min-height: 180px;
+  }
+  .pet-emoji {
+    font-size: 5.5rem;
+    line-height: 1;
+    display: inline-block;
+    filter: drop-shadow(0 6px 4px rgba(0,0,0,0.12));
+    transition: transform 0.3s;
+  }
+  .pet-emoji.happy { animation: happyBounce 0.6s ease; }
+  .pet-emoji.wet { filter: drop-shadow(0 0 8px #4FC3F7); }
+  @keyframes happyBounce {
+    0%, 100% { transform: scale(1) rotate(0); }
+    25% { transform: scale(1.15) rotate(-8deg); }
+    50% { transform: scale(1.2) rotate(8deg); }
+    75% { transform: scale(1.1) rotate(-4deg); }
+  }
+  .pet-name-tag {
+    display: inline-block;
+    background: white;
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-weight: 800;
+    margin-top: 8px;
+    border: 3px solid #FFE0B2;
+    font-size: 1rem;
+  }
+  .pet-outfit-label {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .care-hearts {
+    position: absolute; top: 10px; right: 12px;
+    font-size: 0.95rem;
+  }
+  .care-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .care-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 14px 10px;
+    border: none; border-radius: 18px;
+    background: white;
+    box-shadow: 0 5px 0 #E8D5F0;
+    border: 3px solid #F5EEF8;
+    font-family: inherit;
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--ink);
+    cursor: pointer;
+    min-height: 88px;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .care-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #E8D5F0; }
+  .care-btn .ico { font-size: 1.8rem; }
+  .care-btn.done {
+    background: linear-gradient(145deg, #E8F5E9, #C8E6C9);
+    border-color: #A5D6A7;
+    box-shadow: 0 5px 0 #81C784;
+  }
+  .care-btn.done::after {
+    content: ' ✓';
+    color: #2E7D32;
+  }
+  .care-status {
+    text-align: center;
+    margin: 12px 0;
+    font-weight: 700;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+  .finish-area { margin-top: 12px; }
+
+  /* ── Mini-games ── */
+  .mg-area {
+    text-align: center;
+    padding: 8px 0;
+  }
+  .mg-score {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--purple);
+    margin-bottom: 12px;
+  }
+  .memory-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-width: 300px;
+    margin: 0 auto 16px;
+  }
+  .mem-card {
+    aspect-ratio: 1;
+    border-radius: 14px;
+    border: 3px solid #E1BEE7;
+    background: linear-gradient(145deg, var(--lavender), var(--purple));
+    font-size: 1.8rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: transparent;
+    box-shadow: 0 4px 0 #5E35B1;
+    transition: transform 0.15s, background 0.2s;
+  }
+  .mem-card:active { transform: scale(0.95); }
+  .mem-card.flipped, .mem-card.matched {
+    background: white;
+    color: inherit;
+    border-color: var(--mint);
+  }
+  .mem-card.matched {
+    background: #E8F5E9;
+    box-shadow: 0 4px 0 #81C784;
+  }
+  .tap-zone {
+    width: 100%;
+    max-width: 280px;
+    aspect-ratio: 1;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #FFCCBC, #FF8A65);
+    border: 6px solid white;
+    box-shadow: 0 10px 30px rgba(255,138,101,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 4rem;
+    cursor: pointer;
+    transition: transform 0.08s;
+    user-select: none;
+  }
+  .tap-zone:active { transform: scale(0.92); }
+  .tap-zone.pop { animation: pop 0.25s ease; }
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
+  .fetch-area {
+    position: relative;
+    width: 100%;
+    height: 220px;
+    background: linear-gradient(180deg, #81D4FA 0%, #A5D6A7 70%);
+    border-radius: 20px;
+    border: 4px solid white;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .fetch-ball {
+    position: absolute;
+    width: 40px; height: 40px;
+    font-size: 2rem;
+    cursor: pointer;
+    transition: left 0.05s linear, top 0.05s linear;
+    filter: drop-shadow(0 3px 2px rgba(0,0,0,0.2));
+    z-index: 2;
+  }
+  .fetch-pet {
+    position: absolute;
+    bottom: 10px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 3rem;
+    transition: left 0.3s ease;
+  }
+  .timer-bar {
+    height: 10px;
+    background: #FCE4EC;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .timer-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--pink), var(--coral));
+    transition: width 0.1s linear;
+  }
+
+  /* ── Park ── */
+  .park-scene {
+    background: linear-gradient(180deg, #81D4FA 0%, #B3E5FC 40%, #AED581 40%, #8BC34A 100%);
+    border-radius: 24px;
+    border: 4px solid white;
+    min-height: 220px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .park-tree { position: absolute; font-size: 3rem; top: 30%; }
+  .park-tree.t1 { left: 10%; }
+  .park-tree.t2 { right: 10%; top: 35%; font-size: 2.5rem; }
+  .park-pet {
+    font-size: 4.5rem;
+    animation: hop 1.2s ease-in-out infinite;
+    z-index: 2;
+  }
+  @keyframes hop {
+    0%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-18px); }
+    60% { transform: translateY(-10px); }
+  }
+  .park-sparkle {
+    position: absolute;
+    font-size: 1.2rem;
+    animation: sparkle 2s ease-in-out infinite;
+  }
+  @keyframes sparkle {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+  }
+
+  /* ── Dress up ── */
+  .outfit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .outfit-item {
+    background: white;
+    border: 3px solid #F0E6F5;
+    border-radius: 16px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 700;
+    box-shadow: 0 4px 0 #E8D5F0;
+    transition: transform 0.1s;
+  }
+  .outfit-item:active { transform: translateY(2px); }
+  .outfit-item.selected {
+    border-color: var(--mint-dark);
+    background: #E8F5E9;
+    box-shadow: 0 4px 0 #81C784;
+  }
+  .outfit-item .ico { font-size: 2rem; display: block; margin-bottom: 4px; }
+  .outfit-item .price { font-size: 0.8rem; color: var(--ink-soft); }
+  .outfit-item.owned .price { color: var(--mint-dark); font-weight: 800; }
+  .outfit-item.locked { opacity: 0.55; }
+
+  /* ── Shop ── */
+  .shop-tabs {
+    display: flex; gap: 6px;
+    margin-bottom: 12px;
+  }
+  .shop-tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 14px;
+    background: white;
+    font-family: inherit;
+    font-weight: 800;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    border: 3px solid #F0E6F5;
+    cursor: pointer;
+  }
+  .shop-tab.active {
+    background: linear-gradient(135deg, var(--pink), var(--coral));
+    color: white;
+    border-color: transparent;
+  }
+  .shop-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .shop-item {
+    background: white;
+    border-radius: 16px;
+    padding: 14px 10px;
+    text-align: center;
+    border: 3px solid #F0E6F5;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  .shop-item .ico { font-size: 2.2rem; }
+  .shop-item .name { font-weight: 800; font-size: 0.9rem; margin: 6px 0 2px; }
+  .shop-item .desc { font-size: 0.75rem; color: var(--ink-soft); margin-bottom: 8px; min-height: 2.2em; }
+  .shop-item.owned {
+    background: #E8F5E9;
+    border-color: #A5D6A7;
+  }
+
+  /* ── Adoption ── */
+  .adopt-steps { display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }
+  .adopt-step-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #E1BEE7;
+  }
+  .adopt-step-dot.on { background: var(--pink); transform: scale(1.2); }
+  .type-grid, .breed-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .type-card, .breed-card {
+    background: white;
+    border: 3px solid #F0E6F5;
+    border-radius: 16px;
+    padding: 12px 6px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 0 #E8D5F0;
+  }
+  .type-card .ico, .breed-card .ico { font-size: 2rem; display: block; }
+  .type-card.selected, .breed-card.selected {
+    border-color: var(--pink);
+    background: #FFF0F5;
+    box-shadow: 0 4px 0 var(--pink-dark);
+  }
+  .color-row {
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .color-swatch {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 4px solid white;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    cursor: pointer;
+  }
+  .color-swatch.selected {
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
+    transform: scale(1.1);
+  }
+  .name-input {
+    width: 100%;
+    padding: 16px;
+    border: 3px solid #E1BEE7;
+    border-radius: 16px;
+    font-size: 1.15rem;
+    font-family: inherit;
+    font-weight: 700;
+    text-align: center;
+    color: var(--ink);
+    background: white;
+    margin-bottom: 16px;
+    outline: none;
+  }
+  .name-input:focus { border-color: var(--pink); }
+
+  /* ── Celebration ── */
+  .celeb {
+    text-align: center;
+    padding: 24px 8px;
+  }
+  .celeb-emoji {
+    font-size: 5rem;
+    animation: happyBounce 1s ease infinite;
+  }
+  .confetti {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    overflow: hidden;
+  }
+  .confetti span {
+    position: absolute;
+    top: -20px;
+    font-size: 1.2rem;
+    animation: fall linear forwards;
+  }
+  @keyframes fall {
+    to { transform: translateY(110vh) rotate(720deg); opacity: 0.3; }
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    left: 50%; bottom: calc(24px + var(--safe-bot));
+    transform: translateX(-50%) translateY(120px);
+    background: var(--ink);
+    color: white;
+    padding: 12px 22px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    z-index: 200;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    max-width: 90%;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.good { background: linear-gradient(135deg, #43A047, #2E7D32); }
+  .toast.money { background: linear-gradient(135deg, #F9A825, #EF6C00); }
+
+  /* ── Modal overlay ── */
+  .overlay {
+    position: absolute; inset: 0;
+    background: rgba(61,44,74,0.45);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 80;
+    padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 24px;
+    padding: 24px 20px;
+    max-width: 340px;
+    width: 100%;
+    text-align: center;
+    border: 4px solid #FFE0F0;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    animation: fadeIn 0.25s ease;
+  }
+  .modal h2 { margin-bottom: 8px; }
+  .modal p { color: var(--ink-soft); margin-bottom: 16px; }
+
+  /* ── Own pet home card ── */
+  .own-pet-card {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+  .own-pet-card .big { font-size: 2.8rem; }
+  .own-pet-card .info { flex: 1; text-align: left; }
+  .own-pet-card .info strong { display: block; font-size: 1.1rem; }
+  .own-pet-card .info span { font-size: 0.85rem; color: var(--ink-soft); font-weight: 600; }
+
+  .back-btn {
+    align-self: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .section-title {
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .speech {
+    background: white;
+    border-radius: 16px;
+    padding: 12px 16px;
+    margin: 10px 0;
+    border: 3px solid #B3E5FC;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .hidden { display: none !important; }
+
+  /* Welcome splash */
+  #screen-welcome {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    background: linear-gradient(165deg, #FFE0F0, #E3F2FD, #E8F5E9);
+  }
+  .logo-pets {
+    font-size: 3rem;
+    letter-spacing: 4px;
+    margin-bottom: 12px;
+    animation: bounceSoft 2s ease-in-out infinite;
+  }
+  .welcome-title {
+    font-size: 1.85rem;
+    background: linear-gradient(90deg, var(--pink), var(--purple), var(--sky));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 8px;
+  }
+  .welcome-blurb {
+    color: var(--ink-soft);
+    font-weight: 600;
+    max-width: 280px;
+    margin: 0 auto 24px;
+    font-size: 1rem;
+  }
+
+  @media (max-height: 700px) {
+    .pet-emoji { font-size: 4.2rem; }
+    .house-scene { max-width: 280px; }
+    .care-btn { min-height: 76px; padding: 10px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar" id="topbar">
+    <div class="brand">🐾 Pet Sitter</div>
+    <div class="jobs-pill" id="jobsPill">Jobs: 0/11</div>
+    <div class="money-pill"><span>💵</span> $<span id="moneyDisplay">0</span></div>
+  </header>
+
+  <div class="screens">
+    <!-- WELCOME -->
+    <section class="screen active" id="screen-welcome">
+      <div class="logo-pets">🐱🐶🐰🐦🐹</div>
+      <h1 class="welcome-title">Pet Sitter Adventure</h1>
+      <p class="welcome-blurb">Answer the phone, care for cute pets, earn money, and adopt a best friend!</p>
+      <button class="btn btn-pink btn-lg" id="btnStart">Let's Play! 🎉</button>
+      <p style="margin-top:16px;font-size:0.8rem;color:var(--ink-soft);font-weight:600;">Made for kids · Saves automatically</p>
+    </section>
+
+    <!-- HOME -->
+    <section class="screen" id="screen-home">
+      <div class="home-hero">
+        <h1>Your Cozy Home</h1>
+        <p class="home-sub" id="homeSub">Wait for pet owners to call!</p>
+      </div>
+
+      <div class="house-scene" id="houseScene">
+        <div class="sun">☀️</div>
+        <div class="cloud c1">☁️</div>
+        <div class="cloud c2">☁️</div>
+        <div class="flowers">🌸🌼</div>
+        <div class="flowers f2">🌺🌷</div>
+        <div class="house">
+          <div class="roof"></div>
+          <div class="house-body">
+            <div class="window w1"></div>
+            <div class="window w2"></div>
+            <div class="door"></div>
+          </div>
+        </div>
+        <div class="pet-home-badge hidden" id="homePetBadge">🐕</div>
+        <div class="phone-area">
+          <button class="phone-btn" id="phoneBtn" aria-label="Answer phone">📱</button>
+          <div class="phone-label" id="phoneLabel">Phone</div>
+        </div>
+      </div>
+
+      <div class="home-actions">
+        <button class="btn btn-purple" id="btnShop">🛒 Shop</button>
+        <button class="btn btn-sky" id="btnOwnPet" disabled>🏠 My Pet</button>
+        <button class="btn btn-mint" id="btnAdopt" disabled style="grid-column:1/-1;">💖 Adopt a Pet!</button>
+      </div>
+
+      <div class="card status-card card-soft">
+        <strong>Job Progress</strong>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="jobProgress" style="width:0%"></div>
+        </div>
+        <div class="progress-label" id="jobProgressLabel">Complete 11 jobs to adopt your own pet!</div>
+      </div>
+
+      <div class="card own-pet-card hidden" id="ownPetHomeCard">
+        <div class="big" id="ownPetHomeEmoji">🐾</div>
+        <div class="info">
+          <strong id="ownPetHomeName">Buddy</strong>
+          <span id="ownPetHomeMeta">Your adopted friend · Tap to care</span>
+        </div>
+        <span style="font-size:1.4rem;">›</span>
+      </div>
+    </section>
+
+    <!-- CALL -->
+    <section class="screen" id="screen-call">
+      <div class="call-ring">
+        <div class="caller-avatar" id="callerAvatar">👤</div>
+        <div class="caller-name" id="callerName">Pet Owner</div>
+        <p style="color:var(--ink-soft);font-weight:700;">📞 Incoming call…</p>
+      </div>
+      <div class="caller-msg" id="callerMsg">Hi! Can you watch my pet?</div>
+      <div class="job-details">
+        <span class="chip" id="jobAnimalChip">🐶 Dog</span>
+        <span class="chip" id="jobTimeChip">⏱️ 1 day</span>
+        <span class="chip pay" id="jobPayChip">💵 $250</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-white" id="btnDecline">Maybe later</button>
+        <button class="btn btn-mint btn-lg" id="btnAccept">Accept! ✓</button>
+      </div>
+    </section>
+
+    <!-- CARE (sitting or own) -->
+    <section class="screen" id="screen-care">
+      <button class="btn btn-white btn-sm back-btn" id="btnCareBack">← Home</button>
+      <div class="pet-stage" id="petStage">
+        <div class="care-hearts" id="careHearts">💛💛💛</div>
+        <div class="pet-emoji" id="carePetEmoji">🐶</div>
+        <div class="pet-name-tag" id="carePetName">Buddy</div>
+        <div class="pet-outfit-label" id="careOutfitLabel"></div>
+      </div>
+      <div class="speech" id="careSpeech">What should we do together?</div>
+      <div class="care-status" id="careStatus">Care tasks: 0 / 7</div>
+      <div class="care-grid" id="careGrid">
+        <button class="care-btn" data-action="feed"><span class="ico">🍖</span>Feed</button>
+        <button class="care-btn" data-action="water"><span class="ico">💧</span>Water</button>
+        <button class="care-btn" data-action="treat"><span class="ico">🍪</span>Treats</button>
+        <button class="care-btn" data-action="bathe"><span class="ico">🛁</span>Bathe</button>
+        <button class="care-btn" data-action="play"><span class="ico">🎮</span>Play</button>
+        <button class="care-btn" data-action="dress"><span class="ico">👔</span>Dress Up</button>
+        <button class="care-btn" data-action="park" style="grid-column:1/-1;"><span class="ico">🌳</span>Go to the Park</button>
+      </div>
+      <div class="finish-area hidden" id="finishArea">
+        <button class="btn btn-pink btn-lg btn-block" id="btnFinishJob">All done! Get paid 💵</button>
+      </div>
+    </section>
+
+    <!-- MINIGAME -->
+    <section class="screen" id="screen-minigame">
+      <button class="btn btn-white btn-sm back-btn" id="btnMgBack">← Back</button>
+      <h2 class="section-title" id="mgTitle">Mini-Game!</h2>
+      <p class="speech" id="mgInstructions">Have fun!</p>
+      <div class="timer-bar"><div class="timer-fill" id="mgTimer" style="width:100%"></div></div>
+      <div class="mg-score" id="mgScore">Score: 0</div>
+      <div class="mg-area" id="mgArea"></div>
+      <button class="btn btn-mint btn-block hidden" id="btnMgDone">Yay! Done 🎉</button>
+    </section>
+
+    <!-- PARK -->
+    <section class="screen" id="screen-park">
+      <button class="btn btn-white btn-sm back-btn" id="btnParkBack">← Back</button>
+      <h2 class="section-title">🌳 The Park</h2>
+      <div class="park-scene">
+        <span class="park-tree t1">🌲</span>
+        <span class="park-tree t2">🌳</span>
+        <span class="park-sparkle" style="top:20%;left:30%;">✨</span>
+        <span class="park-sparkle" style="top:25%;right:25%;animation-delay:0.5s;">⭐</span>
+        <span class="park-sparkle" style="top:15%;left:60%;animation-delay:1s;">💫</span>
+        <div class="park-pet" id="parkPet">🐶</div>
+        <div style="font-size:1.5rem;margin-top:4px;">🦋 🌻 🦋</div>
+      </div>
+      <p class="speech" id="parkSpeech">What a sunny day! Running around feels great!</p>
+      <div class="btn-row">
+        <button class="btn btn-sky" id="btnParkRun">🏃 Run around</button>
+        <button class="btn btn-yellow" id="btnParkPicnic">🧺 Picnic</button>
+      </div>
+      <button class="btn btn-mint btn-block" id="btnParkDone" style="margin-top:12px;">Head home 🏠</button>
+    </section>
+
+    <!-- DRESS -->
+    <section class="screen" id="screen-dress">
+      <button class="btn btn-white btn-sm back-btn" id="btnDressBack">← Back</button>
+      <h2 class="section-title">👔 Dress Up!</h2>
+      <div class="pet-stage" style="min-height:140px;">
+        <div class="pet-emoji" id="dressPetEmoji" style="font-size:4.5rem;">🐶</div>
+        <div class="pet-outfit-label" id="dressPreviewLabel">No outfit</div>
+      </div>
+      <p class="speech">Pick an outfit or accessory! Buy more in the Shop.</p>
+      <div class="outfit-grid" id="outfitGrid"></div>
+      <button class="btn btn-mint btn-block" id="btnDressDone">Looking great! ✓</button>
+    </section>
+
+    <!-- SHOP -->
+    <section class="screen" id="screen-shop">
+      <button class="btn btn-white btn-sm back-btn" id="btnShopBack">← Home</button>
+      <h2 class="section-title">🛒 Pet Shop</h2>
+      <p style="text-align:center;color:var(--ink-soft);font-weight:600;margin-bottom:12px;">Spend your earnings on cute stuff!</p>
+      <div class="shop-tabs">
+        <button class="shop-tab active" data-tab="outfits">👔 Outfits</button>
+        <button class="shop-tab" data-tab="accessories">🎀 Accessories</button>
+        <button class="shop-tab" data-tab="toys">🧸 Toys</button>
+      </div>
+      <div class="shop-grid" id="shopGrid"></div>
+    </section>
+
+    <!-- ADOPTION -->
+    <section class="screen" id="screen-adopt">
+      <button class="btn btn-white btn-sm back-btn" id="btnAdoptBack">← Home</button>
+      <h2 class="section-title">💖 Adopt a Pet!</h2>
+      <div class="adopt-steps" id="adoptSteps">
+        <div class="adopt-step-dot on"></div>
+        <div class="adopt-step-dot"></div>
+        <div class="adopt-step-dot"></div>
+        <div class="adopt-step-dot"></div>
+      </div>
+      <div id="adoptContent"></div>
+    </section>
+
+    <!-- CELEBRATION -->
+    <section class="screen" id="screen-celeb">
+      <div class="celeb">
+        <div class="celeb-emoji">🎊</div>
+        <h1 style="margin:12px 0;background:linear-gradient(90deg,var(--pink),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent;">Amazing!</h1>
+        <p class="speech" id="celebMsg">You finished 11 pet-sitting jobs! You can now adopt your very own pet!</p>
+        <button class="btn btn-pink btn-lg btn-block" id="btnCelebOk">Let's go! 💖</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="confetti" id="confetti"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ═══════════════════════════════════════
+  // DATA
+  // ═══════════════════════════════════════
+  const JOB_PAY = 250;
+  const ADOPT_FEE = 500;
+  const JOBS_NEEDED = 11;
+  const STORAGE_KEY = 'petSitterAdventure_v1';
+
+  const ANIMALS = {
+    cat: {
+      name: 'Cat', emoji: '🐱',
+      breeds: [
+        { id: 'tabby', name: 'Tabby', emoji: '😺', colors: ['orange', 'gray', 'brown'] },
+        { id: 'calico', name: 'Calico', emoji: '🐈', colors: ['calico', 'white'] },
+        { id: 'siamese', name: 'Siamese', emoji: '🐈‍⬛', colors: ['cream', 'brown'] },
+        { id: 'black', name: 'Black Cat', emoji: '🐈‍⬛', colors: ['black'] },
+      ]
+    },
+    dog: {
+      name: 'Dog', emoji: '🐶',
+      breeds: [
+        { id: 'golden', name: 'Golden', emoji: '🐕', colors: ['gold', 'cream'] },
+        { id: 'labrador', name: 'Labrador', emoji: '🦮', colors: ['yellow', 'black', 'chocolate'] },
+        { id: 'poodle', name: 'Poodle', emoji: '🐩', colors: ['white', 'pink', 'brown'] },
+        { id: 'corgi', name: 'Corgi', emoji: '🐕', colors: ['tan', 'tricolor'] },
+        { id: 'husky', name: 'Husky', emoji: '🐺', colors: ['gray', 'white'] },
+      ]
+    },
+    hamster: {
+      name: 'Hamster', emoji: '🐹',
+      breeds: [
+        { id: 'golden', name: 'Golden', emoji: '🐹', colors: ['gold', 'white'] },
+        { id: 'winter', name: 'Winter White', emoji: '🐹', colors: ['white', 'gray'] },
+        { id: 'robo', name: 'Roborovski', emoji: '🐹', colors: ['sandy', 'white'] },
+      ]
+    },
+    guineapig: {
+      name: 'Guinea Pig', emoji: '🐹',
+      breeds: [
+        { id: 'american', name: 'American', emoji: '🐹', colors: ['brown', 'white', 'black'] },
+        { id: 'abyssinian', name: 'Abyssinian', emoji: '🐹', colors: ['orange', 'tricolor'] },
+        { id: 'peruvian', name: 'Peruvian', emoji: '🐹', colors: ['cream', 'brown'] },
+      ]
+    },
+    rabbit: {
+      name: 'Rabbit', emoji: '🐰',
+      breeds: [
+        { id: 'lop', name: 'Holland Lop', emoji: '🐇', colors: ['white', 'gray', 'brown'] },
+        { id: 'dwarf', name: 'Netherland Dwarf', emoji: '🐰', colors: ['black', 'white', 'spotted'] },
+        { id: 'giant', name: 'Flemish Giant', emoji: '🐇', colors: ['gray', 'sandy'] },
+      ]
+    },
+    bird: {
+      name: 'Bird', emoji: '🐦',
+      breeds: [
+        { id: 'parakeet', name: 'Parakeet', emoji: '🦜', colors: ['green', 'blue', 'yellow'] },
+        { id: 'cockatiel', name: 'Cockatiel', emoji: '🐦', colors: ['gray', 'yellow'] },
+        { id: 'canary', name: 'Canary', emoji: '🐤', colors: ['yellow', 'orange'] },
+      ]
+    },
+    ferret: {
+      name: 'Ferret', emoji: '🦡',
+      breeds: [
+        { id: 'sable', name: 'Sable', emoji: '🦡', colors: ['brown', 'cream'] },
+        { id: 'albino', name: 'Albino', emoji: '🦡', colors: ['white'] },
+      ]
+    },
+    turtle: {
+      name: 'Turtle', emoji: '🐢',
+      breeds: [
+        { id: 'slider', name: 'Red-Eared Slider', emoji: '🐢', colors: ['green'] },
+        { id: 'box', name: 'Box Turtle', emoji: '🐢', colors: ['brown', 'olive'] },
+      ]
+    },
+  };
+
+  const OWNER_NAMES = [
+    'Ms. Sunny', 'Mr. Bubbles', 'Aunt Maple', 'Coach Sparkle',
+    'Dr. Whiskers', 'Mrs. Rainbow', 'Uncle Zippy', 'Captain Cuddle',
+    'Miss Daisy', 'Professor Paws', 'Chef Cookie', 'Nurse Noodle'
+  ];
+  const OWNER_EMOJI = ['👩', '👨', '👩‍🦰', '👨‍🦱', '👩‍🦳', '🧑', '👵', '👴', '👩‍🔬', '👨‍🍳'];
+
+  const DURATIONS = [
+    { label: '1 day', tasks: 5 },
+    { label: '2 days', tasks: 6 },
+    { label: 'a weekend', tasks: 7 },
+  ];
+
+  const SHOP = {
+    outfits: [
+      { id: 'sweater', name: 'Cozy Sweater', emoji: '🧥', price: 100, desc: 'Warm & snuggly' },
+      { id: 'raincoat', name: 'Raincoat', emoji: '🌂', price: 120, desc: 'Splash-proof style' },
+      { id: 'tutu', name: 'Sparkle Tutu', emoji: '🩰', price: 150, desc: 'Ballet ready!' },
+      { id: 'superhero', name: 'Superhero Cape', emoji: '🦸', price: 200, desc: 'To the rescue!' },
+      { id: 'pajamas', name: 'Star PJs', emoji: '🌙', price: 110, desc: 'Bedtime cuteness' },
+      { id: 'tuxedo', name: 'Fancy Tux', emoji: '🤵', price: 250, desc: 'Dressy night out' },
+    ],
+    accessories: [
+      { id: 'bow', name: 'Ribbon Bow', emoji: '🎀', price: 50, desc: 'Classic cute' },
+      { id: 'hat', name: 'Party Hat', emoji: '🥳', price: 75, desc: 'Celebrate always' },
+      { id: 'glasses', name: 'Cool Glasses', emoji: '🕶️', price: 80, desc: 'So stylish' },
+      { id: 'crown', name: 'Royal Crown', emoji: '👑', price: 180, desc: 'Pet royalty' },
+      { id: 'scarf', name: 'Knit Scarf', emoji: '🧣', price: 90, desc: 'Chilly day chic' },
+      { id: 'collar', name: 'Heart Collar', emoji: '💝', price: 60, desc: 'Full of love' },
+    ],
+    toys: [
+      { id: 'ball', name: 'Bouncy Ball', emoji: '⚽', price: 40, desc: 'Bounce bounce!' },
+      { id: 'mouse', name: 'Squeaky Mouse', emoji: '🐭', price: 45, desc: 'Chase time' },
+      { id: 'rope', name: 'Rope Toy', emoji: '🪢', price: 55, desc: 'Tug of war' },
+      { id: 'frisbee', name: 'Frisbee', emoji: '🥏', price: 70, desc: 'Park favorite' },
+      { id: 'plush', name: 'Plush Buddy', emoji: '🧸', price: 100, desc: 'Cuddle friend' },
+      { id: 'laser', name: 'Laser Dot', emoji: '🔴', price: 85, desc: 'Zoom zoom!' },
+    ],
+  };
+
+  const CARE_LINES = {
+    feed: [
+      'Nom nom nom! That was delicious! 😋',
+      'Yummy! My tummy is happy!',
+      'Thanks for dinner, best sitter ever!'
+    ],
+    water: [
+      'Sip sip… ahh, refreshing! 💧',
+      'Just what I needed!',
+      'Cool water on a warm day!'
+    ],
+    treat: [
+      'A treat?! You spoil me! 🍪',
+      'Crunch crunch — so good!',
+      'Treats make everything better!'
+    ],
+    bathe: [
+      'Splash splash! I feel squeaky clean! ✨',
+      'Bubbles everywhere! That was fun!',
+      'Fresh and fluffy!'
+    ],
+    play: [
+      'That game was awesome! 🎮',
+      'You are so fun to play with!',
+      'Best playtime ever!'
+    ],
+    dress: [
+      'I look fabulous! 💅',
+      'Do you like my new look?',
+      'Dressed to impress!'
+    ],
+    park: [
+      'The park was amazing! 🌳',
+      'Fresh air and sunshine — yay!',
+      'I ran so much. Happy tired!'
+    ],
+  };
+
+  const COLOR_HEX = {
+    orange: '#FF9800', gray: '#9E9E9E', brown: '#8D6E63', calico: '#FFCC80',
+    white: '#FAFAFA', cream: '#FFF8E1', black: '#424242', gold: '#FFD54F',
+    yellow: '#FFEB3B', chocolate: '#6D4C41', pink: '#F48FB1', tan: '#D7CCC8',
+    tricolor: '#A1887F', sandy: '#E6C38A', spotted: '#BDBDBD', green: '#66BB6A',
+    blue: '#42A5F5', olive: '#9E9D24'
+  };
+
+  // ═══════════════════════════════════════
+  // STATE
+  // ═══════════════════════════════════════
+  let state = {
+    money: 0,
+    jobsCompleted: 0,
+    inventory: { outfits: [], accessories: [], toys: [] },
+    ownPet: null,
+    celebrated: false,
+    phoneReady: true,
+    pendingJob: null,
+    currentCare: null, // { mode: 'job'|'own', pet, done: {}, required }
+  };
+
+  let mgState = null;
+  let toastTimer = null;
+  let callTimer = null;
+
+  // ═══════════════════════════════════════
+  // AUDIO (Web Audio API — soft happy beeps)
+  // ═══════════════════════════════════════
+  let audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function tone(freq, dur, type, vol) {
+    if (!audioCtx) return;
+    try {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type || 'sine';
+      o.frequency.value = freq;
+      g.gain.value = vol || 0.08;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+      o.stop(audioCtx.currentTime + dur);
+    } catch (e) {}
+  }
+  function sfx(name) {
+    ensureAudio();
+    if (name === 'tap') tone(520, 0.08, 'sine', 0.06);
+    else if (name === 'success') { tone(523, 0.1); setTimeout(() => tone(659, 0.1), 90); setTimeout(() => tone(784, 0.18), 180); }
+    else if (name === 'money') { tone(880, 0.1); setTimeout(() => tone(1175, 0.15), 100); }
+    else if (name === 'ring') { tone(800, 0.12, 'square', 0.04); setTimeout(() => tone(600, 0.12, 'square', 0.04), 150); }
+    else if (name === 'happy') { tone(392, 0.08); setTimeout(() => tone(523, 0.08), 80); setTimeout(() => tone(659, 0.12), 160); }
+    else if (name === 'pop') tone(400 + Math.random() * 200, 0.06, 'triangle', 0.07);
+    else if (name === 'buy') { tone(700, 0.08); setTimeout(() => tone(900, 0.12), 80); }
+  }
+
+  // ═══════════════════════════════════════
+  // STORAGE
+  // ═══════════════════════════════════════
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        money: state.money,
+        jobsCompleted: state.jobsCompleted,
+        inventory: state.inventory,
+        ownPet: state.ownPet,
+        celebrated: state.celebrated,
+      }));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      state.money = d.money || 0;
+      state.jobsCompleted = d.jobsCompleted || 0;
+      state.inventory = d.inventory || { outfits: [], accessories: [], toys: [] };
+      state.ownPet = d.ownPet || null;
+      state.celebrated = !!d.celebrated;
+    } catch (e) {}
+  }
+
+  // ═══════════════════════════════════════
+  // HELPERS
+  // ═══════════════════════════════════════
+  function $(id) { return document.getElementById(id); }
+  function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function pickBreed(type) {
+    const a = ANIMALS[type];
+    const b = rand(a.breeds);
+    const color = rand(b.colors);
+    return { type, breed: b.id, breedName: b.name, color, emoji: b.emoji || a.emoji, typeName: a.name };
+  }
+  function petLabel(p) {
+    return `${p.color} ${p.breedName} ${p.typeName}`;
+  }
+  function toast(msg, kind) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+  function confettiBurst() {
+    const box = $('confetti');
+    box.innerHTML = '';
+    const emojis = ['🎉', '✨', '💖', '⭐', '🎊', '🌈', '🐾', '💫'];
+    for (let i = 0; i < 28; i++) {
+      const s = document.createElement('span');
+      s.textContent = rand(emojis);
+      s.style.left = Math.random() * 100 + '%';
+      s.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+      s.style.animationDelay = (Math.random() * 0.5) + 's';
+      box.appendChild(s);
+    }
+    setTimeout(() => { box.innerHTML = ''; }, 4000);
+  }
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const el = $(id);
+    if (el) el.classList.add('active');
+  }
+  function updateHUD() {
+    $('moneyDisplay').textContent = state.money;
+    const jobs = Math.min(state.jobsCompleted, JOBS_NEEDED);
+    $('jobsPill').textContent = `Jobs: ${jobs}/${JOBS_NEEDED}`;
+    const pct = Math.min(100, (state.jobsCompleted / JOBS_NEEDED) * 100);
+    $('jobProgress').style.width = pct + '%';
+    if (state.jobsCompleted >= JOBS_NEEDED) {
+      $('jobProgressLabel').textContent = state.ownPet
+        ? '🌟 Super sitter! Keep helping pets!'
+        : 'Ready to adopt! Tap “Adopt a Pet!”';
+    } else {
+      $('jobProgressLabel').textContent = `${JOBS_NEEDED - state.jobsCompleted} more job${JOBS_NEEDED - state.jobsCompleted === 1 ? '' : 's'} until you can adopt!`;
+    }
+    const canAdopt = state.jobsCompleted >= JOBS_NEEDED && !state.ownPet;
+    $('btnAdopt').disabled = !canAdopt;
+    $('btnOwnPet').disabled = !state.ownPet;
+    if (state.ownPet) {
+      $('homePetBadge').classList.remove('hidden');
+      $('homePetBadge').textContent = state.ownPet.emoji;
+      $('ownPetHomeCard').classList.remove('hidden');
+      $('ownPetHomeEmoji').textContent = state.ownPet.emoji;
+      $('ownPetHomeName').textContent = state.ownPet.name;
+      $('ownPetHomeMeta').textContent = petLabel(state.ownPet) + ' · Tap to care';
+      $('homeSub').textContent = state.ownPet.name + ' is happy at home!';
+    } else {
+      $('homePetBadge').classList.add('hidden');
+      $('ownPetHomeCard').classList.add('hidden');
+      $('homeSub').textContent = 'Wait for pet owners to call!';
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // PHONE / JOBS
+  // ═══════════════════════════════════════
+  function scheduleNextCall() {
+    state.phoneReady = false;
+    state.pendingJob = null;
+    const phone = $('phoneBtn');
+    const label = $('phoneLabel');
+    phone.classList.remove('ringing');
+    label.textContent = 'Phone';
+    if (callTimer) clearTimeout(callTimer);
+    const delay = randInt(2500, 5000);
+    function tryRing() {
+      // Wait until player is free from an active sitting job
+      if (state.currentCare && state.currentCare.mode === 'job') {
+        callTimer = setTimeout(tryRing, 3000);
+        return;
+      }
+      state.phoneReady = true;
+      state.pendingJob = generateJob();
+      phone.classList.add('ringing');
+      label.textContent = 'RING!';
+      sfx('ring');
+    }
+    callTimer = setTimeout(tryRing, delay);
+  }
+
+  function generateJob() {
+    const types = Object.keys(ANIMALS);
+    const type = rand(types);
+    const pet = pickBreed(type);
+    pet.name = rand(['Buddy', 'Luna', 'Max', 'Bella', 'Charlie', 'Daisy', 'Milo', 'Coco', 'Oliver', 'Lucy', 'Rocky', 'Molly', 'Simba', 'Nala', 'Pepper', 'Honey']);
+    const owner = rand(OWNER_NAMES);
+    const ownerEmoji = rand(OWNER_EMOJI);
+    const dur = rand(DURATIONS);
+    const msgs = [
+      `Hi! Could you please watch my ${pet.breedName.toLowerCase()} ${pet.typeName.toLowerCase()}, ${pet.name}, for ${dur.label}? They're the sweetest!`,
+      `Hello! I'm going on a short trip. Can you take care of ${pet.name} my ${pet.color} ${pet.typeName.toLowerCase()} for ${dur.label}?`,
+      `Hey there, super sitter! ${pet.name} needs a loving home for ${dur.label}. Will you help?`,
+      `Good day! My ${pet.typeName.toLowerCase()} ${pet.name} would love your care for ${dur.label}. They're very friendly!`,
+    ];
+    return { pet, owner, ownerEmoji, duration: dur, message: rand(msgs), pay: JOB_PAY };
+  }
+
+  function openCall() {
+    if (!state.phoneReady || !state.pendingJob) {
+      toast('No calls right now — hang tight! 📱');
+      return;
+    }
+    sfx('tap');
+    const j = state.pendingJob;
+    $('callerAvatar').textContent = j.ownerEmoji;
+    $('callerName').textContent = j.owner;
+    $('callerMsg').textContent = j.message;
+    $('jobAnimalChip').textContent = `${j.pet.emoji} ${j.pet.typeName}`;
+    $('jobTimeChip').textContent = `⏱️ ${j.duration.label}`;
+    $('jobPayChip').textContent = `💵 $${j.pay}`;
+    showScreen('screen-call');
+  }
+
+  function acceptJob() {
+    sfx('success');
+    const j = state.pendingJob;
+    state.pendingJob = null;
+    state.phoneReady = false;
+    $('phoneBtn').classList.remove('ringing');
+    $('phoneLabel').textContent = 'Busy';
+    startCare('job', j.pet, j.duration.tasks, j);
+    toast(`${j.pet.name} is here! Be a great sitter! 🐾`, 'good');
+  }
+
+  function declineJob() {
+    sfx('tap');
+    state.pendingJob = null;
+    showScreen('screen-home');
+    toast('Maybe next time! Another call soon…');
+    scheduleNextCall();
+  }
+
+  // ═══════════════════════════════════════
+  // CARE
+  // ═══════════════════════════════════════
+  function startCare(mode, pet, requiredTasks, jobMeta) {
+    const allActions = ['feed', 'water', 'treat', 'bathe', 'play', 'dress', 'park'];
+    // For shorter jobs, require a subset but always include variety
+    let required = allActions.slice();
+    if (requiredTasks < 7) {
+      required = shuffle(allActions.slice()).slice(0, requiredTasks);
+      // ensure feed + water always if possible
+      if (!required.includes('feed')) required[0] = 'feed';
+      if (!required.includes('water') && required.length > 1) required[1] = 'water';
+    }
+    state.currentCare = {
+      mode,
+      pet: JSON.parse(JSON.stringify(pet)),
+      done: {},
+      required,
+      jobMeta: jobMeta || null,
+      hearts: 3,
+    };
+    renderCare();
+    showScreen('screen-care');
+  }
+
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function renderCare() {
+    const c = state.currentCare;
+    if (!c) return;
+    const p = c.pet;
+    $('carePetEmoji').textContent = p.emoji + (p.outfitEmoji ? '' : '');
+    // show outfit as label
+    let outfitParts = [];
+    if (p.outfit) {
+      const o = SHOP.outfits.find(x => x.id === p.outfit);
+      if (o) outfitParts.push(o.emoji + ' ' + o.name);
+    }
+    if (p.accessory) {
+      const a = SHOP.accessories.find(x => x.id === p.accessory);
+      if (a) outfitParts.push(a.emoji + ' ' + a.name);
+    }
+    $('careOutfitLabel').textContent = outfitParts.length ? outfitParts.join(' · ') : '';
+    $('carePetName').textContent = p.name || 'Friend';
+    $('careHearts').textContent = '💛'.repeat(c.hearts) + '🤍'.repeat(Math.max(0, 3 - c.hearts));
+
+    const doneCount = c.required.filter(a => c.done[a]).length;
+    $('careStatus').textContent = c.mode === 'own'
+      ? `Care completed: ${doneCount} / ${c.required.length}  ·  (optional fun!)`
+      : `Care tasks: ${doneCount} / ${c.required.length}`;
+
+    document.querySelectorAll('.care-btn').forEach(btn => {
+      const act = btn.dataset.action;
+      const isReq = c.required.includes(act);
+      btn.classList.toggle('done', !!c.done[act]);
+      btn.style.opacity = isReq || c.mode === 'own' ? '1' : '0.55';
+    });
+
+    const allDone = c.required.every(a => c.done[a]);
+    if (c.mode === 'job' && allDone) {
+      $('finishArea').classList.remove('hidden');
+      $('careSpeech').textContent = `${p.name} had a wonderful stay! Time to get paid! 🎉`;
+    } else {
+      $('finishArea').classList.add('hidden');
+      if (!allDone) {
+        $('careSpeech').textContent = c.mode === 'own'
+          ? `What should we do with ${p.name}?`
+          : `Take great care of ${p.name}!`;
+      }
+    }
+
+    // decorate emoji with accessory for fun
+    let display = p.emoji;
+    if (p.accessory === 'crown') display = '👑' + p.emoji;
+    else if (p.accessory === 'bow') display = p.emoji + '🎀';
+    else if (p.accessory === 'hat') display = '🥳' + p.emoji;
+    else if (p.accessory === 'glasses') display = p.emoji + '🕶️';
+    $('carePetEmoji').textContent = display;
+  }
+
+  function doCareAction(action) {
+    const c = state.currentCare;
+    if (!c) return;
+    sfx('tap');
+
+    if (action === 'play') {
+      startMiniGame();
+      return;
+    }
+    if (action === 'dress') {
+      openDress();
+      return;
+    }
+    if (action === 'park') {
+      openPark();
+      return;
+    }
+
+    // immediate care actions
+    completeCareAction(action);
+  }
+
+  function completeCareAction(action) {
+    const c = state.currentCare;
+    if (!c) return;
+    c.done[action] = true;
+    if (c.hearts < 5) c.hearts = Math.min(5, c.hearts + 1);
+
+    const lines = CARE_LINES[action] || ['Yay!'];
+    $('careSpeech').textContent = rand(lines);
+    const emoji = $('carePetEmoji');
+    emoji.classList.remove('happy', 'wet');
+    void emoji.offsetWidth;
+    if (action === 'bathe') emoji.classList.add('wet');
+    emoji.classList.add('happy');
+    sfx('happy');
+
+    // own pet: persist care lightly
+    if (c.mode === 'own' && state.ownPet) {
+      state.ownPet.lastCare = Date.now();
+      if (c.pet.outfit) state.ownPet.outfit = c.pet.outfit;
+      if (c.pet.accessory) state.ownPet.accessory = c.pet.accessory;
+      save();
+    }
+
+    renderCare();
+  }
+
+  function finishJob() {
+    const c = state.currentCare;
+    if (!c || c.mode !== 'job') return;
+    sfx('money');
+    state.money += JOB_PAY;
+    state.jobsCompleted += 1;
+    state.currentCare = null;
+    save();
+    updateHUD();
+    confettiBurst();
+    toast(`+$250! Great job sitting! 💵`, 'money');
+
+    if (state.jobsCompleted === JOBS_NEEDED && !state.celebrated) {
+      state.celebrated = true;
+      save();
+      $('celebMsg').textContent = 'You finished 11 pet-sitting jobs! You can now adopt your very own pet for $500!';
+      showScreen('screen-celeb');
+      sfx('success');
+      confettiBurst();
+    } else {
+      showScreen('screen-home');
+      scheduleNextCall();
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // MINI-GAMES
+  // ═══════════════════════════════════════
+  function startMiniGame() {
+    const games = ['memory', 'tap', 'fetch'];
+    const which = rand(games);
+    showScreen('screen-minigame');
+    $('btnMgDone').classList.add('hidden');
+    $('mgArea').innerHTML = '';
+    $('mgScore').textContent = 'Score: 0';
+    $('mgTimer').style.width = '100%';
+
+    if (which === 'memory') runMemory();
+    else if (which === 'tap') runTap();
+    else runFetch();
+  }
+
+  function finishMiniGame(won) {
+    if (mgState && mgState.timer) clearInterval(mgState.timer);
+    mgState = null;
+    $('btnMgDone').classList.remove('hidden');
+    if (won) {
+      sfx('success');
+      $('mgInstructions').textContent = 'You did it! Your pet is so happy! 🎉';
+      completeCareAction('play');
+    } else {
+      // never punish — still complete
+      sfx('happy');
+      $('mgInstructions').textContent = 'That was fun! Your pet loved playing! 💖';
+      completeCareAction('play');
+    }
+  }
+
+  function runMemory() {
+    $('mgTitle').textContent = '🧠 Memory Match';
+    $('mgInstructions').textContent = 'Find all the matching pairs!';
+    const icons = ['🐶', '🐱', '🐰', '🐦', '🐹', '🐢'];
+    const pairs = shuffle(icons.slice(0, 4));
+    let cards = shuffle(pairs.concat(pairs));
+    let flipped = [];
+    let matched = 0;
+    let score = 0;
+    let lock = false;
+
+    const grid = document.createElement('div');
+    grid.className = 'memory-grid';
+    cards.forEach((icon, i) => {
+      const card = document.createElement('button');
+      card.className = 'mem-card';
+      card.dataset.icon = icon;
+      card.dataset.i = i;
+      card.textContent = '❓';
+      card.addEventListener('click', () => {
+        if (lock || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+        sfx('pop');
+        card.classList.add('flipped');
+        card.textContent = icon;
+        flipped.push(card);
+        if (flipped.length === 2) {
+          lock = true;
+          if (flipped[0].dataset.icon === flipped[1].dataset.icon) {
+            flipped.forEach(c => c.classList.add('matched'));
+            matched++;
+            score += 10;
+            $('mgScore').textContent = 'Score: ' + score;
+            sfx('happy');
+            flipped = [];
+            lock = false;
+            if (matched >= 4) setTimeout(() => finishMiniGame(true), 400);
+          } else {
+            setTimeout(() => {
+              flipped.forEach(c => { c.classList.remove('flipped'); c.textContent = '❓'; });
+              flipped = [];
+              lock = false;
+            }, 600);
+          }
+        }
+      });
+      grid.appendChild(card);
+    });
+    $('mgArea').appendChild(grid);
+    mgState = { timer: null };
+  }
+
+  function runTap() {
+    $('mgTitle').textContent = '👆 Tap Party';
+    $('mgInstructions').textContent = 'Tap the pet as many times as you can!';
+    let score = 0;
+    let timeLeft = 8;
+    const zone = document.createElement('div');
+    zone.className = 'tap-zone';
+    zone.textContent = (state.currentCare && state.currentCare.pet.emoji) || '🐾';
+    zone.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      score++;
+      $('mgScore').textContent = 'Score: ' + score;
+      zone.classList.remove('pop');
+      void zone.offsetWidth;
+      zone.classList.add('pop');
+      sfx('pop');
+    });
+    $('mgArea').appendChild(zone);
+    const t = setInterval(() => {
+      timeLeft -= 0.1;
+      $('mgTimer').style.width = Math.max(0, (timeLeft / 8) * 100) + '%';
+      if (timeLeft <= 0) {
+        clearInterval(t);
+        finishMiniGame(score >= 5);
+      }
+    }, 100);
+    mgState = { timer: t };
+  }
+
+  function runFetch() {
+    $('mgTitle').textContent = '🎾 Catch the Ball';
+    $('mgInstructions').textContent = 'Tap the bouncing ball!';
+    let score = 0;
+    let timeLeft = 10;
+    const area = document.createElement('div');
+    area.className = 'fetch-area';
+    const ball = document.createElement('div');
+    ball.className = 'fetch-ball';
+    ball.textContent = '🎾';
+    const pet = document.createElement('div');
+    pet.className = 'fetch-pet';
+    pet.textContent = (state.currentCare && state.currentCare.pet.emoji) || '🐶';
+    area.appendChild(ball);
+    area.appendChild(pet);
+    $('mgArea').appendChild(area);
+
+    let x = 50, y = 40, vx = 3, vy = 2.5;
+    function move() {
+      if (!mgState || !mgState.alive) return;
+      const w = area.clientWidth - 40;
+      const h = area.clientHeight - 80;
+      x += vx; y += vy;
+      if (x <= 0 || x >= w) vx *= -1;
+      if (y <= 0 || y >= h) vy *= -1;
+      x = Math.max(0, Math.min(w, x));
+      y = Math.max(0, Math.min(h, y));
+      ball.style.left = x + 'px';
+      ball.style.top = y + 'px';
+      requestAnimationFrame(move);
+    }
+    ball.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      score++;
+      $('mgScore').textContent = 'Score: ' + score;
+      vx = (Math.random() > 0.5 ? 1 : -1) * (2.5 + Math.random() * 3);
+      vy = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2.5);
+      sfx('pop');
+      // happy pet bounce
+      pet.style.transform = 'translateX(-50%) scale(1.15)';
+      setTimeout(() => { pet.style.transform = 'translateX(-50%) scale(1)'; }, 150);
+    });
+
+    mgState = { alive: true, timer: null };
+    move();
+    const t = setInterval(() => {
+      timeLeft -= 0.1;
+      $('mgTimer').style.width = Math.max(0, (timeLeft / 10) * 100) + '%';
+      if (timeLeft <= 0) {
+        clearInterval(t);
+        if (mgState) mgState.alive = false;
+        finishMiniGame(score >= 3);
+      }
+    }, 100);
+    mgState.timer = t;
+  }
+
+  // ═══════════════════════════════════════
+  // PARK
+  // ═══════════════════════════════════════
+  function openPark() {
+    const c = state.currentCare;
+    if (!c) return;
+    $('parkPet').textContent = c.pet.emoji;
+    $('parkSpeech').textContent = `${c.pet.name} loves the park! Look at those butterflies! 🦋`;
+    showScreen('screen-park');
+    sfx('happy');
+  }
+  function parkActivity(kind) {
+    sfx('pop');
+    const p = state.currentCare.pet;
+    if (kind === 'run') {
+      $('parkSpeech').textContent = `${p.name} is zooming around! Zoom zoom! 💨`;
+      $('parkPet').style.animationDuration = '0.5s';
+    } else {
+      $('parkSpeech').textContent = `Picnic time! ${p.name} shares a cookie with you 🍪`;
+      $('parkPet').style.animationDuration = '1.8s';
+    }
+  }
+  function finishPark() {
+    $('parkPet').style.animationDuration = '';
+    completeCareAction('park');
+    showScreen('screen-care');
+    renderCare();
+  }
+
+  // ═══════════════════════════════════════
+  // DRESS UP
+  // ═══════════════════════════════════════
+  function openDress() {
+    const c = state.currentCare;
+    if (!c) return;
+    $('dressPetEmoji').textContent = c.pet.emoji;
+    renderOutfitGrid();
+    showScreen('screen-dress');
+  }
+
+  function renderOutfitGrid() {
+    const c = state.currentCare;
+    const grid = $('outfitGrid');
+    grid.innerHTML = '';
+
+    // none option
+    const none = document.createElement('div');
+    none.className = 'outfit-item' + (!c.pet.outfit && !c.pet.accessory ? ' selected' : '');
+    none.innerHTML = `<span class="ico">✨</span>Natural look`;
+    none.addEventListener('click', () => {
+      c.pet.outfit = null;
+      c.pet.accessory = null;
+      updateDressPreview();
+      renderOutfitGrid();
+      sfx('tap');
+    });
+    grid.appendChild(none);
+
+    SHOP.outfits.forEach(item => {
+      const owned = state.inventory.outfits.includes(item.id);
+      const el = document.createElement('div');
+      el.className = 'outfit-item' + (owned ? ' owned' : ' locked') + (c.pet.outfit === item.id ? ' selected' : '');
+      el.innerHTML = `<span class="ico">${item.emoji}</span>${item.name}<div class="price">${owned ? 'Owned ✓' : 'Buy in Shop $' + item.price}</div>`;
+      if (owned) {
+        el.addEventListener('click', () => {
+          c.pet.outfit = item.id;
+          updateDressPreview();
+          renderOutfitGrid();
+          sfx('tap');
+        });
+      }
+      grid.appendChild(el);
+    });
+
+    SHOP.accessories.forEach(item => {
+      const owned = state.inventory.accessories.includes(item.id);
+      const el = document.createElement('div');
+      el.className = 'outfit-item' + (owned ? ' owned' : ' locked') + (c.pet.accessory === item.id ? ' selected' : '');
+      el.innerHTML = `<span class="ico">${item.emoji}</span>${item.name}<div class="price">${owned ? 'Owned ✓' : 'Buy in Shop $' + item.price}</div>`;
+      if (owned) {
+        el.addEventListener('click', () => {
+          c.pet.accessory = item.id;
+          updateDressPreview();
+          renderOutfitGrid();
+          sfx('tap');
+        });
+      }
+      grid.appendChild(el);
+    });
+
+    updateDressPreview();
+  }
+
+  function updateDressPreview() {
+    const c = state.currentCare;
+    let display = c.pet.emoji;
+    if (c.pet.accessory === 'crown') display = '👑' + c.pet.emoji;
+    else if (c.pet.accessory === 'bow') display = c.pet.emoji + '🎀';
+    else if (c.pet.accessory === 'hat') display = '🥳' + c.pet.emoji;
+    else if (c.pet.accessory === 'glasses') display = c.pet.emoji + '🕶️';
+    else if (c.pet.accessory === 'scarf') display = c.pet.emoji + '🧣';
+    else if (c.pet.accessory === 'collar') display = c.pet.emoji + '💝';
+    $('dressPetEmoji').textContent = display;
+
+    const parts = [];
+    if (c.pet.outfit) {
+      const o = SHOP.outfits.find(x => x.id === c.pet.outfit);
+      if (o) parts.push(o.emoji + ' ' + o.name);
+    }
+    if (c.pet.accessory) {
+      const a = SHOP.accessories.find(x => x.id === c.pet.accessory);
+      if (a) parts.push(a.emoji + ' ' + a.name);
+    }
+    $('dressPreviewLabel').textContent = parts.length ? parts.join(' · ') : 'Natural look';
+  }
+
+  function finishDress() {
+    completeCareAction('dress');
+    showScreen('screen-care');
+    renderCare();
+  }
+
+  // ═══════════════════════════════════════
+  // SHOP
+  // ═══════════════════════════════════════
+  let shopTab = 'outfits';
+
+  function openShop() {
+    shopTab = 'outfits';
+    document.querySelectorAll('.shop-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === shopTab);
+    });
+    renderShop();
+    showScreen('screen-shop');
+    sfx('tap');
+  }
+
+  function renderShop() {
+    const grid = $('shopGrid');
+    grid.innerHTML = '';
+    const items = SHOP[shopTab];
+    const inv = state.inventory[shopTab];
+    items.forEach(item => {
+      const owned = inv.includes(item.id);
+      const el = document.createElement('div');
+      el.className = 'shop-item' + (owned ? ' owned' : '');
+      el.innerHTML = `
+        <div class="ico">${item.emoji}</div>
+        <div class="name">${item.name}</div>
+        <div class="desc">${item.desc}</div>
+        <button class="btn btn-sm ${owned ? 'btn-white' : 'btn-pink'}" ${owned ? 'disabled' : ''}>
+          ${owned ? 'Owned ✓' : '$' + item.price}
+        </button>
+      `;
+      if (!owned) {
+        el.querySelector('button').addEventListener('click', () => buyItem(shopTab, item));
+      }
+      grid.appendChild(el);
+    });
+  }
+
+  function buyItem(category, item) {
+    if (state.money < item.price) {
+      toast('Need a bit more money — keep sitting! 💪');
+      sfx('tap');
+      return;
+    }
+    state.money -= item.price;
+    state.inventory[category].push(item.id);
+    save();
+    updateHUD();
+    sfx('buy');
+    toast(`Bought ${item.emoji} ${item.name}!`, 'good');
+    renderShop();
+  }
+
+  // ═══════════════════════════════════════
+  // ADOPTION
+  // ═══════════════════════════════════════
+  let adoptDraft = { step: 0, type: null, breed: null, color: null, name: '' };
+
+  function openAdopt() {
+    if (state.ownPet) {
+      toast('You already have a wonderful pet!');
+      return;
+    }
+    if (state.jobsCompleted < JOBS_NEEDED) {
+      toast(`Complete ${JOBS_NEEDED} jobs first!`);
+      return;
+    }
+    if (state.money < ADOPT_FEE) {
+      toast(`Adoption costs $${ADOPT_FEE}. Keep earning! You have $${state.money}.`);
+      return;
+    }
+    adoptDraft = { step: 0, type: null, breed: null, color: null, name: '' };
+    renderAdopt();
+    showScreen('screen-adopt');
+    sfx('tap');
+  }
+
+  function renderAdopt() {
+    const dots = $('adoptSteps').children;
+    for (let i = 0; i < dots.length; i++) dots[i].classList.toggle('on', i <= adoptDraft.step);
+    const box = $('adoptContent');
+    box.innerHTML = '';
+
+    if (adoptDraft.step === 0) {
+      box.innerHTML = `<p class="speech">Which kind of animal would you love to adopt? (Fee: $${ADOPT_FEE})</p>`;
+      const grid = document.createElement('div');
+      grid.className = 'type-grid';
+      Object.keys(ANIMALS).forEach(key => {
+        const a = ANIMALS[key];
+        const card = document.createElement('div');
+        card.className = 'type-card' + (adoptDraft.type === key ? ' selected' : '');
+        card.innerHTML = `<span class="ico">${a.emoji}</span>${a.name}`;
+        card.addEventListener('click', () => {
+          adoptDraft.type = key;
+          adoptDraft.breed = null;
+          adoptDraft.color = null;
+          sfx('tap');
+          renderAdopt();
+        });
+        grid.appendChild(card);
+      });
+      box.appendChild(grid);
+      const next = document.createElement('button');
+      next.className = 'btn btn-pink btn-block';
+      next.textContent = 'Next →';
+      next.disabled = !adoptDraft.type;
+      next.addEventListener('click', () => { adoptDraft.step = 1; sfx('tap'); renderAdopt(); });
+      box.appendChild(next);
+    } else if (adoptDraft.step === 1) {
+      const breeds = ANIMALS[adoptDraft.type].breeds;
+      box.innerHTML = `<p class="speech">Pick a breed / style!</p>`;
+      const grid = document.createElement('div');
+      grid.className = 'breed-grid';
+      breeds.forEach(b => {
+        const card = document.createElement('div');
+        card.className = 'breed-card' + (adoptDraft.breed === b.id ? ' selected' : '');
+        card.innerHTML = `<span class="ico">${b.emoji}</span>${b.name}`;
+        card.addEventListener('click', () => {
+          adoptDraft.breed = b.id;
+          adoptDraft.color = null;
+          sfx('tap');
+          renderAdopt();
+        });
+        grid.appendChild(card);
+      });
+      box.appendChild(grid);
+      const row = document.createElement('div');
+      row.className = 'btn-row';
+      row.innerHTML = `<button class="btn btn-white" id="adBack">← Back</button><button class="btn btn-pink" id="adNext" ${!adoptDraft.breed ? 'disabled' : ''}>Next →</button>`;
+      box.appendChild(row);
+      row.querySelector('#adBack').onclick = () => { adoptDraft.step = 0; renderAdopt(); };
+      row.querySelector('#adNext').onclick = () => { adoptDraft.step = 2; sfx('tap'); renderAdopt(); };
+    } else if (adoptDraft.step === 2) {
+      const breed = ANIMALS[adoptDraft.type].breeds.find(b => b.id === adoptDraft.breed);
+      box.innerHTML = `<p class="speech">Choose a color!</p>`;
+      const row = document.createElement('div');
+      row.className = 'color-row';
+      breed.colors.forEach(col => {
+        const sw = document.createElement('div');
+        sw.className = 'color-swatch' + (adoptDraft.color === col ? ' selected' : '');
+        sw.style.background = COLOR_HEX[col] || '#ccc';
+        sw.title = col;
+        sw.addEventListener('click', () => {
+          adoptDraft.color = col;
+          sfx('tap');
+          renderAdopt();
+        });
+        row.appendChild(sw);
+      });
+      box.appendChild(row);
+      const label = document.createElement('p');
+      label.style.cssText = 'text-align:center;font-weight:800;margin-bottom:12px;text-transform:capitalize;';
+      label.textContent = adoptDraft.color || 'Tap a color';
+      box.appendChild(label);
+      const prev = document.createElement('div');
+      prev.className = 'pet-stage';
+      prev.style.minHeight = '100px';
+      prev.innerHTML = `<div class="pet-emoji" style="font-size:4rem;">${breed.emoji}</div>`;
+      box.appendChild(prev);
+      const btns = document.createElement('div');
+      btns.className = 'btn-row';
+      btns.innerHTML = `<button class="btn btn-white" id="adBack">← Back</button><button class="btn btn-pink" id="adNext" ${!adoptDraft.color ? 'disabled' : ''}>Next →</button>`;
+      box.appendChild(btns);
+      btns.querySelector('#adBack').onclick = () => { adoptDraft.step = 1; renderAdopt(); };
+      btns.querySelector('#adNext').onclick = () => { adoptDraft.step = 3; sfx('tap'); renderAdopt(); };
+    } else {
+      const breed = ANIMALS[adoptDraft.type].breeds.find(b => b.id === adoptDraft.breed);
+      box.innerHTML = `
+        <p class="speech">Give your new friend a name!</p>
+        <div class="pet-stage" style="min-height:100px;margin-bottom:12px;">
+          <div class="pet-emoji" style="font-size:4rem;">${breed.emoji}</div>
+          <div class="pet-outfit-label" style="text-transform:capitalize;">${adoptDraft.color} ${breed.name}</div>
+        </div>
+        <input class="name-input" id="petNameInput" maxlength="14" placeholder="Type a name…" value="${adoptDraft.name || ''}" />
+        <div class="btn-row">
+          <button class="btn btn-white" id="adBack">← Back</button>
+          <button class="btn btn-pink btn-lg" id="adConfirm">Adopt for $${ADOPT_FEE}! 💖</button>
+        </div>
+      `;
+      const input = box.querySelector('#petNameInput');
+      input.addEventListener('input', () => { adoptDraft.name = input.value.trim(); });
+      // focus for mobile after paint
+      setTimeout(() => input.focus(), 200);
+      box.querySelector('#adBack').onclick = () => { adoptDraft.step = 2; renderAdopt(); };
+      box.querySelector('#adConfirm').onclick = confirmAdopt;
+    }
+  }
+
+  function confirmAdopt() {
+    const name = (adoptDraft.name || '').trim();
+    if (!name) {
+      toast('Please pick a name! ✏️');
+      return;
+    }
+    if (state.money < ADOPT_FEE) {
+      toast(`Need $${ADOPT_FEE} to adopt.`);
+      return;
+    }
+    const breed = ANIMALS[adoptDraft.type].breeds.find(b => b.id === adoptDraft.breed);
+    state.money -= ADOPT_FEE;
+    state.ownPet = {
+      type: adoptDraft.type,
+      typeName: ANIMALS[adoptDraft.type].name,
+      breed: breed.id,
+      breedName: breed.name,
+      color: adoptDraft.color,
+      emoji: breed.emoji,
+      name,
+      outfit: null,
+      accessory: null,
+      lastCare: Date.now(),
+    };
+    save();
+    updateHUD();
+    confettiBurst();
+    sfx('success');
+    $('celebMsg').textContent = `Welcome home, ${name}! 🏠 Your new ${adoptDraft.color} ${breed.name} is so happy to be yours!`;
+    showScreen('screen-celeb');
+    toast(`${name} is family now! 💖`, 'good');
+  }
+
+  // ═══════════════════════════════════════
+  // OWN PET CARE
+  // ═══════════════════════════════════════
+  function careOwnPet() {
+    if (!state.ownPet) return;
+    sfx('tap');
+    startCare('own', state.ownPet, 7, null);
+  }
+
+  // ═══════════════════════════════════════
+  // WIRE EVENTS
+  // ═══════════════════════════════════════
+  function wire() {
+    $('btnStart').addEventListener('click', () => {
+      ensureAudio();
+      sfx('success');
+      showScreen('screen-home');
+      updateHUD();
+      scheduleNextCall();
+    });
+
+    $('phoneBtn').addEventListener('click', openCall);
+    $('btnAccept').addEventListener('click', acceptJob);
+    $('btnDecline').addEventListener('click', declineJob);
+
+    $('careGrid').addEventListener('click', (e) => {
+      const btn = e.target.closest('.care-btn');
+      if (!btn) return;
+      doCareAction(btn.dataset.action);
+    });
+
+    $('btnFinishJob').addEventListener('click', finishJob);
+    $('btnCareBack').addEventListener('click', () => {
+      // allow leaving own-pet care anytime; warn lightly on job
+      if (state.currentCare && state.currentCare.mode === 'job') {
+        const done = state.currentCare.required.filter(a => state.currentCare.done[a]).length;
+        if (done < state.currentCare.required.length) {
+          toast('Finish caring for the pet first! You\'ve got this! 💪');
+          return;
+        }
+      }
+      if (state.currentCare && state.currentCare.mode === 'own' && state.ownPet) {
+        // sync outfits
+        state.ownPet.outfit = state.currentCare.pet.outfit || null;
+        state.ownPet.accessory = state.currentCare.pet.accessory || null;
+        save();
+      }
+      state.currentCare = null;
+      showScreen('screen-home');
+      updateHUD();
+      if (!state.phoneReady && !state.pendingJob) scheduleNextCall();
+    });
+
+    $('btnMgBack').addEventListener('click', () => {
+      if (mgState && mgState.timer) clearInterval(mgState.timer);
+      if (mgState) mgState.alive = false;
+      mgState = null;
+      showScreen('screen-care');
+    });
+    $('btnMgDone').addEventListener('click', () => {
+      showScreen('screen-care');
+      renderCare();
+    });
+
+    $('btnParkRun').addEventListener('click', () => parkActivity('run'));
+    $('btnParkPicnic').addEventListener('click', () => parkActivity('picnic'));
+    $('btnParkDone').addEventListener('click', finishPark);
+    $('btnParkBack').addEventListener('click', () => {
+      showScreen('screen-care');
+    });
+
+    $('btnDressBack').addEventListener('click', () => showScreen('screen-care'));
+    $('btnDressDone').addEventListener('click', finishDress);
+
+    $('btnShop').addEventListener('click', openShop);
+    $('btnShopBack').addEventListener('click', () => {
+      showScreen('screen-home');
+      updateHUD();
+    });
+    document.querySelectorAll('.shop-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        shopTab = tab.dataset.tab;
+        document.querySelectorAll('.shop-tab').forEach(t => t.classList.toggle('active', t === tab));
+        renderShop();
+        sfx('tap');
+      });
+    });
+
+    $('btnAdopt').addEventListener('click', openAdopt);
+    $('btnAdoptBack').addEventListener('click', () => {
+      showScreen('screen-home');
+      updateHUD();
+    });
+    $('btnOwnPet').addEventListener('click', careOwnPet);
+    $('ownPetHomeCard').addEventListener('click', careOwnPet);
+
+    $('btnCelebOk').addEventListener('click', () => {
+      showScreen('screen-home');
+      updateHUD();
+      if (!state.phoneReady && !state.pendingJob) scheduleNextCall();
+      sfx('tap');
+    });
+
+    // prevent pull-to-refresh bounce annoyance a bit
+    document.addEventListener('touchmove', (e) => {
+      // allow scroll inside screens
+    }, { passive: true });
+  }
+
+  // ═══════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════
+  load();
+  wire();
+  updateHUD();
+  // if returning player with save, still show welcome for polish, but money visible
+  if (state.jobsCompleted > 0 || state.ownPet || state.money > 0) {
+    $('btnStart').textContent = 'Continue Adventure! 🎉';
+  }
+})();
+</script>
+</body>
+</html>
