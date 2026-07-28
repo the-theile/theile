@@ -295,12 +295,18 @@
   }
   .bath-pet {
     position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
-    font-size: 3.2rem; z-index: 4; transition: all 0.5s ease; opacity: 0; pointer-events: none;
+    z-index: 4; transition: all 0.5s ease; opacity: 0; pointer-events: none;
   }
-  .bath-pet.in-tub { opacity: 1; bottom: 28%; font-size: 2.6rem; }
-  .bath-pet.rinse { filter: drop-shadow(0 0 10px #4FC3F7); animation: shake 0.4s ease; }
+  .bath-pet.in-tub { opacity: 1; bottom: 26%; pointer-events: auto; }
+  .bath-pet.rinse { filter: drop-shadow(0 0 10px #4FC3F7); animation: bathShake 0.4s ease; }
   .bath-pet.dry { animation: happyBounce 0.6s ease; filter: brightness(1.1); }
-  @keyframes shake { 0%,100%{transform:translateX(-50%) rotate(0)} 25%{transform:translateX(-55%) rotate(-8deg)} 75%{transform:translateX(-45%) rotate(8deg)} }
+  @keyframes bathShake {
+    0%,100%{transform:translateX(-50%) rotate(0)}
+    25%{transform:translateX(-55%) rotate(-8deg)}
+    75%{transform:translateX(-45%) rotate(8deg)}
+  }
+  .pet-home-badge .pet-actor { filter: drop-shadow(0 3px 2px rgba(0,0,0,0.15)); }
+  .own-pet-card .pet-actor { flex-shrink: 0; }
 
   /* Bedroom */
   .room-bedroom {
@@ -325,27 +331,123 @@
   }
   .dresser::after { content: '👗'; position: absolute; top: -28px; left: 50%; transform: translateX(-50%); font-size: 1.4rem; }
 
-  /* Pet actor in room */
-  .room-pet {
-    position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%);
-    font-size: 4.2rem; z-index: 10; transition: left 0.55s ease, bottom 0.55s ease, transform 0.3s;
+  /* Pet actor (layered body + clothes) */
+  .pet-actor {
+    position: relative;
+    width: 7rem; height: 7rem;
+    display: inline-flex; align-items: center; justify-content: center;
     filter: drop-shadow(0 6px 4px rgba(0,0,0,0.15));
     cursor: pointer;
+    touch-action: manipulation;
+  }
+  .pet-actor.sm { width: 4.5rem; height: 4.5rem; }
+  .pet-actor.lg { width: 8.5rem; height: 8.5rem; }
+  .pa-body {
+    font-size: 4.2rem; line-height: 1; position: relative; z-index: 2;
+    transition: transform 0.2s;
+  }
+  .pet-actor.sm .pa-body { font-size: 2.6rem; }
+  .pet-actor.lg .pa-body { font-size: 5rem; }
+  .pa-slot {
+    position: absolute; pointer-events: none; line-height: 1;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .pa-slot:empty { display: none; }
+  .pa-head { top: -6%; left: 50%; transform: translateX(-50%); font-size: 1.65rem; z-index: 5; }
+  .pa-face { top: 30%; left: 50%; transform: translateX(-50%); font-size: 1.35rem; z-index: 6; }
+  .pa-clothes { bottom: 2%; left: 50%; transform: translateX(-50%); font-size: 1.85rem; z-index: 3; }
+  .pa-neck { bottom: 18%; left: 50%; transform: translateX(-50%); font-size: 1.25rem; z-index: 4; }
+  .pa-cape { right: -4%; top: 18%; font-size: 1.9rem; z-index: 1; transform: scaleX(-1); }
+  .pet-actor.sm .pa-head { font-size: 1.1rem; }
+  .pet-actor.sm .pa-face { font-size: 0.95rem; }
+  .pet-actor.sm .pa-clothes { font-size: 1.2rem; }
+  .pet-actor.sm .pa-neck { font-size: 0.85rem; }
+  .pet-actor.sm .pa-cape { font-size: 1.2rem; }
+  .pet-actor.lg .pa-head { font-size: 2rem; }
+  .pet-actor.lg .pa-face { font-size: 1.6rem; }
+  .pet-actor.lg .pa-clothes { font-size: 2.2rem; }
+  .pet-actor.lg .pa-neck { font-size: 1.45rem; }
+  .pet-actor.lg .pa-cape { font-size: 2.2rem; }
+  .pa-zzz {
+    position: absolute; top: -18%; right: -8%; font-size: 1.3rem; z-index: 8;
+    opacity: 0; pointer-events: none;
+  }
+  .pet-actor.sleeping .pa-zzz { opacity: 1; animation: zzzFloat 1.6s ease-in-out infinite; }
+  .pet-actor.sleeping .pa-body { animation: breathe 2.2s ease-in-out infinite; }
+  @keyframes zzzFloat {
+    0% { opacity: 0.4; transform: translateY(6px) scale(0.85); }
+    50% { opacity: 1; transform: translateY(-10px) scale(1.1); }
+    100% { opacity: 0.3; transform: translateY(-22px) scale(0.9); }
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1) translateY(0); }
+    50% { transform: scale(1.04) translateY(3px); }
+  }
+
+  .room-pet {
+    position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%);
+    z-index: 10; transition: left 0.55s ease, bottom 0.55s ease, transform 0.3s;
   }
   .room-pet.walking { animation: walkBob 0.35s ease-in-out infinite; }
   @keyframes walkBob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-10px)} }
-  .room-pet.eating { animation: eatBob 0.35s ease-in-out 6; }
-  @keyframes eatBob { 0%,100%{transform:translateX(-50%) scale(1)} 50%{transform:translateX(-50%) scale(1.08) translateY(4px)} }
-  .room-pet.drinking { animation: drinkTilt 0.5s ease-in-out 4; }
-  @keyframes drinkTilt { 0%,100%{transform:translateX(-50%) rotate(0)} 50%{transform:translateX(-50%) rotate(-12deg) translateY(4px)} }
+  .room-pet.eating .pa-body { animation: eatBob 0.35s ease-in-out 6; }
+  @keyframes eatBob { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08) translateY(4px)} }
+  .room-pet.drinking .pa-body { animation: drinkTilt 0.5s ease-in-out 4; }
+  @keyframes drinkTilt { 0%,100%{transform:rotate(0)} 50%{transform:rotate(-12deg) translateY(4px)} }
   .room-pet.happy { animation: happyBounce 0.6s ease; }
   @keyframes happyBounce {
     0%,100%{transform:translateX(-50%) scale(1) rotate(0)}
-    25%{transform:translateX(-50%) scale(1.15) rotate(-8deg)}
-    50%{transform:translateX(-50%) scale(1.2) rotate(8deg)}
-    75%{transform:translateX(-50%) scale(1.1) rotate(-4deg)}
+    25%{transform:translateX(-50%) scale(1.12) rotate(-8deg)}
+    50%{transform:translateX(-50%) scale(1.18) rotate(8deg)}
+    75%{transform:translateX(-50%) scale(1.08) rotate(-4deg)}
   }
   .room-pet.hidden-temp { opacity: 0; pointer-events: none; }
+  .room-pet.on-bed { bottom: 32%; }
+  .room-pet.napping { bottom: 34%; }
+
+  /* Fetch game */
+  .fetch-area {
+    position: relative; width: 100%; height: 280px;
+    background: linear-gradient(180deg, #81D4FA 0%, #A5D6A7 55%, #8BC34A 100%);
+    border-radius: 20px; border: 4px solid white; overflow: hidden; margin-bottom: 12px;
+    touch-action: none; cursor: pointer;
+  }
+  .fetch-area .fetch-hint {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.92); border-radius: 999px; padding: 6px 14px;
+    font-size: 0.8rem; font-weight: 800; color: var(--ink); z-index: 6;
+    border: 2px solid #FFE0B2; white-space: nowrap; pointer-events: none;
+  }
+  .fetch-ball {
+    position: absolute; width: 52px; height: 52px; font-size: 2.4rem;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 4; pointer-events: none;
+    filter: drop-shadow(0 4px 3px rgba(0,0,0,0.25));
+    transition: none;
+  }
+  .fetch-ball.throwing { transition: left 0.45s cubic-bezier(0.2,0.8,0.3,1), top 0.45s cubic-bezier(0.4,0,0.6,1); }
+  .fetch-dog {
+    position: absolute; top: 70%; left: 40%;
+    width: 72px; height: 72px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 5; transition: left 0.55s ease-in-out, top 0.55s ease-in-out;
+    font-size: 3.2rem; pointer-events: none;
+  }
+  .fetch-dog.running { animation: fetchRun 0.25s ease-in-out infinite; }
+  @keyframes fetchRun {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .fetch-dog.got-ball::after {
+    content: '🎾'; position: absolute; top: -4px; right: -4px; font-size: 1.2rem;
+  }
+  .fetch-success {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; font-weight: 800; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    background: rgba(46,125,50,0.35); opacity: 0; pointer-events: none; z-index: 8;
+    transition: opacity 0.2s;
+  }
+  .fetch-success.show { opacity: 1; }
 
   .food-float, .water-float {
     position: absolute; z-index: 12; font-size: 2rem; pointer-events: none;
@@ -446,11 +548,12 @@
   .walk-actors {
     position: absolute; bottom: 20%; left: 12%;
     display: flex; align-items: flex-end; gap: 4px;
-    transition: left 3.2s linear; z-index: 5; font-size: 2.8rem;
+    transition: left 3.2s linear; z-index: 5;
   }
   .walk-actors .sitter { font-size: 2.4rem; }
-  .walk-actors.going { left: 72%; }
-  .walk-actors.bob .sitter, .walk-actors.bob .wpet { animation: walkBob 0.3s ease-in-out infinite; }
+  .walk-actors.going { left: 68%; }
+  .walk-actors.bob .sitter, .walk-actors.bob .wpet { animation: walkBobFlat 0.3s ease-in-out infinite; }
+  @keyframes walkBobFlat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
   .walk-ui { padding: 14px; background: white; border-top: 3px solid #F0E6F5; }
 
   /* Park enhanced */
@@ -479,10 +582,15 @@
   .park-flower { position: absolute; font-size: 1.1rem; bottom: 30%; z-index: 2; }
   .park-bench { position: absolute; right: 18%; bottom: 34%; font-size: 1.8rem; z-index: 2; }
   .park-pet {
-    position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
-    font-size: 4rem; z-index: 5; animation: hop 1.2s ease-in-out infinite;
+    position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%);
+    z-index: 5; animation: hop 1.2s ease-in-out infinite;
+    display: flex; justify-content: center; align-items: flex-end;
   }
-  @keyframes hop { 0%,100%{transform:translateX(-50%) translateY(0)} 40%{transform:translateX(-50%) translateY(-16px)} 60%{transform:translateX(-50%) translateY(-8px)} }
+  @keyframes hop {
+    0%,100%{transform:translateX(-50%) translateY(0)}
+    40%{transform:translateX(-50%) translateY(-16px)}
+    60%{transform:translateX(-50%) translateY(-8px)}
+  }
   .park-sparkle { position: absolute; font-size: 1.1rem; animation: sparkle 2s ease-in-out infinite; }
   @keyframes sparkle { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.2)} }
   .park-ui { padding: 12px 14px 16px; background: white; }
@@ -507,21 +615,17 @@
   }
   .tap-zone.pop { animation: pop 0.25s ease; }
   @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1)} }
-  .fetch-area, .laser-area {
+  .laser-area {
     position: relative; width: 100%; height: 230px;
-    background: linear-gradient(180deg, #81D4FA 0%, #A5D6A7 70%);
+    background: linear-gradient(180deg, #ECEFF1 0%, #CFD8DC 100%);
     border-radius: 20px; border: 4px solid white; overflow: hidden; margin-bottom: 12px;
-  }
-  .laser-area { background: linear-gradient(180deg, #ECEFF1 0%, #CFD8DC 100%); }
-  .fetch-ball, .laser-dot {
-    position: absolute; width: 40px; height: 40px; font-size: 2rem; cursor: pointer;
-    filter: drop-shadow(0 3px 2px rgba(0,0,0,0.2)); z-index: 2;
+    touch-action: none;
   }
   .laser-dot {
-    width: 22px; height: 22px; border-radius: 50%; background: #FF1744;
-    box-shadow: 0 0 12px 4px rgba(255,23,68,0.7); font-size: 0;
+    position: absolute; width: 28px; height: 28px; border-radius: 50%; background: #FF1744;
+    box-shadow: 0 0 14px 5px rgba(255,23,68,0.75); z-index: 2; cursor: pointer;
   }
-  .fetch-pet { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 3rem; transition: left 0.25s ease; }
+  .fetch-pet { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 3rem; transition: left 0.25s ease; cursor: pointer; }
   .timer-bar { height: 10px; background: #FCE4EC; border-radius: 999px; overflow: hidden; margin-bottom: 12px; }
   .timer-fill { height: 100%; background: linear-gradient(90deg, var(--pink), var(--coral)); }
 
@@ -596,8 +700,10 @@
   @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0.3; } }
 
   @media (max-height: 700px) {
-    .room-pet { font-size: 3.4rem; }
+    .pa-body { font-size: 3.5rem; }
+    .pet-actor { width: 5.8rem; height: 5.8rem; }
     .house-scene { max-width: 280px; }
+    .fetch-area { height: 240px; }
   }
 </style>
 </head>
@@ -700,8 +806,8 @@
       <div class="room-view">
         <div class="room-bg room-kitchen" id="roomBg">
           <div id="roomDecor"></div>
-          <div class="room-pet" id="roomPet">🐶</div>
-          <div class="bath-pet" id="bathPet">🐶</div>
+          <div class="room-pet" id="roomPet"></div>
+          <div class="bath-pet" id="bathPet"></div>
           <div class="tub-hint hidden" id="tubHint">👆 Double-tap the tub!</div>
         </div>
       </div>
@@ -750,7 +856,7 @@
         <div class="walk-path"></div>
         <div class="walk-actors" id="walkActors">
           <span class="sitter">🧑</span>
-          <span class="wpet" id="walkPet">🐶</span>
+          <span class="wpet" id="walkPetMount"></span>
         </div>
       </div>
       <div class="walk-ui">
@@ -777,7 +883,7 @@
         <div class="park-path"></div>
         <span class="park-sparkle" style="top:22%;left:30%;">✨</span>
         <span class="park-sparkle" style="top:28%;right:28%;animation-delay:0.5s;">⭐</span>
-        <div class="park-pet" id="parkPet">🐶</div>
+        <div class="park-pet" id="parkPetMount"></div>
         <div style="position:absolute;bottom:12%;left:50%;transform:translateX(-50%);font-size:1.3rem;z-index:3;">🦋 🌻 🦋</div>
       </div>
       <div class="park-ui">
@@ -795,7 +901,7 @@
       <button class="btn btn-white btn-sm back-btn" id="btnDressBack">← Back</button>
       <h2 class="section-title">👔 Dress Up!</h2>
       <div class="pet-stage">
-        <div class="pet-emoji" id="dressPetEmoji">🐶</div>
+        <div id="dressPetMount" style="display:flex;justify-content:center;"></div>
         <div class="pet-outfit-label" id="dressPreviewLabel" style="font-size:0.85rem;color:var(--ink-soft);font-weight:600;margin-top:4px;">No outfit</div>
       </div>
       <p class="speech">Pick an outfit or accessory! You already own some free starters 🎁</p>
@@ -1014,8 +1120,27 @@
     bedroom: [
       { id: 'play', label: '🎮 Play', room: 'bedroom' },
       { id: 'dress', label: '👔 Dress Up', room: 'bedroom' },
+      { id: 'nap', label: '😴 Naptime', room: 'bedroom' },
       { id: 'park', label: '🌳 Park', room: 'bedroom' },
     ],
+  };
+
+  /* Visual gear worn on the pet body */
+  const OUTFIT_VIS = {
+    sweater:   { slot: 'clothes', emoji: '👕' },
+    raincoat:  { slot: 'clothes', emoji: '🧥' },
+    tutu:      { slot: 'clothes', emoji: '🩰' },
+    superhero: { slot: 'cape', emoji: '🦸' },
+    pajamas:   { slot: 'clothes', emoji: '🩳' },
+    tuxedo:    { slot: 'clothes', emoji: '👔' },
+  };
+  const ACC_VIS = {
+    bow:     { slot: 'head', emoji: '🎀' },
+    hat:     { slot: 'head', emoji: '🎩' },
+    glasses: { slot: 'face', emoji: '👓' },
+    crown:   { slot: 'head', emoji: '👑' },
+    scarf:   { slot: 'neck', emoji: '🧣' },
+    collar:  { slot: 'neck', emoji: '💝' },
   };
 
   // ── State ──
@@ -1184,6 +1309,20 @@
       tone(250, 0.08, 'triangle', 0.05);
       setTimeout(() => tone(180, 0.12, 'triangle', 0.04), 90);
     }
+    else if (name === 'snore') {
+      // soft breathing / snore
+      tone(90, 0.35, 'sine', 0.035);
+      setTimeout(() => tone(70, 0.45, 'triangle', 0.028), 280);
+      setTimeout(() => tone(85, 0.3, 'sine', 0.022), 700);
+    }
+    else if (name === 'throw') {
+      tone(320, 0.08, 'triangle', 0.05);
+      setTimeout(() => tone(280, 0.1, 'triangle', 0.04), 60);
+    }
+    else if (name === 'catch') {
+      tone(500, 0.08, 'sine', 0.06);
+      setTimeout(() => tone(700, 0.1, 'sine', 0.05), 70);
+    }
   }
 
   // Calm background music — soft pentatonic arpeggio loop
@@ -1269,15 +1408,61 @@
     return { type, breed: b.id, breedName: b.name, color: rand(b.colors), emoji: b.emoji || a.emoji, typeName: a.name };
   }
   function petLabel(p) { return `${p.color} ${p.breedName} ${p.typeName}`; }
-  function petDisplay(p) {
-    let d = p.emoji;
-    if (p.accessory === 'crown') d = '👑' + p.emoji;
-    else if (p.accessory === 'bow') d = p.emoji + '🎀';
-    else if (p.accessory === 'hat') d = '🥳' + p.emoji;
-    else if (p.accessory === 'glasses') d = p.emoji + '🕶️';
-    else if (p.accessory === 'scarf') d = p.emoji + '🧣';
-    else if (p.accessory === 'collar') d = p.emoji + '💝';
-    return d;
+
+  /** Build layered pet HTML that visually wears outfit + accessory */
+  function mountPet(container, pet, opts) {
+    if (!container || !pet) return null;
+    opts = opts || {};
+    const size = opts.size || ''; // '', 'sm', 'lg'
+    const sleeping = !!opts.sleeping;
+    const actor = document.createElement('div');
+    actor.className = 'pet-actor' + (size ? ' ' + size : '') + (sleeping ? ' sleeping' : '');
+    actor.dataset.animalType = pet.type || '';
+    actor.setAttribute('role', 'button');
+    actor.setAttribute('aria-label', (pet.name || 'Pet') + ' — tap to hear');
+
+    const slots = { head: '', face: '', clothes: '', neck: '', cape: '' };
+    if (pet.outfit && OUTFIT_VIS[pet.outfit]) {
+      const v = OUTFIT_VIS[pet.outfit];
+      slots[v.slot] = v.emoji;
+    }
+    if (pet.accessory && ACC_VIS[pet.accessory]) {
+      const v = ACC_VIS[pet.accessory];
+      // head accessory wins over outfit only on same slot — accessories take priority on head
+      slots[v.slot] = v.emoji;
+    }
+
+    actor.innerHTML =
+      `<span class="pa-slot pa-cape">${slots.cape || ''}</span>` +
+      `<span class="pa-slot pa-head">${slots.head || ''}</span>` +
+      `<span class="pa-body">${pet.emoji || '🐾'}</span>` +
+      `<span class="pa-slot pa-face">${slots.face || ''}</span>` +
+      `<span class="pa-slot pa-clothes">${slots.clothes || ''}</span>` +
+      `<span class="pa-slot pa-neck">${slots.neck || ''}</span>` +
+      `<span class="pa-zzz">💤</span>`;
+
+    actor.addEventListener('click', (e) => {
+      // Play species sound whenever the animal is tapped
+      ensureAudio();
+      animalSound(pet.type);
+      if (!actor.classList.contains('sleeping')) {
+        const body = actor.querySelector('.pa-body');
+        if (body) {
+          body.style.transform = 'scale(1.12)';
+          setTimeout(() => { body.style.transform = ''; }, 220);
+        }
+      }
+    });
+
+    container.innerHTML = '';
+    container.appendChild(actor);
+    return actor;
+  }
+
+  function setPetSleeping(container, on) {
+    const actor = container && container.querySelector('.pet-actor');
+    if (!actor) return;
+    actor.classList.toggle('sleeping', !!on);
   }
   function toast(msg, kind) {
     const el = $('toast');
@@ -1323,14 +1508,15 @@
     $('muteBtn').textContent = state.muted ? '🔇' : '🔊';
     if (state.ownPet) {
       $('homePetBadge').classList.remove('hidden');
-      $('homePetBadge').textContent = state.ownPet.emoji;
+      mountPet($('homePetBadge'), state.ownPet, { size: 'sm' });
       $('ownPetHomeCard').classList.remove('hidden');
-      $('ownPetHomeEmoji').textContent = state.ownPet.emoji;
+      mountPet($('ownPetHomeEmoji'), state.ownPet, { size: 'sm' });
       $('ownPetHomeName').textContent = state.ownPet.name;
       $('ownPetHomeMeta').textContent = petLabel(state.ownPet) + ' · Tap to care';
       $('homeSub').textContent = state.ownPet.name + ' is happy at home!';
     } else {
       $('homePetBadge').classList.add('hidden');
+      $('homePetBadge').innerHTML = '';
       $('ownPetHomeCard').classList.add('hidden');
       $('homeSub').textContent = 'Wait for pet owners to call!';
     }
@@ -1423,9 +1609,9 @@
   // CARE + ROOMS
   // ══════════════════════════════════════
   function startCare(mode, pet, requiredTasks, jobMeta) {
-    const allActions = ['feed', 'water', 'treat', 'bathe', 'play', 'dress', 'park'];
+    const allActions = ['feed', 'water', 'treat', 'bathe', 'play', 'dress', 'nap', 'park'];
     let required = allActions.slice();
-    if (requiredTasks < 7) {
+    if (requiredTasks < allActions.length) {
       required = shuffle(allActions.slice()).slice(0, requiredTasks);
       if (!required.includes('feed')) required[0] = 'feed';
       if (!required.includes('water') && required.length > 1) required[1] = 'water';
@@ -1507,7 +1693,10 @@
       el.classList.add('hidden-temp');
     } else {
       el.classList.remove('hidden-temp');
-      el.textContent = petDisplay(c.pet);
+      const wasSleeping = el.classList.contains('napping');
+      mountPet(el, c.pet, { sleeping: wasSleeping });
+      if (wasSleeping) el.classList.add('napping', 'on-bed');
+      else el.classList.remove('napping', 'on-bed');
     }
   }
 
@@ -1525,6 +1714,7 @@
       if (a.id === 'bathe') btn.className = 'btn btn-sky' + (c.done[a.id] ? ' done' : '');
       if (a.id === 'play') btn.className = 'btn btn-purple' + (c.done[a.id] ? ' done' : '');
       if (a.id === 'dress') btn.className = 'btn btn-pink' + (c.done[a.id] ? ' done' : '');
+      if (a.id === 'nap') btn.className = 'btn btn-lavender btn-purple' + (c.done[a.id] ? ' done' : '');
       if (a.id === 'park') btn.className = 'btn btn-mint' + (c.done[a.id] ? ' done' : '');
       btn.textContent = a.label + (c.done[a.id] ? ' ✓' : '');
       btn.addEventListener('click', () => onRoomAction(a.id));
@@ -1599,7 +1789,41 @@
     }
     if (action === 'play') { startMiniGame(); return; }
     if (action === 'dress') { openDress(); return; }
+    if (action === 'nap') { doNaptime(); return; }
     if (action === 'park') { startWalkToPark(); return; }
+  }
+
+  // ── Naptime ──
+  function doNaptime() {
+    const c = state.currentCare;
+    if (!c) return;
+    if (c.done.nap) {
+      toast(`${c.pet.name} already had a cozy nap! 😴`);
+      return;
+    }
+    const petWrap = $('roomPet');
+    petWrap.classList.add('on-bed', 'napping');
+    mountPet(petWrap, c.pet, { sleeping: true });
+    $('careSpeech').textContent = `${c.pet.name} is curling up for a nap… 💤`;
+    sfx('snore');
+    let snores = 0;
+    const snoreLoop = setInterval(() => {
+      sfx('snore');
+      snores++;
+      if (snores >= 3) clearInterval(snoreLoop);
+    }, 900);
+
+    setTimeout(() => {
+      clearInterval(snoreLoop);
+      petWrap.classList.remove('napping', 'on-bed', 'happy');
+      mountPet(petWrap, c.pet, { sleeping: false });
+      petWrap.classList.add('happy');
+      animalSound(c.pet.type);
+      sfx('happy');
+      completeCareAction('nap');
+      $('careSpeech').textContent = `${c.pet.name} woke up refreshed! What a sweet nap 😴✨`;
+      setTimeout(() => petWrap.classList.remove('happy'), 700);
+    }, 3200);
   }
 
   // ── Feeding ──
@@ -1745,7 +1969,10 @@
     const pet = $('roomPet');
     pet.classList.add('hidden-temp');
     const bp = $('bathPet');
-    bp.textContent = c.pet.emoji;
+    // No clothes in the tub — just the animal body
+    bp.innerHTML = '';
+    const bare = Object.assign({}, c.pet, { outfit: null, accessory: null });
+    mountPet(bp, bare, { size: 'sm' });
     bp.className = 'bath-pet in-tub';
     bp.style.opacity = '1';
 
@@ -1819,7 +2046,8 @@
     if (!bathState) return;
     const c = state.currentCare;
     const bp = $('bathPet');
-    bp.textContent = c.pet.emoji;
+    const bare = Object.assign({}, c.pet, { outfit: null, accessory: null });
+    mountPet(bp, bare, { size: 'sm' });
     if (bathState.step >= 1) {
       bp.className = 'bath-pet in-tub' + (bathState.step >= 3 ? ' rinse' : '') + (bathState.step >= 4 ? ' dry' : '');
       bp.style.opacity = '1';
@@ -1955,14 +2183,14 @@
     let score = 0, timeLeft = 8;
     const zone = document.createElement('div');
     zone.className = 'tap-zone';
-    zone.textContent = state.currentCare.pet.emoji;
+    mountPet(zone, state.currentCare.pet, { size: 'lg' });
     zone.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       score++;
       $('mgScore').textContent = 'Score: ' + score;
       zone.classList.remove('pop'); void zone.offsetWidth; zone.classList.add('pop');
       sfx('pop');
-      if (score % 3 === 0) animalSound(state.currentCare.pet.type);
+      animalSound(state.currentCare.pet.type);
     });
     $('mgArea').appendChild(zone);
     const t = setInterval(() => {
@@ -1974,48 +2202,153 @@
   }
 
   function runFetch() {
+    // Real fetch: tap field to throw → dog runs → picks up → brings back
+    const GOAL = 3;
+    const TIME = 30;
     $('mgTitle').textContent = '🎾 Fetch!';
-    $('mgInstructions').textContent = 'Tap the bouncing ball — good dog!';
-    let score = 0, timeLeft = 10;
+    $('mgInstructions').textContent = 'Tap the grass to throw the ball! Watch your pet bring it back.';
+    let score = 0;
+    let timeLeft = TIME;
+    let phase = 'ready'; // ready | flying | retrieve | return
+    let busy = false;
+
     const area = document.createElement('div');
     area.className = 'fetch-area';
-    const ball = document.createElement('div');
-    ball.className = 'fetch-ball';
-    ball.textContent = '🎾';
-    const pet = document.createElement('div');
-    pet.className = 'fetch-pet';
-    pet.textContent = state.currentCare.pet.emoji;
-    area.appendChild(ball); area.appendChild(pet);
+    area.innerHTML = `
+      <div class="fetch-hint" id="fetchHint">👆 Tap to throw!</div>
+      <div class="fetch-success" id="fetchSuccess">Good fetch! 🎉</div>
+      <div class="fetch-ball" id="fetchBall">🎾</div>
+      <div class="fetch-dog" id="fetchDog"></div>
+    `;
     $('mgArea').appendChild(area);
-    let x = 50, y = 40, vx = 3, vy = 2.5;
-    function move() {
-      if (!mgState || !mgState.alive) return;
-      const w = area.clientWidth - 40, h = area.clientHeight - 80;
-      x += vx; y += vy;
-      if (x <= 0 || x >= w) vx *= -1;
-      if (y <= 0 || y >= h) vy *= -1;
-      x = Math.max(0, Math.min(w, x)); y = Math.max(0, Math.min(h, y));
-      ball.style.left = x + 'px'; ball.style.top = y + 'px';
-      requestAnimationFrame(move);
+
+    const ball = area.querySelector('#fetchBall');
+    const dog = area.querySelector('#fetchDog');
+    const hint = area.querySelector('#fetchHint');
+    const success = area.querySelector('#fetchSuccess');
+
+    // Show clothed pet as the dog/fetcher
+    mountPet(dog, state.currentCare.pet, { size: 'sm' });
+    // Override: whole dog node handles run class
+    dog.querySelector('.pet-actor')?.classList.add('sm');
+
+    const HOME = { x: 0.5, y: 0.78 }; // fraction of area (0–1)
+    function placeDog(fx, fy, animate) {
+      const w = area.clientWidth || 300;
+      const h = area.clientHeight || 280;
+      const px = Math.max(0, Math.min(w - 72, fx * w - 36));
+      const py = Math.max(0, Math.min(h - 72, fy * h - 36));
+      dog.style.transition = animate ? 'left 0.55s ease-in-out, top 0.55s ease-in-out' : 'none';
+      dog.style.left = px + 'px';
+      dog.style.top = py + 'px';
     }
-    ball.addEventListener('pointerdown', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      score++; $('mgScore').textContent = 'Score: ' + score;
-      vx = (Math.random() > 0.5 ? 1 : -1) * (2.5 + Math.random() * 3);
-      vy = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2.5);
-      sfx('pop'); animalSound('dog');
-      pet.style.transform = 'translateX(-50%) scale(1.15)';
-      setTimeout(() => { pet.style.transform = 'translateX(-50%) scale(1)'; }, 150);
+    function placeBall(fx, fy, animate) {
+      const w = area.clientWidth || 300;
+      const h = area.clientHeight || 280;
+      const px = Math.max(0, Math.min(w - 52, fx * w - 26));
+      const py = Math.max(0, Math.min(h - 52, fy * h - 26));
+      ball.classList.toggle('throwing', !!animate);
+      ball.style.left = px + 'px';
+      ball.style.top = py + 'px';
+    }
+
+    // Initial layout after paint
+    requestAnimationFrame(() => {
+      placeDog(HOME.x, HOME.y, false);
+      placeBall(HOME.x + 0.12, HOME.y - 0.05, false);
     });
+
+    function setHint(t) { hint.textContent = t; }
+
+    function throwTo(clientX, clientY) {
+      if (busy || phase !== 'ready' || !mgState || !mgState.alive) return;
+      const rect = area.getBoundingClientRect();
+      let fx = (clientX - rect.left) / rect.width;
+      let fy = (clientY - rect.top) / rect.height;
+      // keep throw in upper/mid field so dog has room to run
+      fx = Math.max(0.12, Math.min(0.88, fx));
+      fy = Math.max(0.12, Math.min(0.55, fy));
+
+      busy = true;
+      phase = 'flying';
+      setHint('Ball is flying…');
+      sfx('throw');
+
+      placeBall(fx, fy, true);
+
+      setTimeout(() => {
+        if (!mgState || !mgState.alive) return;
+        phase = 'retrieve';
+        setHint('Go get it!');
+        dog.classList.add('running');
+        sfx('walk');
+        animalSound(state.currentCare.pet.type);
+
+        // Run dog to ball
+        placeDog(fx, fy + 0.08, true);
+
+        setTimeout(() => {
+          if (!mgState || !mgState.alive) return;
+          // Pick up
+          dog.classList.add('got-ball');
+          ball.style.opacity = '0';
+          sfx('catch');
+          setHint('Bringing it back!');
+
+          phase = 'return';
+          placeDog(HOME.x, HOME.y, true);
+
+          setTimeout(() => {
+            if (!mgState || !mgState.alive) return;
+            dog.classList.remove('running', 'got-ball');
+            ball.style.opacity = '1';
+            placeBall(HOME.x + 0.12, HOME.y - 0.05, false);
+
+            score++;
+            $('mgScore').textContent = 'Score: ' + score + ' / ' + GOAL;
+            sfx('success');
+            animalSound(state.currentCare.pet.type);
+            success.classList.add('show');
+            success.textContent = score >= GOAL ? 'Amazing! All fetches done! 🌟' : 'Good fetch! 🎉';
+            setTimeout(() => success.classList.remove('show'), 700);
+
+            phase = 'ready';
+            busy = false;
+            setHint(score >= GOAL ? 'All done!' : '👆 Tap to throw again!');
+
+            if (score >= GOAL) {
+              if (mgState && mgState.timer) clearInterval(mgState.timer);
+              mgState.alive = false;
+              setTimeout(() => finishMiniGame(true), 600);
+            }
+          }, 600);
+        }, 600);
+      }, 480);
+    }
+
+    // Touch-friendly: whole field is the throw target
+    function onPointer(e) {
+      e.preventDefault();
+      const t = e.changedTouches ? e.changedTouches[0] : e;
+      const x = t.clientX, y = t.clientY;
+      throwTo(x, y);
+    }
+    area.addEventListener('pointerdown', onPointer, { passive: false });
+    // Also allow dog tap for sound without throwing if ready... actually whole area throws
+    // Dog sound on tap is fine during throw via animalSound in sequence
+
+    $('mgScore').textContent = 'Score: 0 / ' + GOAL;
+    $('mgTimer').style.width = '100%';
+
     mgState = { alive: true, timer: null };
-    move();
     const t = setInterval(() => {
       timeLeft -= 0.1;
-      $('mgTimer').style.width = Math.max(0, (timeLeft / 10) * 100) + '%';
+      $('mgTimer').style.width = Math.max(0, (timeLeft / TIME) * 100) + '%';
       if (timeLeft <= 0) {
         clearInterval(t);
         if (mgState) mgState.alive = false;
-        finishMiniGame(score >= 3);
+        // Never punish — complete if they got at least 1, else still positive
+        finishMiniGame(score >= 1 || score >= GOAL);
       }
     }, 100);
     mgState.timer = t;
@@ -2031,7 +2364,7 @@
     dot.className = 'laser-dot';
     const pet = document.createElement('div');
     pet.className = 'fetch-pet';
-    pet.textContent = state.currentCare.pet.emoji;
+    mountPet(pet, state.currentCare.pet, { size: 'sm' });
     area.appendChild(dot); area.appendChild(pet);
     $('mgArea').appendChild(area);
     let x = 80, y = 60, tx = 100, ty = 80;
@@ -2080,7 +2413,7 @@
   // ══════════════════════════════════════
   function startWalkToPark() {
     const c = state.currentCare;
-    $('walkPet').textContent = c.pet.emoji;
+    mountPet($('walkPetMount'), c.pet, { size: 'sm' });
     $('walkActors').classList.remove('going', 'bob');
     $('walkActors').style.left = '';
     $('walkSpeech').textContent = `Time for a walk! Take ${c.pet.name} to the park.`;
@@ -2114,7 +2447,7 @@
 
   function openPark() {
     const c = state.currentCare;
-    $('parkPet').textContent = petDisplay(c.pet);
+    mountPet($('parkPetMount'), c.pet, { size: 'lg' });
     $('parkSpeech').textContent = `${c.pet.name} loves the park! Look at those butterflies! 🦋`;
     showScreen('screen-park');
     animalSound(c.pet.type);
@@ -2125,18 +2458,19 @@
     sfx('pop');
     animalSound(state.currentCare.pet.type);
     const p = state.currentCare.pet;
+    const mount = $('parkPetMount');
     if (kind === 'run') {
       $('parkSpeech').textContent = `${p.name} is zooming around! Zoom zoom! 💨`;
-      $('parkPet').style.animationDuration = '0.45s';
+      mount.style.animationDuration = '0.45s';
     } else {
       $('parkSpeech').textContent = `Picnic time! ${p.name} shares a cookie with you 🍪`;
-      $('parkPet').style.animationDuration = '1.8s';
+      mount.style.animationDuration = '1.8s';
       sfx('eat');
     }
   }
 
   function finishPark() {
-    $('parkPet').style.animationDuration = '';
+    $('parkPetMount').style.animationDuration = '';
     sfx('walk');
     completeCareAction('park');
     state.room = 'bedroom';
@@ -2151,7 +2485,7 @@
   // ══════════════════════════════════════
   function openDress() {
     const c = state.currentCare;
-    $('dressPetEmoji').textContent = petDisplay(c.pet);
+    mountPet($('dressPetMount'), c.pet, { size: 'lg' });
     renderOutfitGrid();
     showScreen('screen-dress');
     sfx('tap');
@@ -2193,7 +2527,7 @@
 
   function updateDressPreview() {
     const c = state.currentCare;
-    $('dressPetEmoji').textContent = petDisplay(c.pet);
+    mountPet($('dressPetMount'), c.pet, { size: 'lg' });
     const parts = [];
     if (c.pet.outfit) {
       const o = SHOP.outfits.find(x => x.id === c.pet.outfit);
@@ -2424,14 +2758,14 @@
       tab.addEventListener('click', () => goToRoom(tab.dataset.room));
     });
 
+    // Pet sound is handled by mountPet click on .pet-actor; also bounce the wrapper
     $('roomPet').addEventListener('click', () => {
-      if (state.currentCare) {
-        animalSound(state.currentCare.pet.type);
-        $('roomPet').classList.remove('happy');
-        void $('roomPet').offsetWidth;
-        $('roomPet').classList.add('happy');
-        setTimeout(() => $('roomPet').classList.remove('happy'), 600);
-      }
+      if (!state.currentCare) return;
+      const wrap = $('roomPet');
+      wrap.classList.remove('happy');
+      void wrap.offsetWidth;
+      wrap.classList.add('happy');
+      setTimeout(() => wrap.classList.remove('happy'), 600);
     });
 
     $('btnFinishJob').addEventListener('click', finishJob);
