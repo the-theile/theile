@@ -182,10 +182,30 @@
   .progress-bar { height: 100%; background: linear-gradient(90deg, var(--mint), var(--sky)); border-radius: 999px; transition: width 0.5s ease; }
   .progress-label { font-size: 0.85rem; font-weight: 700; color: var(--ink-soft); }
   .own-pet-card { display: flex; align-items: center; gap: 12px; margin-top: 10px; cursor: pointer; }
-  .own-pet-card .big { font-size: 2.6rem; }
-  .own-pet-card .info { flex: 1; text-align: left; }
+  .own-pet-card .big { font-size: 2.6rem; flex-shrink: 0; }
+  .own-pet-card .info { flex: 1; text-align: left; min-width: 0; }
   .own-pet-card .info strong { display: block; font-size: 1.05rem; }
   .own-pet-card .info span { font-size: 0.82rem; color: var(--ink-soft); font-weight: 600; }
+  .own-pets-section { margin-top: 12px; }
+  .own-pets-section h3 {
+    font-size: 1rem; margin-bottom: 8px; text-align: center;
+    color: var(--purple);
+  }
+  .own-pets-list { display: flex; flex-direction: column; gap: 8px; }
+  .own-pets-list .own-pet-card { margin-top: 0; }
+  .home-pets-row {
+    position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; align-items: flex-end; z-index: 4;
+    max-width: 85%; flex-wrap: wrap; justify-content: center;
+  }
+  .home-pets-row .pet-actor { width: 2.8rem; height: 2.8rem; }
+  .home-pets-row .pa-body-img { border-width: 2px; }
+  .home-pets-row .pa-slot { display: none; } /* keep house badges clean */
+  .pet-count-pill {
+    display: inline-block; background: #F3E5F5; color: var(--purple);
+    border-radius: 999px; padding: 2px 10px; font-size: 0.78rem; font-weight: 800;
+    margin-left: 6px;
+  }
 
   /* Call */
   .call-ring { text-align: center; padding: 18px 0; }
@@ -794,7 +814,7 @@
             <div class="door"></div>
           </div>
         </div>
-        <div class="pet-home-badge hidden" id="homePetBadge">🐕</div>
+        <div class="home-pets-row hidden" id="homePetsRow"></div>
         <div class="phone-area">
           <button class="phone-btn" id="phoneBtn" aria-label="Answer phone">📱</button>
           <div class="phone-label" id="phoneLabel">Phone</div>
@@ -802,7 +822,7 @@
       </div>
       <div class="home-actions">
         <button class="btn btn-purple" id="btnShop">🛒 Shop</button>
-        <button class="btn btn-sky" id="btnOwnPet" disabled>🏠 My Pet</button>
+        <button class="btn btn-sky" id="btnOwnPet" disabled>🏠 My Pets</button>
         <button class="btn btn-mint" id="btnAdopt" disabled style="grid-column:1/-1;">💖 Adopt a Pet!</button>
       </div>
       <div class="card status-card card-soft">
@@ -810,14 +830,22 @@
         <div class="progress-bar-wrap"><div class="progress-bar" id="jobProgress" style="width:0%"></div></div>
         <div class="progress-label" id="jobProgressLabel">Complete 11 jobs to adopt your own pet!</div>
       </div>
-      <div class="card own-pet-card hidden" id="ownPetHomeCard">
-        <div class="big" id="ownPetHomeEmoji">🐾</div>
-        <div class="info">
-          <strong id="ownPetHomeName">Buddy</strong>
-          <span id="ownPetHomeMeta">Your adopted friend · Tap to care</span>
-        </div>
-        <span style="font-size:1.4rem;">›</span>
+      <div class="own-pets-section hidden" id="ownPetsSection">
+        <h3>🏡 Your Pets <span class="pet-count-pill" id="petCountPill">0</span></h3>
+        <p style="text-align:center;font-size:0.85rem;color:var(--ink-soft);font-weight:600;margin-bottom:8px;">
+          Tap a pet to care for them
+        </p>
+        <div class="own-pets-list" id="ownPetsList"></div>
       </div>
+    </section>
+
+    <!-- Pick a pet to care for (also used when list is long) -->
+    <section class="screen" id="screen-mypets">
+      <button class="btn btn-white btn-sm back-btn" id="btnMyPetsBack">← Home</button>
+      <h2 class="section-title">🏠 My Pets</h2>
+      <p class="speech" id="myPetsSpeech">Who do you want to spend time with?</p>
+      <div class="own-pets-list" id="myPetsList"></div>
+      <button class="btn btn-mint btn-block" id="btnMyPetsAdopt" style="margin-top:14px;">💖 Adopt another pet</button>
     </section>
 
     <!-- CALL -->
@@ -1292,7 +1320,8 @@
   let state = {
     money: 0, jobsCompleted: 0,
     inventory: { outfits: [], accessories: [], toys: [] },
-    ownPet: null, celebrated: false, muted: false,
+    ownPets: [], // array of adopted pets (multi-pet)
+    celebrated: false, muted: false,
     phoneReady: true, pendingJob: null,
     currentCare: null, room: 'kitchen',
   };
@@ -1491,11 +1520,45 @@
   // ══════════════════════════════════════
   // STORAGE
   // ══════════════════════════════════════
+  function newPetId() {
+    return 'pet_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+  }
+
+  function normalizeOwnPets(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(p => {
+      if (!p) return null;
+      if (!p.id) p.id = newPetId();
+      if (!p.img) p.img = resolvePetImg(p);
+      return p;
+    }).filter(Boolean);
+  }
+
+  function findOwnPet(id) {
+    return (state.ownPets || []).find(p => p.id === id) || null;
+  }
+
+  function syncOwnPetFromCare(c) {
+    if (!c || c.mode !== 'own' || !c.pet) return;
+    const id = c.pet.id;
+    const stored = id ? findOwnPet(id) : state.ownPets[0];
+    if (!stored) return;
+    stored.lastCare = Date.now();
+    stored.outfit = c.pet.outfit || null;
+    stored.accessory = c.pet.accessory || null;
+    // keep name/img/type in sync if care mutated
+    if (c.pet.img) stored.img = c.pet.img;
+    save();
+  }
+
   function save() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         money: state.money, jobsCompleted: state.jobsCompleted,
-        inventory: state.inventory, ownPet: state.ownPet,
+        inventory: state.inventory,
+        ownPets: state.ownPets,
+        // keep legacy key for older readers; first pet only
+        ownPet: state.ownPets[0] || null,
         celebrated: state.celebrated, muted: state.muted,
       }));
     } catch (e) {}
@@ -1520,17 +1583,26 @@
       }
       if (!raw) {
         state.inventory = giveStarters({ outfits: [], accessories: [], toys: [] });
+        state.ownPets = [];
         return;
       }
       const d = JSON.parse(raw);
       state.money = d.money || 0;
       state.jobsCompleted = d.jobsCompleted || 0;
       state.inventory = giveStarters(d.inventory || { outfits: [], accessories: [], toys: [] });
-      state.ownPet = d.ownPet || null;
+      // Multi-pet: prefer ownPets; migrate single ownPet if needed
+      if (Array.isArray(d.ownPets) && d.ownPets.length) {
+        state.ownPets = normalizeOwnPets(d.ownPets);
+      } else if (d.ownPet) {
+        state.ownPets = normalizeOwnPets([d.ownPet]);
+      } else {
+        state.ownPets = [];
+      }
       state.celebrated = !!d.celebrated;
       state.muted = !!d.muted;
     } catch (e) {
       state.inventory = giveStarters({ outfits: [], accessories: [], toys: [] });
+      state.ownPets = [];
     }
   }
 
@@ -1680,34 +1752,95 @@
     const el = $(id);
     if (el) el.classList.add('active');
   }
+  function renderOwnPetsList(container, opts) {
+    if (!container) return;
+    opts = opts || {};
+    container.innerHTML = '';
+    const pets = state.ownPets || [];
+    if (!pets.length) {
+      container.innerHTML = '<p class="speech">No pets yet — adopt your first friend!</p>';
+      return;
+    }
+    pets.forEach(pet => {
+      const card = document.createElement('div');
+      card.className = 'card own-pet-card';
+      const thumb = document.createElement('div');
+      thumb.className = 'big';
+      mountPet(thumb, pet, { size: 'sm' });
+      const info = document.createElement('div');
+      info.className = 'info';
+      info.innerHTML = `<strong>${pet.name || 'Friend'}</strong><span>${petLabel(pet)} · Tap to care</span>`;
+      const chev = document.createElement('span');
+      chev.style.fontSize = '1.4rem';
+      chev.textContent = '›';
+      card.appendChild(thumb);
+      card.appendChild(info);
+      card.appendChild(chev);
+      card.addEventListener('click', (e) => {
+        // Don't block if they tapped the photo for sound — still open care on card
+        if (e.target && e.target.closest && e.target.closest('.pet-actor') && e.detail === 1) {
+          // slight delay so sound plays, then care
+        }
+        careOwnPet(pet.id);
+      });
+      container.appendChild(card);
+    });
+  }
+
   function updateHUD() {
     $('moneyDisplay').textContent = state.money;
     const jobs = Math.min(state.jobsCompleted, JOBS_NEEDED);
     $('jobsPill').textContent = `Jobs: ${jobs}/${JOBS_NEEDED}`;
     $('jobProgress').style.width = Math.min(100, (state.jobsCompleted / JOBS_NEEDED) * 100) + '%';
+    const petCount = (state.ownPets || []).length;
     if (state.jobsCompleted >= JOBS_NEEDED) {
-      $('jobProgressLabel').textContent = state.ownPet
-        ? '🌟 Super sitter! Keep helping pets!'
+      $('jobProgressLabel').textContent = petCount
+        ? `🌟 Super sitter! You have ${petCount} pet${petCount === 1 ? '' : 's'} — adopt more anytime!`
         : 'Ready to adopt! Tap “Adopt a Pet!”';
     } else {
       const left = JOBS_NEEDED - state.jobsCompleted;
       $('jobProgressLabel').textContent = `${left} more job${left === 1 ? '' : 's'} until you can adopt!`;
     }
-    $('btnAdopt').disabled = !(state.jobsCompleted >= JOBS_NEEDED && !state.ownPet);
-    $('btnOwnPet').disabled = !state.ownPet;
+    // Can adopt more pets after unlock (not limited to one)
+    $('btnAdopt').disabled = !(state.jobsCompleted >= JOBS_NEEDED);
+    $('btnOwnPet').disabled = petCount === 0;
+    $('btnOwnPet').textContent = petCount === 0 ? '🏠 My Pets' : (petCount === 1 ? '🏠 My Pet' : `🏠 My Pets (${petCount})`);
     $('muteBtn').textContent = state.muted ? '🔇' : '🔊';
-    if (state.ownPet) {
-      $('homePetBadge').classList.remove('hidden');
-      mountPet($('homePetBadge'), state.ownPet, { size: 'sm' });
-      $('ownPetHomeCard').classList.remove('hidden');
-      mountPet($('ownPetHomeEmoji'), state.ownPet, { size: 'sm' });
-      $('ownPetHomeName').textContent = state.ownPet.name;
-      $('ownPetHomeMeta').textContent = petLabel(state.ownPet) + ' · Tap to care';
-      $('homeSub').textContent = state.ownPet.name + ' is happy at home!';
+
+    const row = $('homePetsRow');
+    const section = $('ownPetsSection');
+    const list = $('ownPetsList');
+    const pill = $('petCountPill');
+
+    if (petCount > 0) {
+      if (row) {
+        row.classList.remove('hidden');
+        row.innerHTML = '';
+        // show up to 5 pets on the house lawn
+        state.ownPets.slice(0, 5).forEach(p => {
+          const wrap = document.createElement('div');
+          mountPet(wrap, p, { size: 'sm' });
+          // hide accessory clutter on tiny lawn icons already via CSS
+          row.appendChild(wrap.firstChild || wrap);
+        });
+        if (petCount > 5) {
+          const more = document.createElement('div');
+          more.style.cssText = 'font-weight:800;font-size:0.75rem;background:white;border-radius:999px;padding:4px 8px;';
+          more.textContent = '+' + (petCount - 5);
+          row.appendChild(more);
+        }
+      }
+      if (section) section.classList.remove('hidden');
+      if (pill) pill.textContent = String(petCount);
+      renderOwnPetsList(list);
+      const names = state.ownPets.map(p => p.name).filter(Boolean);
+      if (names.length === 1) $('homeSub').textContent = names[0] + ' is happy at home!';
+      else if (names.length === 2) $('homeSub').textContent = names[0] + ' & ' + names[1] + ' are at home!';
+      else $('homeSub').textContent = names.slice(0, 2).join(', ') + ' & friends are at home!';
     } else {
-      $('homePetBadge').classList.add('hidden');
-      $('homePetBadge').innerHTML = '';
-      $('ownPetHomeCard').classList.add('hidden');
+      if (row) { row.classList.add('hidden'); row.innerHTML = ''; }
+      if (section) section.classList.add('hidden');
+      if (list) list.innerHTML = '';
       $('homeSub').textContent = 'Wait for pet owners to call!';
     }
   }
@@ -2252,11 +2385,8 @@
     if (!c) return;
     c.done[action] = true;
     if (c.hearts < 5) c.hearts = Math.min(5, c.hearts + 1);
-    if (c.mode === 'own' && state.ownPet) {
-      state.ownPet.lastCare = Date.now();
-      if (c.pet.outfit) state.ownPet.outfit = c.pet.outfit;
-      if (c.pet.accessory) state.ownPet.accessory = c.pet.accessory;
-      save();
+    if (c.mode === 'own') {
+      syncOwnPetFromCare(c);
     }
     renderRoomActions();
     updateCareHUD();
@@ -2786,7 +2916,6 @@
   let adoptDraft = { step: 0, type: null, breed: null, color: null, name: '' };
 
   function openAdopt() {
-    if (state.ownPet) { toast('You already have a wonderful pet!'); return; }
     if (state.jobsCompleted < JOBS_NEEDED) { toast(`Complete ${JOBS_NEEDED} jobs first!`); return; }
     if (state.money < ADOPT_FEE) { toast(`Adoption costs $${ADOPT_FEE}. You have $${state.money}.`); return; }
     adoptDraft = { step: 0, type: null, breed: null, color: null, colorLabel: null, img: null, name: '' };
@@ -2802,7 +2931,10 @@
     box.innerHTML = '';
 
     if (adoptDraft.step === 0) {
-      box.innerHTML = `<p class="speech">Which animal would you love? (Fee: $${ADOPT_FEE})</p>`;
+      const family = state.ownPets.length
+        ? ` Grow your family! (You have ${state.ownPets.length} already · Fee: $${ADOPT_FEE})`
+        : ` (Fee: $${ADOPT_FEE})`;
+      box.innerHTML = `<p class="speech">Which animal would you love?${family}</p>`;
       const grid = document.createElement('div');
       grid.className = 'type-grid';
       Object.keys(ANIMALS).forEach(key => {
@@ -2913,7 +3045,8 @@
     const colors = colorOptions(breed);
     const col = colors.find(c => c.id === adoptDraft.color) || colors[0];
     state.money -= ADOPT_FEE;
-    state.ownPet = {
+    const pet = {
+      id: newPetId(),
       type: adoptDraft.type,
       typeName: ANIMALS[adoptDraft.type].name,
       breed: breed.id,
@@ -2926,17 +3059,46 @@
       accessory: null,
       lastCare: Date.now(),
     };
+    state.ownPets.push(pet);
     save(); updateHUD(); confettiBurst(); sfx('success');
     animalSound(adoptDraft.type);
-    $('celebMsg').textContent = `Welcome home, ${name}! 🏠 Your new ${state.ownPet.colorLabel} ${breed.name} is so happy!`;
+    const n = state.ownPets.length;
+    $('celebMsg').textContent = n === 1
+      ? `Welcome home, ${name}! 🏠 Your new ${pet.colorLabel} ${breed.name} is so happy!`
+      : `Welcome home, ${name}! 🏠 You now have ${n} pets in the family!`;
     showScreen('screen-celeb');
-    toast(`${name} is family now! 💖`, 'good');
+    toast(`${name} joined the family! 💖`, 'good');
   }
 
-  function careOwnPet() {
-    if (!state.ownPet) return;
+  function openMyPets() {
+    if (!state.ownPets.length) {
+      toast('Adopt a pet first! 💖');
+      return;
+    }
     sfx('tap');
-    startCare('own', state.ownPet, 7, null);
+    // Single pet → care right away
+    if (state.ownPets.length === 1) {
+      careOwnPet(state.ownPets[0].id);
+      return;
+    }
+    $('myPetsSpeech').textContent = `You have ${state.ownPets.length} pets! Who needs love today?`;
+    renderOwnPetsList($('myPetsList'));
+    const adoptBtn = $('btnMyPetsAdopt');
+    if (adoptBtn) {
+      adoptBtn.disabled = state.jobsCompleted < JOBS_NEEDED || state.money < ADOPT_FEE;
+      adoptBtn.textContent = state.jobsCompleted < JOBS_NEEDED
+        ? `💖 Unlock more adoptions (${JOBS_NEEDED} jobs)`
+        : `💖 Adopt another ($${ADOPT_FEE})`;
+    }
+    showScreen('screen-mypets');
+  }
+
+  function careOwnPet(petId) {
+    const pet = petId ? findOwnPet(petId) : state.ownPets[0];
+    if (!pet) return;
+    sfx('tap');
+    // Clone so care mutations don't drop until we sync
+    startCare('own', JSON.parse(JSON.stringify(pet)), 7, null);
   }
 
   // ══════════════════════════════════════
@@ -2988,10 +3150,8 @@
           return;
         }
       }
-      if (state.currentCare && state.currentCare.mode === 'own' && state.ownPet) {
-        state.ownPet.outfit = state.currentCare.pet.outfit || null;
-        state.ownPet.accessory = state.currentCare.pet.accessory || null;
-        save();
+      if (state.currentCare && state.currentCare.mode === 'own') {
+        syncOwnPetFromCare(state.currentCare);
       }
       state.currentCare = null;
       bathState = null;
@@ -3038,8 +3198,11 @@
 
     $('btnAdopt').addEventListener('click', openAdopt);
     $('btnAdoptBack').addEventListener('click', () => { showScreen('screen-home'); updateHUD(); });
-    $('btnOwnPet').addEventListener('click', careOwnPet);
-    $('ownPetHomeCard').addEventListener('click', careOwnPet);
+    $('btnOwnPet').addEventListener('click', openMyPets);
+    const myPetsBack = $('btnMyPetsBack');
+    if (myPetsBack) myPetsBack.addEventListener('click', () => { showScreen('screen-home'); updateHUD(); sfx('tap'); });
+    const myPetsAdopt = $('btnMyPetsAdopt');
+    if (myPetsAdopt) myPetsAdopt.addEventListener('click', openAdopt);
     $('btnCelebOk').addEventListener('click', () => {
       showScreen('screen-home');
       updateHUD();
@@ -3050,14 +3213,14 @@
 
   // INIT
   load();
-  // Migrate older saves: ensure adopted pet has a valid image path
-  if (state.ownPet && !state.ownPet.img) {
-    state.ownPet.img = resolvePetImg(state.ownPet);
+  // Ensure every adopted pet has id + image
+  if (state.ownPets.length) {
+    state.ownPets = normalizeOwnPets(state.ownPets);
     save();
   }
   wire();
   updateHUD();
-  if (state.jobsCompleted > 0 || state.ownPet || state.money > 0) {
+  if (state.jobsCompleted > 0 || state.ownPets.length > 0 || state.money > 0) {
     $('btnStart').textContent = 'Continue Adventure! 🎉';
   }
   // Welcome strip of real animal photos
