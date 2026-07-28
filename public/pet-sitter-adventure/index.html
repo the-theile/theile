@@ -8,123 +8,72 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#FF6B9D" />
 <title>Pet Sitter Adventure</title>
-<meta name="description" content="A fun kid-friendly pet sitting game! Answer calls, care for animals, and adopt your own pet." />
+<meta name="description" content="A fun kid-friendly pet sitting game! Care for pets room by room, play games, and adopt your own pet." />
 <style>
   :root {
-    --pink: #FF6B9D;
-    --pink-dark: #E84A7F;
-    --coral: #FF8A65;
-    --yellow: #FFD54F;
-    --yellow-dark: #F9A825;
-    --mint: #69F0AE;
-    --mint-dark: #00C853;
-    --sky: #4FC3F7;
-    --sky-dark: #0288D1;
-    --lavender: #B39DDB;
-    --purple: #7E57C2;
-    --cream: #FFF8E7;
-    --peach: #FFE0B2;
-    --white: #FFFFFF;
-    --ink: #3D2C4A;
-    --ink-soft: #6B5B7A;
-    --shadow: 0 6px 0 rgba(0,0,0,0.12);
-    --radius: 20px;
+    --pink: #FF6B9D; --pink-dark: #E84A7F; --coral: #FF8A65;
+    --yellow: #FFD54F; --yellow-dark: #F9A825; --mint: #69F0AE; --mint-dark: #00C853;
+    --sky: #4FC3F7; --sky-dark: #0288D1; --lavender: #B39DDB; --purple: #7E57C2;
+    --cream: #FFF8E7; --white: #FFFFFF; --ink: #3D2C4A; --ink-soft: #6B5B7A;
+    --shadow: 0 6px 0 rgba(0,0,0,0.12); --radius: 20px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bot: env(safe-area-inset-bottom, 0px);
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body {
-    width: 100%; height: 100%;
-    overflow: hidden;
+    width: 100%; height: 100%; overflow: hidden;
     font-family: "Segoe UI", system-ui, -apple-system, "Comic Sans MS", "Chalkboard SE", sans-serif;
     background: linear-gradient(165deg, #FFE0F0 0%, #E3F2FD 45%, #E8F5E9 100%);
-    color: var(--ink);
-    touch-action: manipulation;
+    color: var(--ink); touch-action: manipulation;
     user-select: none; -webkit-user-select: none;
   }
-
   #app {
-    position: fixed; inset: 0;
-    display: flex; flex-direction: column;
-    max-width: 480px;
-    margin: 0 auto;
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    max-width: 480px; margin: 0 auto;
     padding: var(--safe-top) 0 var(--safe-bot);
     background: linear-gradient(180deg, #FFF5F8 0%, #F0F7FF 50%, #F5FFF8 100%);
     box-shadow: 0 0 40px rgba(255,107,157,0.15);
   }
 
-  /* ── Top bar ── */
   .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px;
-    padding: 10px 14px 8px;
-    background: linear-gradient(135deg, var(--pink), #FF8E53);
-    color: white;
-    z-index: 50;
-    box-shadow: 0 4px 16px rgba(255,107,157,0.35);
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    padding: 8px 10px; background: linear-gradient(135deg, var(--pink), #FF8E53);
+    color: white; z-index: 50; box-shadow: 0 4px 16px rgba(255,107,157,0.35);
   }
-  .brand {
-    font-weight: 800; font-size: 0.95rem;
-    letter-spacing: -0.02em;
-    text-shadow: 0 2px 0 rgba(0,0,0,0.1);
-    white-space: nowrap;
+  .brand { font-weight: 800; font-size: 0.88rem; white-space: nowrap; text-shadow: 0 2px 0 rgba(0,0,0,0.1); }
+  .top-right { display: flex; align-items: center; gap: 6px; }
+  .money-pill, .jobs-pill, .mute-btn {
+    display: flex; align-items: center; gap: 3px;
+    background: rgba(255,255,255,0.25); border: 2px solid rgba(255,255,255,0.45);
+    border-radius: 999px; padding: 5px 10px; font-weight: 800; font-size: 0.9rem; color: white;
   }
-  .money-pill {
-    display: flex; align-items: center; gap: 4px;
-    background: rgba(255,255,255,0.25);
-    backdrop-filter: blur(8px);
-    border: 2px solid rgba(255,255,255,0.5);
-    border-radius: 999px;
-    padding: 6px 12px;
-    font-weight: 800; font-size: 1.05rem;
+  .jobs-pill { font-size: 0.72rem; padding: 5px 8px; }
+  .mute-btn {
+    cursor: pointer; font-family: inherit; min-width: 42px; min-height: 36px;
+    justify-content: center; font-size: 1.05rem; border-style: solid;
   }
-  .money-pill span { font-size: 1.1rem; }
-  .jobs-pill {
-    background: rgba(255,255,255,0.2);
-    border-radius: 999px;
-    padding: 5px 10px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    white-space: nowrap;
-  }
+  .mute-btn:active { transform: scale(0.94); }
 
-  /* ── Screens ── */
   .screens { flex: 1; position: relative; overflow: hidden; }
   .screen {
-    position: absolute; inset: 0;
-    display: none;
-    flex-direction: column;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
     padding: 12px 14px 20px;
   }
   .screen.active { display: flex; animation: fadeIn 0.28s ease; }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: none; }
-  }
+  .screen.no-pad { padding: 0; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
   h1, h2, h3 { font-weight: 800; line-height: 1.2; }
-  h1 { font-size: 1.55rem; }
-  h2 { font-size: 1.3rem; }
-  h3 { font-size: 1.1rem; }
+  h1 { font-size: 1.5rem; } h2 { font-size: 1.25rem; }
   p { line-height: 1.45; }
 
-  /* ── Buttons ── */
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    border: none; border-radius: 16px;
-    padding: 14px 20px;
-    font-size: 1.05rem; font-weight: 800;
-    font-family: inherit;
-    cursor: pointer;
-    color: white;
-    box-shadow: var(--shadow);
-    transition: transform 0.1s, box-shadow 0.1s, filter 0.15s;
-    min-height: 52px;
-    text-align: center;
+    border: none; border-radius: 16px; padding: 14px 18px;
+    font-size: 1.02rem; font-weight: 800; font-family: inherit; cursor: pointer;
+    color: white; box-shadow: var(--shadow); min-height: 52px; text-align: center;
+    transition: transform 0.1s, box-shadow 0.1s;
   }
   .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.12); }
   .btn:disabled { opacity: 0.45; pointer-events: none; }
@@ -134,756 +83,508 @@
   .btn-yellow { background: linear-gradient(180deg, #FFE082, var(--yellow-dark)); color: var(--ink); }
   .btn-purple { background: linear-gradient(180deg, #C3A6F0, var(--purple)); }
   .btn-coral { background: linear-gradient(180deg, #FFAB91, #FF5722); }
-  .btn-white {
-    background: white; color: var(--ink);
-    border: 3px solid #F0E6F5;
-    box-shadow: 0 4px 0 #E8D5F0;
-  }
-  .btn-lg { font-size: 1.15rem; padding: 16px 24px; min-height: 58px; border-radius: 18px; }
-  .btn-sm { font-size: 0.9rem; padding: 10px 14px; min-height: 44px; border-radius: 14px; }
+  .btn-white { background: white; color: var(--ink); border: 3px solid #F0E6F5; box-shadow: 0 4px 0 #E8D5F0; }
+  .btn-lg { font-size: 1.12rem; padding: 16px 22px; min-height: 56px; }
+  .btn-sm { font-size: 0.88rem; padding: 10px 12px; min-height: 42px; border-radius: 14px; }
   .btn-block { width: 100%; }
   .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .btn-row .btn { flex: 1; min-width: 120px; }
+  .btn-row .btn { flex: 1; min-width: 110px; }
 
-  /* ── Cards ── */
   .card {
-    background: white;
-    border-radius: var(--radius);
-    padding: 16px;
-    box-shadow: 0 8px 24px rgba(61,44,74,0.08);
-    border: 3px solid #FFF0F5;
+    background: white; border-radius: var(--radius); padding: 16px;
+    box-shadow: 0 8px 24px rgba(61,44,74,0.08); border: 3px solid #FFF0F5;
   }
-  .card-soft {
-    background: linear-gradient(145deg, #FFF9FC, #F0F9FF);
-    border: 3px solid #FFE4F0;
-  }
+  .card-soft { background: linear-gradient(145deg, #FFF9FC, #F0F9FF); border: 3px solid #FFE4F0; }
 
-  /* ── Home ── */
-  .home-hero {
-    text-align: center;
-    padding: 8px 0 4px;
+  /* Welcome */
+  #screen-welcome { justify-content: center; align-items: center; text-align: center;
+    background: linear-gradient(165deg, #FFE0F0, #E3F2FD, #E8F5E9); }
+  .logo-pets { font-size: 2.8rem; letter-spacing: 4px; margin-bottom: 12px; animation: bounceSoft 2s ease-in-out infinite; }
+  .welcome-title {
+    font-size: 1.8rem;
+    background: linear-gradient(90deg, var(--pink), var(--purple), var(--sky));
+    -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 8px;
   }
+  .welcome-blurb { color: var(--ink-soft); font-weight: 600; max-width: 290px; margin: 0 auto 22px; }
+
+  /* Home exterior */
+  .home-hero { text-align: center; padding: 8px 0 4px; }
   .home-hero h1 {
     background: linear-gradient(90deg, var(--pink), var(--purple));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin-bottom: 4px;
+    -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 4px;
   }
-  .home-sub { color: var(--ink-soft); font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; }
-
+  .home-sub { color: var(--ink-soft); font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; }
   .house-scene {
-    position: relative;
-    margin: 8px auto 16px;
-    width: 100%;
-    max-width: 340px;
-    aspect-ratio: 1.1;
+    position: relative; margin: 6px auto 14px; width: 100%; max-width: 340px; aspect-ratio: 1.1;
     background: linear-gradient(180deg, #87CEEB 0%, #B3E5FC 55%, #A5D6A7 55%, #81C784 100%);
-    border-radius: 24px;
-    border: 4px solid white;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    overflow: hidden;
+    border-radius: 24px; border: 4px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden;
   }
-  .sun {
-    position: absolute; top: 14px; right: 18px;
-    font-size: 2rem;
-    animation: spinSlow 20s linear infinite;
-  }
+  .sun { position: absolute; top: 14px; right: 18px; font-size: 2rem; animation: spinSlow 20s linear infinite; }
   @keyframes spinSlow { to { transform: rotate(360deg); } }
-  .cloud {
-    position: absolute; font-size: 1.6rem; opacity: 0.9;
-    animation: floatCloud 8s ease-in-out infinite;
-  }
-  .cloud.c1 { top: 20px; left: 20px; animation-delay: 0s; }
-  .cloud.c2 { top: 40px; left: 55%; animation-delay: -3s; font-size: 1.3rem; }
-  @keyframes floatCloud {
-    0%, 100% { transform: translateX(0); }
-    50% { transform: translateX(12px); }
-  }
-  .house {
-    position: absolute;
-    bottom: 18%; left: 50%;
-    transform: translateX(-50%);
-    width: 58%;
-  }
+  .cloud { position: absolute; font-size: 1.5rem; animation: floatCloud 8s ease-in-out infinite; }
+  .cloud.c1 { top: 20px; left: 20px; } .cloud.c2 { top: 40px; left: 55%; animation-delay: -3s; font-size: 1.2rem; }
+  @keyframes floatCloud { 0%,100%{transform:translateX(0)} 50%{transform:translateX(12px)} }
+  .house { position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%); width: 58%; }
+  .roof { width: 100%; height: 52px; background: #E53935; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); margin: 0 auto -2px; }
   .house-body {
-    background: linear-gradient(180deg, #FFCCBC, #FFAB91);
-    border: 3px solid #E57373;
-    border-radius: 8px 8px 4px 4px;
-    height: 90px;
-    position: relative;
-  }
-  .roof {
-    width: 100%;
-    height: 52px;
-    background: #E53935;
-    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
-    margin: 0 auto -2px;
-    filter: drop-shadow(0 -2px 0 #C62828);
+    background: linear-gradient(180deg, #FFCCBC, #FFAB91); border: 3px solid #E57373;
+    border-radius: 8px 8px 4px 4px; height: 90px; position: relative;
   }
   .door {
-    position: absolute; bottom: 0; left: 50%;
-    transform: translateX(-50%);
-    width: 28px; height: 42px;
-    background: #8D6E63;
-    border-radius: 6px 6px 0 0;
-    border: 2px solid #5D4037;
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 28px; height: 42px; background: #8D6E63; border-radius: 6px 6px 0 0; border: 2px solid #5D4037;
   }
-  .door::after {
-    content: '';
-    position: absolute; right: 4px; top: 50%;
-    width: 5px; height: 5px;
-    background: var(--yellow);
-    border-radius: 50%;
-  }
-  .window {
-    position: absolute; top: 16px;
-    width: 22px; height: 22px;
-    background: #BBDEFB;
-    border: 2px solid #5D4037;
-    border-radius: 4px;
-  }
-  .window.w1 { left: 12px; }
-  .window.w2 { right: 12px; }
-  .window::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(transparent 48%, #5D4037 48% 52%, transparent 52%),
-                linear-gradient(90deg, transparent 48%, #5D4037 48% 52%, transparent 52%);
-  }
-  .flowers {
-    position: absolute; bottom: 12%; left: 12%;
-    font-size: 1.4rem;
-  }
+  .door::after { content: ''; position: absolute; right: 4px; top: 50%; width: 5px; height: 5px; background: var(--yellow); border-radius: 50%; }
+  .window { position: absolute; top: 16px; width: 22px; height: 22px; background: #BBDEFB; border: 2px solid #5D4037; border-radius: 4px; }
+  .window.w1 { left: 12px; } .window.w2 { right: 12px; }
+  .flowers { position: absolute; bottom: 12%; left: 12%; font-size: 1.3rem; }
   .flowers.f2 { left: auto; right: 12%; }
-  .pet-home-badge {
-    position: absolute;
-    bottom: 22%; right: 18%;
-    font-size: 2rem;
-    animation: bounceSoft 2s ease-in-out infinite;
-    filter: drop-shadow(0 3px 2px rgba(0,0,0,0.15));
-  }
-  @keyframes bounceSoft {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-  }
-
-  /* Phone */
-  .phone-area {
-    position: absolute;
-    bottom: 8px; left: 50%;
-    transform: translateX(-50%);
-    z-index: 5;
-  }
+  .pet-home-badge { position: absolute; bottom: 22%; right: 18%; font-size: 2rem; animation: bounceSoft 2s ease-in-out infinite; }
+  @keyframes bounceSoft { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  .phone-area { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 5; }
   .phone-btn {
-    width: 72px; height: 72px;
-    border-radius: 50%;
-    border: 4px solid white;
-    background: linear-gradient(145deg, #66BB6A, #2E7D32);
-    font-size: 2rem;
-    box-shadow: 0 6px 0 #1B5E20, 0 8px 20px rgba(0,0,0,0.2);
-    cursor: pointer;
+    width: 72px; height: 72px; border-radius: 50%; border: 4px solid white;
+    background: linear-gradient(145deg, #66BB6A, #2E7D32); font-size: 2rem;
+    box-shadow: 0 6px 0 #1B5E20, 0 8px 20px rgba(0,0,0,0.2); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    transition: transform 0.1s;
   }
   .phone-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #1B5E20; }
   .phone-btn.ringing {
     animation: ring 0.4s ease-in-out infinite;
     background: linear-gradient(145deg, #FF8A65, #E64A19);
-    box-shadow: 0 6px 0 #BF360C, 0 0 0 0 rgba(255,138,101,0.5);
+    box-shadow: 0 6px 0 #BF360C;
   }
   @keyframes ring {
-    0%, 100% { transform: rotate(-8deg) scale(1); }
-    25% { transform: rotate(8deg) scale(1.05); }
-    50% { transform: rotate(-8deg) scale(1.08); }
-    75% { transform: rotate(8deg) scale(1.05); }
+    0%,100%{transform:rotate(-8deg) scale(1)} 25%{transform:rotate(8deg) scale(1.05)}
+    50%{transform:rotate(-8deg) scale(1.08)} 75%{transform:rotate(8deg) scale(1.05)}
   }
-  .phone-label {
-    text-align: center;
-    font-size: 0.75rem;
-    font-weight: 800;
-    color: white;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
-    margin-top: 4px;
-  }
-
-  .home-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 4px;
-  }
-  .home-actions .btn { min-height: 56px; }
-
-  .status-card {
-    margin-top: 12px;
-    text-align: center;
-  }
-  .progress-bar-wrap {
-    background: #FCE4EC;
-    border-radius: 999px;
-    height: 16px;
-    overflow: hidden;
-    margin: 10px 0 6px;
-    border: 2px solid #F8BBD9;
-  }
-  .progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--mint), var(--sky));
-    border-radius: 999px;
-    transition: width 0.5s ease;
-    min-width: 0;
-  }
+  .phone-label { text-align: center; font-size: 0.75rem; font-weight: 800; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.4); margin-top: 4px; }
+  .home-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .home-actions .btn { min-height: 54px; }
+  .status-card { margin-top: 12px; text-align: center; }
+  .progress-bar-wrap { background: #FCE4EC; border-radius: 999px; height: 16px; overflow: hidden; margin: 10px 0 6px; border: 2px solid #F8BBD9; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, var(--mint), var(--sky)); border-radius: 999px; transition: width 0.5s ease; }
   .progress-label { font-size: 0.85rem; font-weight: 700; color: var(--ink-soft); }
+  .own-pet-card { display: flex; align-items: center; gap: 12px; margin-top: 10px; cursor: pointer; }
+  .own-pet-card .big { font-size: 2.6rem; }
+  .own-pet-card .info { flex: 1; text-align: left; }
+  .own-pet-card .info strong { display: block; font-size: 1.05rem; }
+  .own-pet-card .info span { font-size: 0.82rem; color: var(--ink-soft); font-weight: 600; }
 
-  /* ── Call screen ── */
-  .call-ring {
-    text-align: center;
-    padding: 20px 0;
-  }
+  /* Call */
+  .call-ring { text-align: center; padding: 18px 0; }
   .caller-avatar {
-    width: 110px; height: 110px;
-    margin: 0 auto 16px;
-    border-radius: 50%;
+    width: 100px; height: 100px; margin: 0 auto 14px; border-radius: 50%;
     background: linear-gradient(145deg, var(--lavender), var(--sky));
-    display: flex; align-items: center; justify-content: center;
-    font-size: 3.5rem;
-    border: 5px solid white;
-    box-shadow: 0 8px 24px rgba(126,87,194,0.3);
-    animation: pulse 1.2s ease-in-out infinite;
+    display: flex; align-items: center; justify-content: center; font-size: 3.2rem;
+    border: 5px solid white; box-shadow: 0 8px 24px rgba(126,87,194,0.3); animation: pulse 1.2s ease-in-out infinite;
   }
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.06); }
-  }
-  .caller-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+  .caller-name { font-size: 1.35rem; font-weight: 800; margin-bottom: 4px; }
   .caller-msg {
-    background: white;
-    border-radius: 18px;
-    padding: 16px;
-    margin: 16px 0;
-    border: 3px solid #E1BEE7;
-    font-size: 1.05rem;
-    line-height: 1.5;
-    position: relative;
+    background: white; border-radius: 18px; padding: 16px; margin: 14px 0;
+    border: 3px solid #E1BEE7; font-size: 1.02rem; line-height: 1.5; position: relative;
   }
-  .caller-msg::before {
-    content: '';
-    position: absolute;
-    top: -12px; left: 50%;
-    transform: translateX(-50%);
-    border: 8px solid transparent;
-    border-bottom-color: #E1BEE7;
-  }
-  .job-details {
-    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
-    margin: 12px 0 20px;
-  }
-  .chip {
-    background: white;
-    border: 2px solid #F0E6F5;
-    border-radius: 999px;
-    padding: 8px 14px;
-    font-weight: 700; font-size: 0.9rem;
-  }
+  .job-details { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0 18px; }
+  .chip { background: white; border: 2px solid #F0E6F5; border-radius: 999px; padding: 8px 12px; font-weight: 700; font-size: 0.88rem; }
   .chip.pay { background: #E8F5E9; border-color: #A5D6A7; color: #2E7D32; }
 
-  /* ── Care screen ── */
-  .pet-stage {
-    text-align: center;
-    padding: 12px;
-    background: linear-gradient(180deg, #E3F2FD, #FFF8E1);
-    border-radius: 24px;
-    border: 4px solid white;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
-    margin-bottom: 14px;
-    position: relative;
-    min-height: 180px;
+  /* ── HOUSE INTERIOR ── */
+  #screen-house { padding: 0; background: #3D2C4A; }
+  .house-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 10px 12px; background: rgba(255,255,255,0.95); border-bottom: 3px solid #F0E6F5;
   }
-  .pet-emoji {
-    font-size: 5.5rem;
-    line-height: 1;
-    display: inline-block;
-    filter: drop-shadow(0 6px 4px rgba(0,0,0,0.12));
-    transition: transform 0.3s;
+  .room-tabs { display: flex; gap: 6px; flex: 1; overflow-x: auto; }
+  .room-tab {
+    flex: 1; min-width: 0; padding: 10px 6px; border: none; border-radius: 14px;
+    background: #F5EEF8; font-family: inherit; font-weight: 800; font-size: 0.72rem;
+    color: var(--ink-soft); cursor: pointer; white-space: nowrap;
   }
-  .pet-emoji.happy { animation: happyBounce 0.6s ease; }
-  .pet-emoji.wet { filter: drop-shadow(0 0 8px #4FC3F7); }
-  @keyframes happyBounce {
-    0%, 100% { transform: scale(1) rotate(0); }
-    25% { transform: scale(1.15) rotate(-8deg); }
-    50% { transform: scale(1.2) rotate(8deg); }
-    75% { transform: scale(1.1) rotate(-4deg); }
+  .room-tab.active {
+    background: linear-gradient(135deg, var(--pink), var(--coral)); color: white;
+    box-shadow: 0 3px 0 var(--pink-dark);
   }
-  .pet-name-tag {
-    display: inline-block;
-    background: white;
-    border-radius: 999px;
-    padding: 6px 16px;
-    font-weight: 800;
-    margin-top: 8px;
-    border: 3px solid #FFE0B2;
-    font-size: 1rem;
-  }
-  .pet-outfit-label {
-    font-size: 0.85rem;
-    color: var(--ink-soft);
-    font-weight: 600;
-    margin-top: 4px;
-  }
-  .care-hearts {
-    position: absolute; top: 10px; right: 12px;
-    font-size: 0.95rem;
-  }
-  .care-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .care-btn {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 14px 10px;
-    border: none; border-radius: 18px;
-    background: white;
-    box-shadow: 0 5px 0 #E8D5F0;
-    border: 3px solid #F5EEF8;
-    font-family: inherit;
-    font-weight: 800;
-    font-size: 0.9rem;
-    color: var(--ink);
-    cursor: pointer;
-    min-height: 88px;
-    transition: transform 0.1s, box-shadow 0.1s;
-  }
-  .care-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #E8D5F0; }
-  .care-btn .ico { font-size: 1.8rem; }
-  .care-btn.done {
-    background: linear-gradient(145deg, #E8F5E9, #C8E6C9);
-    border-color: #A5D6A7;
-    box-shadow: 0 5px 0 #81C784;
-  }
-  .care-btn.done::after {
-    content: ' ✓';
-    color: #2E7D32;
-  }
-  .care-status {
-    text-align: center;
-    margin: 12px 0;
-    font-weight: 700;
-    color: var(--ink-soft);
-    font-size: 0.95rem;
-  }
-  .finish-area { margin-top: 12px; }
+  .room-tab .rt-ico { display: block; font-size: 1.15rem; margin-bottom: 2px; }
 
-  /* ── Mini-games ── */
-  .mg-area {
-    text-align: center;
-    padding: 8px 0;
-  }
-  .mg-score {
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: var(--purple);
-    margin-bottom: 12px;
-  }
-  .memory-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    max-width: 300px;
-    margin: 0 auto 16px;
-  }
-  .mem-card {
-    aspect-ratio: 1;
-    border-radius: 14px;
-    border: 3px solid #E1BEE7;
-    background: linear-gradient(145deg, var(--lavender), var(--purple));
-    font-size: 1.8rem;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    color: transparent;
-    box-shadow: 0 4px 0 #5E35B1;
-    transition: transform 0.15s, background 0.2s;
-  }
-  .mem-card:active { transform: scale(0.95); }
-  .mem-card.flipped, .mem-card.matched {
-    background: white;
-    color: inherit;
-    border-color: var(--mint);
-  }
-  .mem-card.matched {
-    background: #E8F5E9;
-    box-shadow: 0 4px 0 #81C784;
-  }
-  .tap-zone {
-    width: 100%;
-    max-width: 280px;
-    aspect-ratio: 1;
-    margin: 0 auto 16px;
-    border-radius: 50%;
-    background: linear-gradient(145deg, #FFCCBC, #FF8A65);
-    border: 6px solid white;
-    box-shadow: 0 10px 30px rgba(255,138,101,0.4);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 4rem;
-    cursor: pointer;
-    transition: transform 0.08s;
-    user-select: none;
-  }
-  .tap-zone:active { transform: scale(0.92); }
-  .tap-zone.pop { animation: pop 0.25s ease; }
-  @keyframes pop {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.12); }
-    100% { transform: scale(1); }
-  }
-  .fetch-area {
-    position: relative;
-    width: 100%;
-    height: 220px;
-    background: linear-gradient(180deg, #81D4FA 0%, #A5D6A7 70%);
-    border-radius: 20px;
-    border: 4px solid white;
-    overflow: hidden;
-    margin-bottom: 12px;
-  }
-  .fetch-ball {
-    position: absolute;
-    width: 40px; height: 40px;
-    font-size: 2rem;
-    cursor: pointer;
-    transition: left 0.05s linear, top 0.05s linear;
-    filter: drop-shadow(0 3px 2px rgba(0,0,0,0.2));
-    z-index: 2;
-  }
-  .fetch-pet {
-    position: absolute;
-    bottom: 10px; left: 50%;
-    transform: translateX(-50%);
-    font-size: 3rem;
-    transition: left 0.3s ease;
-  }
-  .timer-bar {
-    height: 10px;
-    background: #FCE4EC;
-    border-radius: 999px;
-    overflow: hidden;
-    margin-bottom: 12px;
-  }
-  .timer-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--pink), var(--coral));
-    transition: width 0.1s linear;
-  }
-
-  /* ── Park ── */
-  .park-scene {
-    background: linear-gradient(180deg, #81D4FA 0%, #B3E5FC 40%, #AED581 40%, #8BC34A 100%);
-    border-radius: 24px;
-    border: 4px solid white;
-    min-height: 220px;
+  .room-view {
+    flex: 1; position: relative; min-height: 280px; overflow: hidden;
     display: flex; flex-direction: column;
-    align-items: center; justify-content: flex-end;
-    padding: 20px;
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 16px;
   }
-  .park-tree { position: absolute; font-size: 3rem; top: 30%; }
-  .park-tree.t1 { left: 10%; }
-  .park-tree.t2 { right: 10%; top: 35%; font-size: 2.5rem; }
-  .park-pet {
-    font-size: 4.5rem;
-    animation: hop 1.2s ease-in-out infinite;
-    z-index: 2;
-  }
-  @keyframes hop {
-    0%, 100% { transform: translateY(0); }
-    40% { transform: translateY(-18px); }
-    60% { transform: translateY(-10px); }
-  }
-  .park-sparkle {
-    position: absolute;
-    font-size: 1.2rem;
-    animation: sparkle 2s ease-in-out infinite;
-  }
-  @keyframes sparkle {
-    0%, 100% { opacity: 0.3; transform: scale(0.8); }
-    50% { opacity: 1; transform: scale(1.2); }
+  .room-bg {
+    flex: 1; position: relative; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end; padding: 12px; overflow: hidden;
   }
 
-  /* ── Dress up ── */
-  .outfit-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin: 12px 0;
+  /* Kitchen */
+  .room-kitchen {
+    background:
+      linear-gradient(180deg, #FFF3E0 0%, #FFE0B2 55%),
+      repeating-linear-gradient(90deg, transparent, transparent 28px, rgba(255,255,255,0.25) 28px, rgba(255,255,255,0.25) 30px);
   }
-  .outfit-item {
-    background: white;
-    border: 3px solid #F0E6F5;
-    border-radius: 16px;
-    padding: 12px;
-    text-align: center;
-    cursor: pointer;
-    font-weight: 700;
-    box-shadow: 0 4px 0 #E8D5F0;
-    transition: transform 0.1s;
+  .room-kitchen::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 38%;
+    background: linear-gradient(180deg, #81D4FA 0%, #B3E5FC 100%);
+    border-bottom: 4px solid #8D6E63;
   }
-  .outfit-item:active { transform: translateY(2px); }
-  .outfit-item.selected {
-    border-color: var(--mint-dark);
-    background: #E8F5E9;
-    box-shadow: 0 4px 0 #81C784;
+  .counter {
+    position: absolute; bottom: 28%; left: 5%; right: 5%; height: 22%;
+    background: linear-gradient(180deg, #A1887F, #8D6E63); border-radius: 8px 8px 0 0;
+    border: 3px solid #5D4037; z-index: 1;
   }
-  .outfit-item .ico { font-size: 2rem; display: block; margin-bottom: 4px; }
-  .outfit-item .price { font-size: 0.8rem; color: var(--ink-soft); }
-  .outfit-item.owned .price { color: var(--mint-dark); font-weight: 800; }
-  .outfit-item.locked { opacity: 0.55; }
+  .counter::after {
+    content: '🍽️ 🥗 🥣'; position: absolute; top: -28px; left: 12px; font-size: 1.3rem; letter-spacing: 8px;
+  }
+  .fridge {
+    position: absolute; right: 8%; top: 22%; width: 48px; height: 90px;
+    background: linear-gradient(180deg, #ECEFF1, #B0BEC5); border-radius: 8px;
+    border: 3px solid #78909C; z-index: 1;
+  }
+  .fridge::before { content: ''; position: absolute; right: 6px; top: 40%; width: 6px; height: 14px; background: #546E7A; border-radius: 3px; }
 
-  /* ── Shop ── */
-  .shop-tabs {
-    display: flex; gap: 6px;
-    margin-bottom: 12px;
+  /* Bathroom */
+  .room-bathroom {
+    background: linear-gradient(180deg, #E0F7FA 0%, #B2EBF2 40%, #E0F2F1 40%, #B2DFDB 100%);
   }
-  .shop-tab {
-    flex: 1;
-    padding: 10px;
-    border: none;
-    border-radius: 14px;
-    background: white;
-    font-family: inherit;
-    font-weight: 800;
-    font-size: 0.85rem;
-    color: var(--ink-soft);
-    border: 3px solid #F0E6F5;
+  .tub {
+    position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%);
+    width: 72%; height: 38%; max-width: 260px;
+    background: linear-gradient(180deg, #F5F5F5, #E0E0E0);
+    border: 4px solid #90A4AE; border-radius: 20px 20px 40px 40px;
+    z-index: 2; cursor: pointer; box-shadow: 0 8px 0 #78909C;
+    display: flex; align-items: flex-end; justify-content: center; overflow: hidden;
+  }
+  .tub.glow { animation: tubGlow 0.8s ease-in-out infinite; }
+  @keyframes tubGlow {
+    0%,100% { box-shadow: 0 8px 0 #78909C, 0 0 0 0 rgba(79,195,247,0.4); }
+    50% { box-shadow: 0 8px 0 #78909C, 0 0 0 12px rgba(79,195,247,0.25); }
+  }
+  .tub-water {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 0%;
+    background: linear-gradient(180deg, rgba(79,195,247,0.55), rgba(3,169,244,0.75));
+    transition: height 0.6s ease; border-radius: 0 0 36px 36px;
+  }
+  .tub-water.filled { height: 55%; }
+  .tub-bubbles { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+  .tub-bubbles.show { opacity: 1; }
+  .tub-bubbles span {
+    position: absolute; font-size: 1.2rem; animation: bubbleUp 1.8s ease-in-out infinite;
+  }
+  @keyframes bubbleUp {
+    0% { transform: translateY(20px) scale(0.6); opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { transform: translateY(-30px) scale(1.1); opacity: 0.2; }
+  }
+  .tub-hint {
+    position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%);
+    background: white; border-radius: 999px; padding: 6px 12px; font-size: 0.75rem;
+    font-weight: 800; color: var(--sky-dark); border: 2px solid #B3E5FC; white-space: nowrap; z-index: 3;
+  }
+  .bath-pet {
+    position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
+    font-size: 3.2rem; z-index: 4; transition: all 0.5s ease; opacity: 0; pointer-events: none;
+  }
+  .bath-pet.in-tub { opacity: 1; bottom: 28%; font-size: 2.6rem; }
+  .bath-pet.rinse { filter: drop-shadow(0 0 10px #4FC3F7); animation: shake 0.4s ease; }
+  .bath-pet.dry { animation: happyBounce 0.6s ease; filter: brightness(1.1); }
+  @keyframes shake { 0%,100%{transform:translateX(-50%) rotate(0)} 25%{transform:translateX(-55%) rotate(-8deg)} 75%{transform:translateX(-45%) rotate(8deg)} }
+
+  /* Bedroom */
+  .room-bedroom {
+    background: linear-gradient(180deg, #F3E5F5 0%, #E1BEE7 35%, #FFE0B2 35%, #FFCC80 100%);
+  }
+  .bed {
+    position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%);
+    width: 70%; height: 28%; max-width: 240px;
+    background: linear-gradient(180deg, #CE93D8, #AB47BC);
+    border: 3px solid #8E24AA; border-radius: 16px 16px 8px 8px; z-index: 1;
+  }
+  .bed::before {
+    content: '🛏️'; position: absolute; top: -36px; left: 50%; transform: translateX(-50%); font-size: 2rem;
+  }
+  .pillow {
+    position: absolute; top: 8px; left: 12px; width: 36px; height: 22px;
+    background: #F8BBD9; border-radius: 10px; border: 2px solid #F48FB1;
+  }
+  .dresser {
+    position: absolute; right: 6%; top: 28%; width: 50px; height: 70px;
+    background: #A1887F; border: 3px solid #6D4C41; border-radius: 6px; z-index: 1;
+  }
+  .dresser::after { content: '👗'; position: absolute; top: -28px; left: 50%; transform: translateX(-50%); font-size: 1.4rem; }
+
+  /* Pet actor in room */
+  .room-pet {
+    position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%);
+    font-size: 4.2rem; z-index: 10; transition: left 0.55s ease, bottom 0.55s ease, transform 0.3s;
+    filter: drop-shadow(0 6px 4px rgba(0,0,0,0.15));
     cursor: pointer;
   }
-  .shop-tab.active {
-    background: linear-gradient(135deg, var(--pink), var(--coral));
+  .room-pet.walking { animation: walkBob 0.35s ease-in-out infinite; }
+  @keyframes walkBob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-10px)} }
+  .room-pet.eating { animation: eatBob 0.35s ease-in-out 6; }
+  @keyframes eatBob { 0%,100%{transform:translateX(-50%) scale(1)} 50%{transform:translateX(-50%) scale(1.08) translateY(4px)} }
+  .room-pet.drinking { animation: drinkTilt 0.5s ease-in-out 4; }
+  @keyframes drinkTilt { 0%,100%{transform:translateX(-50%) rotate(0)} 50%{transform:translateX(-50%) rotate(-12deg) translateY(4px)} }
+  .room-pet.happy { animation: happyBounce 0.6s ease; }
+  @keyframes happyBounce {
+    0%,100%{transform:translateX(-50%) scale(1) rotate(0)}
+    25%{transform:translateX(-50%) scale(1.15) rotate(-8deg)}
+    50%{transform:translateX(-50%) scale(1.2) rotate(8deg)}
+    75%{transform:translateX(-50%) scale(1.1) rotate(-4deg)}
+  }
+  .room-pet.hidden-temp { opacity: 0; pointer-events: none; }
+
+  .food-float, .water-float {
+    position: absolute; z-index: 12; font-size: 2rem; pointer-events: none;
+    animation: floatAway 1.2s ease forwards;
+  }
+  @keyframes floatAway {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-50px) scale(0.5); }
+  }
+  .crumb {
+    position: absolute; z-index: 11; font-size: 0.9rem; pointer-events: none;
+    animation: crumbFall 0.8s ease forwards;
+  }
+  @keyframes crumbFall {
+    0% { opacity: 1; transform: translate(0,0); }
+    100% { opacity: 0; transform: translate(var(--dx), 30px); }
+  }
+  .droplet {
+    position: absolute; z-index: 11; font-size: 1rem; pointer-events: none;
+    animation: drop 0.7s ease forwards;
+  }
+  @keyframes drop {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(40px); }
+  }
+
+  .house-bottom {
+    background: white; padding: 10px 12px 14px; border-top: 3px solid #F0E6F5;
+    box-shadow: 0 -6px 20px rgba(0,0,0,0.06);
+  }
+  .care-status { text-align: center; font-weight: 700; color: var(--ink-soft); font-size: 0.88rem; margin-bottom: 8px; }
+  .speech {
+    background: white; border-radius: 14px; padding: 10px 14px; margin: 0 0 10px;
+    border: 3px solid #B3E5FC; font-weight: 600; font-size: 0.92rem; text-align: center;
+  }
+  .house-bottom .speech { background: #F0F9FF; }
+  .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .action-row .btn { min-height: 48px; font-size: 0.92rem; padding: 10px; }
+  .action-row .btn.done { background: linear-gradient(180deg, #A5D6A7, #66BB6A); box-shadow: 0 4px 0 #2E7D32; }
+  .action-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .hearts { font-size: 0.9rem; text-align: center; margin-bottom: 6px; }
+
+  /* Food picker modal */
+  .overlay {
+    position: absolute; inset: 0; background: rgba(61,44,74,0.5);
+    display: none; align-items: flex-end; justify-content: center; z-index: 80; padding: 16px;
+  }
+  .overlay.show { display: flex; }
+  .sheet {
+    background: white; border-radius: 24px 24px 20px 20px; padding: 20px 16px;
+    width: 100%; max-width: 400px; border: 4px solid #FFE0F0;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.2); animation: slideUp 0.3s ease;
+    max-height: 75%; overflow-y: auto;
+  }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .sheet h3 { text-align: center; margin-bottom: 12px; }
+  .food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .food-card {
+    background: #FFF8E7; border: 3px solid #FFE0B2; border-radius: 16px; padding: 14px 8px;
+    text-align: center; cursor: pointer; font-weight: 800; font-size: 0.9rem;
+    box-shadow: 0 4px 0 #FFCC80;
+  }
+  .food-card:active { transform: translateY(2px); box-shadow: 0 2px 0 #FFCC80; }
+  .food-card .ico { font-size: 2rem; display: block; margin-bottom: 4px; }
+
+  /* Bath step UI */
+  .bath-steps {
+    display: flex; gap: 6px; justify-content: center; margin: 8px 0; flex-wrap: wrap;
+  }
+  .bath-step-dot {
+    width: 28px; height: 28px; border-radius: 50%; background: #E0E0E0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;
     color: white;
-    border-color: transparent;
   }
-  .shop-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .shop-item {
-    background: white;
-    border-radius: 16px;
-    padding: 14px 10px;
-    text-align: center;
-    border: 3px solid #F0E6F5;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  }
-  .shop-item .ico { font-size: 2.2rem; }
-  .shop-item .name { font-weight: 800; font-size: 0.9rem; margin: 6px 0 2px; }
-  .shop-item .desc { font-size: 0.75rem; color: var(--ink-soft); margin-bottom: 8px; min-height: 2.2em; }
-  .shop-item.owned {
-    background: #E8F5E9;
-    border-color: #A5D6A7;
-  }
+  .bath-step-dot.on { background: var(--sky); }
+  .bath-step-dot.done { background: var(--mint-dark); }
 
-  /* ── Adoption ── */
-  .adopt-steps { display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }
-  .adopt-step-dot {
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: #E1BEE7;
+  /* Walk to park */
+  #screen-walk { padding: 0; }
+  .walk-scene {
+    flex: 1; position: relative; min-height: 320px; overflow: hidden;
+    background: linear-gradient(180deg, #81D4FA 0 42%, #AED581 42% 100%);
   }
+  .walk-path {
+    position: absolute; bottom: 18%; left: 0; right: 0; height: 40px;
+    background: linear-gradient(180deg, #D7CCC8, #BCAAA4);
+    border-top: 3px solid #A1887F; border-bottom: 3px solid #8D6E63;
+  }
+  .walk-path::before {
+    content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 3px;
+    background: repeating-linear-gradient(90deg, #FFF59D 0 20px, transparent 20px 40px);
+    transform: translateY(-50%);
+  }
+  .walk-house { position: absolute; bottom: 28%; left: 4%; font-size: 3rem; z-index: 2; }
+  .walk-park-sign { position: absolute; bottom: 28%; right: 6%; font-size: 2.4rem; z-index: 2; text-align: center; }
+  .walk-park-sign span { display: block; font-size: 0.7rem; font-weight: 800; color: #2E7D32; background: white; border-radius: 8px; padding: 2px 6px; margin-top: 2px; }
+  .walk-tree { position: absolute; font-size: 2.5rem; bottom: 30%; }
+  .walk-actors {
+    position: absolute; bottom: 20%; left: 12%;
+    display: flex; align-items: flex-end; gap: 4px;
+    transition: left 3.2s linear; z-index: 5; font-size: 2.8rem;
+  }
+  .walk-actors .sitter { font-size: 2.4rem; }
+  .walk-actors.going { left: 72%; }
+  .walk-actors.bob .sitter, .walk-actors.bob .wpet { animation: walkBob 0.3s ease-in-out infinite; }
+  .walk-ui { padding: 14px; background: white; border-top: 3px solid #F0E6F5; }
+
+  /* Park enhanced */
+  .park-scene {
+    position: relative; flex: 1; min-height: 260px; overflow: hidden;
+    background: linear-gradient(180deg, #4FC3F7 0%, #81D4FA 38%, #C5E1A5 38%, #8BC34A 70%, #7CB342 100%);
+    border-radius: 0; border: none;
+  }
+  .park-scene .sky-sun { position: absolute; top: 12px; right: 20px; font-size: 2.2rem; }
+  .park-scene .sky-cloud { position: absolute; font-size: 1.6rem; opacity: 0.9; animation: floatCloud 10s ease-in-out infinite; }
+  .park-path {
+    position: absolute; bottom: 0; left: 15%; right: 15%; height: 55%;
+    background: #D7CCC8; border-radius: 60% 60% 0 0;
+    border: 4px solid #A1887F; border-bottom: none;
+  }
+  .park-path::after {
+    content: ''; position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
+    width: 30%; height: 70%; background: repeating-linear-gradient(180deg, #FFF59D 0 12px, transparent 12px 28px);
+    opacity: 0.7; border-radius: 8px;
+  }
+  .park-tree { position: absolute; font-size: 3rem; z-index: 2; }
+  .park-tree.t1 { left: 4%; bottom: 35%; }
+  .park-tree.t2 { right: 4%; bottom: 40%; font-size: 2.6rem; }
+  .park-tree.t3 { left: 18%; bottom: 48%; font-size: 2rem; }
+  .park-bush { position: absolute; font-size: 1.5rem; bottom: 32%; z-index: 2; }
+  .park-flower { position: absolute; font-size: 1.1rem; bottom: 30%; z-index: 2; }
+  .park-bench { position: absolute; right: 18%; bottom: 34%; font-size: 1.8rem; z-index: 2; }
+  .park-pet {
+    position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
+    font-size: 4rem; z-index: 5; animation: hop 1.2s ease-in-out infinite;
+  }
+  @keyframes hop { 0%,100%{transform:translateX(-50%) translateY(0)} 40%{transform:translateX(-50%) translateY(-16px)} 60%{transform:translateX(-50%) translateY(-8px)} }
+  .park-sparkle { position: absolute; font-size: 1.1rem; animation: sparkle 2s ease-in-out infinite; }
+  @keyframes sparkle { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.2)} }
+  .park-ui { padding: 12px 14px 16px; background: white; }
+
+  /* Mini-games */
+  .mg-area { text-align: center; padding: 8px 0; }
+  .mg-score { font-size: 1.15rem; font-weight: 800; color: var(--purple); margin-bottom: 10px; }
+  .memory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 300px; margin: 0 auto 14px; }
+  .mem-card {
+    aspect-ratio: 1; border-radius: 14px; border: 3px solid #E1BEE7;
+    background: linear-gradient(145deg, var(--lavender), var(--purple));
+    font-size: 1.7rem; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: transparent; box-shadow: 0 4px 0 #5E35B1;
+  }
+  .mem-card.flipped, .mem-card.matched { background: white; color: inherit; border-color: var(--mint); }
+  .mem-card.matched { background: #E8F5E9; box-shadow: 0 4px 0 #81C784; }
+  .tap-zone {
+    width: 100%; max-width: 260px; aspect-ratio: 1; margin: 0 auto 14px; border-radius: 50%;
+    background: linear-gradient(145deg, #FFCCBC, #FF8A65); border: 6px solid white;
+    box-shadow: 0 10px 30px rgba(255,138,101,0.4); display: flex; align-items: center; justify-content: center;
+    font-size: 3.8rem; cursor: pointer;
+  }
+  .tap-zone.pop { animation: pop 0.25s ease; }
+  @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1)} }
+  .fetch-area, .laser-area {
+    position: relative; width: 100%; height: 230px;
+    background: linear-gradient(180deg, #81D4FA 0%, #A5D6A7 70%);
+    border-radius: 20px; border: 4px solid white; overflow: hidden; margin-bottom: 12px;
+  }
+  .laser-area { background: linear-gradient(180deg, #ECEFF1 0%, #CFD8DC 100%); }
+  .fetch-ball, .laser-dot {
+    position: absolute; width: 40px; height: 40px; font-size: 2rem; cursor: pointer;
+    filter: drop-shadow(0 3px 2px rgba(0,0,0,0.2)); z-index: 2;
+  }
+  .laser-dot {
+    width: 22px; height: 22px; border-radius: 50%; background: #FF1744;
+    box-shadow: 0 0 12px 4px rgba(255,23,68,0.7); font-size: 0;
+  }
+  .fetch-pet { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 3rem; transition: left 0.25s ease; }
+  .timer-bar { height: 10px; background: #FCE4EC; border-radius: 999px; overflow: hidden; margin-bottom: 12px; }
+  .timer-fill { height: 100%; background: linear-gradient(90deg, var(--pink), var(--coral)); }
+
+  /* Dress / shop */
+  .pet-stage {
+    text-align: center; padding: 12px; background: linear-gradient(180deg, #E3F2FD, #FFF8E1);
+    border-radius: 24px; border: 4px solid white; box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    margin-bottom: 12px; min-height: 140px;
+  }
+  .pet-emoji { font-size: 4.5rem; line-height: 1; display: inline-block; filter: drop-shadow(0 6px 4px rgba(0,0,0,0.12)); }
+  .pet-name-tag {
+    display: inline-block; background: white; border-radius: 999px; padding: 6px 14px;
+    font-weight: 800; margin-top: 6px; border: 3px solid #FFE0B2;
+  }
+  .outfit-grid, .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+  .outfit-item, .shop-item {
+    background: white; border: 3px solid #F0E6F5; border-radius: 16px; padding: 12px;
+    text-align: center; cursor: pointer; font-weight: 700; box-shadow: 0 4px 0 #E8D5F0;
+  }
+  .outfit-item.selected, .shop-item.owned { border-color: var(--mint-dark); background: #E8F5E9; box-shadow: 0 4px 0 #81C784; }
+  .outfit-item.locked { opacity: 0.55; }
+  .outfit-item .ico, .shop-item .ico { font-size: 2rem; display: block; margin-bottom: 4px; }
+  .outfit-item .price, .shop-item .desc { font-size: 0.78rem; color: var(--ink-soft); }
+  .shop-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .shop-tab {
+    flex: 1; padding: 10px 4px; border: none; border-radius: 14px; background: white;
+    font-family: inherit; font-weight: 800; font-size: 0.8rem; color: var(--ink-soft);
+    border: 3px solid #F0E6F5; cursor: pointer;
+  }
+  .shop-tab.active { background: linear-gradient(135deg, var(--pink), var(--coral)); color: white; border-color: transparent; }
+
+  /* Adoption */
+  .adopt-steps { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
+  .adopt-step-dot { width: 12px; height: 12px; border-radius: 50%; background: #E1BEE7; }
   .adopt-step-dot.on { background: var(--pink); transform: scale(1.2); }
-  .type-grid, .breed-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 16px;
-  }
+  .type-grid, .breed-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
   .type-card, .breed-card {
-    background: white;
-    border: 3px solid #F0E6F5;
-    border-radius: 16px;
-    padding: 12px 6px;
-    text-align: center;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 0.85rem;
-    box-shadow: 0 4px 0 #E8D5F0;
+    background: white; border: 3px solid #F0E6F5; border-radius: 16px; padding: 12px 6px;
+    text-align: center; cursor: pointer; font-weight: 700; font-size: 0.82rem; box-shadow: 0 4px 0 #E8D5F0;
   }
-  .type-card .ico, .breed-card .ico { font-size: 2rem; display: block; }
-  .type-card.selected, .breed-card.selected {
-    border-color: var(--pink);
-    background: #FFF0F5;
-    box-shadow: 0 4px 0 var(--pink-dark);
-  }
-  .color-row {
-    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
-    margin-bottom: 16px;
-  }
-  .color-swatch {
-    width: 48px; height: 48px;
-    border-radius: 50%;
-    border: 4px solid white;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-    cursor: pointer;
-  }
-  .color-swatch.selected {
-    outline: 3px solid var(--pink);
-    outline-offset: 2px;
-    transform: scale(1.1);
-  }
+  .type-card .ico, .breed-card .ico { font-size: 1.9rem; display: block; }
+  .type-card.selected, .breed-card.selected { border-color: var(--pink); background: #FFF0F5; box-shadow: 0 4px 0 var(--pink-dark); }
+  .color-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .color-swatch { width: 46px; height: 46px; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.15); cursor: pointer; }
+  .color-swatch.selected { outline: 3px solid var(--pink); outline-offset: 2px; transform: scale(1.1); }
   .name-input {
-    width: 100%;
-    padding: 16px;
-    border: 3px solid #E1BEE7;
-    border-radius: 16px;
-    font-size: 1.15rem;
-    font-family: inherit;
-    font-weight: 700;
-    text-align: center;
-    color: var(--ink);
-    background: white;
-    margin-bottom: 16px;
-    outline: none;
+    width: 100%; padding: 14px; border: 3px solid #E1BEE7; border-radius: 16px;
+    font-size: 1.1rem; font-family: inherit; font-weight: 700; text-align: center;
+    color: var(--ink); background: white; margin-bottom: 14px; outline: none;
   }
   .name-input:focus { border-color: var(--pink); }
 
-  /* ── Celebration ── */
-  .celeb {
-    text-align: center;
-    padding: 24px 8px;
-  }
-  .celeb-emoji {
-    font-size: 5rem;
-    animation: happyBounce 1s ease infinite;
-  }
-  .confetti {
-    position: fixed; inset: 0;
-    pointer-events: none;
-    z-index: 100;
-    overflow: hidden;
-  }
-  .confetti span {
-    position: absolute;
-    top: -20px;
-    font-size: 1.2rem;
-    animation: fall linear forwards;
-  }
-  @keyframes fall {
-    to { transform: translateY(110vh) rotate(720deg); opacity: 0.3; }
-  }
+  .celeb { text-align: center; padding: 24px 8px; }
+  .celeb-emoji { font-size: 4.5rem; animation: happyBounce 1s ease infinite; }
+  .section-title { text-align: center; margin-bottom: 12px; }
+  .back-btn { align-self: flex-start; margin: 10px 12px 0; }
+  .hidden { display: none !important; }
 
-  /* ── Toast ── */
   .toast {
-    position: fixed;
-    left: 50%; bottom: calc(24px + var(--safe-bot));
-    transform: translateX(-50%) translateY(120px);
-    background: var(--ink);
-    color: white;
-    padding: 12px 22px;
-    border-radius: 999px;
-    font-weight: 800;
-    font-size: 0.95rem;
-    z-index: 200;
-    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-    max-width: 90%;
-    text-align: center;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    position: fixed; left: 50%; bottom: calc(22px + var(--safe-bot));
+    transform: translateX(-50%) translateY(120px); background: var(--ink); color: white;
+    padding: 12px 20px; border-radius: 999px; font-weight: 800; font-size: 0.92rem;
+    z-index: 200; transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    max-width: 90%; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
   }
   .toast.show { transform: translateX(-50%) translateY(0); }
   .toast.good { background: linear-gradient(135deg, #43A047, #2E7D32); }
   .toast.money { background: linear-gradient(135deg, #F9A825, #EF6C00); }
 
-  /* ── Modal overlay ── */
-  .overlay {
-    position: absolute; inset: 0;
-    background: rgba(61,44,74,0.45);
-    display: none;
-    align-items: center; justify-content: center;
-    z-index: 80;
-    padding: 20px;
-  }
-  .overlay.show { display: flex; }
-  .modal {
-    background: white;
-    border-radius: 24px;
-    padding: 24px 20px;
-    max-width: 340px;
-    width: 100%;
-    text-align: center;
-    border: 4px solid #FFE0F0;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-    animation: fadeIn 0.25s ease;
-  }
-  .modal h2 { margin-bottom: 8px; }
-  .modal p { color: var(--ink-soft); margin-bottom: 16px; }
-
-  /* ── Own pet home card ── */
-  .own-pet-card {
-    display: flex; align-items: center; gap: 12px;
-    margin-top: 10px;
-    cursor: pointer;
-  }
-  .own-pet-card .big { font-size: 2.8rem; }
-  .own-pet-card .info { flex: 1; text-align: left; }
-  .own-pet-card .info strong { display: block; font-size: 1.1rem; }
-  .own-pet-card .info span { font-size: 0.85rem; color: var(--ink-soft); font-weight: 600; }
-
-  .back-btn {
-    align-self: flex-start;
-    margin-bottom: 8px;
-  }
-
-  .section-title {
-    text-align: center;
-    margin-bottom: 12px;
-  }
-
-  .speech {
-    background: white;
-    border-radius: 16px;
-    padding: 12px 16px;
-    margin: 10px 0;
-    border: 3px solid #B3E5FC;
-    font-weight: 600;
-    font-size: 0.95rem;
-  }
-
-  .hidden { display: none !important; }
-
-  /* Welcome splash */
-  #screen-welcome {
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    background: linear-gradient(165deg, #FFE0F0, #E3F2FD, #E8F5E9);
-  }
-  .logo-pets {
-    font-size: 3rem;
-    letter-spacing: 4px;
-    margin-bottom: 12px;
-    animation: bounceSoft 2s ease-in-out infinite;
-  }
-  .welcome-title {
-    font-size: 1.85rem;
-    background: linear-gradient(90deg, var(--pink), var(--purple), var(--sky));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin-bottom: 8px;
-  }
-  .welcome-blurb {
-    color: var(--ink-soft);
-    font-weight: 600;
-    max-width: 280px;
-    margin: 0 auto 24px;
-    font-size: 1rem;
-  }
+  .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden; }
+  .confetti span { position: absolute; top: -20px; font-size: 1.2rem; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0.3; } }
 
   @media (max-height: 700px) {
-    .pet-emoji { font-size: 4.2rem; }
+    .room-pet { font-size: 3.4rem; }
     .house-scene { max-width: 280px; }
-    .care-btn { min-height: 76px; padding: 10px; }
   }
 </style>
 </head>
@@ -892,7 +593,10 @@
   <header class="topbar" id="topbar">
     <div class="brand">🐾 Pet Sitter</div>
     <div class="jobs-pill" id="jobsPill">Jobs: 0/11</div>
-    <div class="money-pill"><span>💵</span> $<span id="moneyDisplay">0</span></div>
+    <div class="top-right">
+      <button class="mute-btn" id="muteBtn" aria-label="Mute sound" title="Mute / Unmute">🔊</button>
+      <div class="money-pill"><span>💵</span>$<span id="moneyDisplay">0</span></div>
+    </div>
   </header>
 
   <div class="screens">
@@ -900,19 +604,18 @@
     <section class="screen active" id="screen-welcome">
       <div class="logo-pets">🐱🐶🐰🐦🐹</div>
       <h1 class="welcome-title">Pet Sitter Adventure</h1>
-      <p class="welcome-blurb">Answer the phone, care for cute pets, earn money, and adopt a best friend!</p>
+      <p class="welcome-blurb">Walk pets through your house, feed them yummy food, splash in the tub, and play games that fit each animal!</p>
       <button class="btn btn-pink btn-lg" id="btnStart">Let's Play! 🎉</button>
-      <p style="margin-top:16px;font-size:0.8rem;color:var(--ink-soft);font-weight:600;">Made for kids · Saves automatically</p>
+      <p style="margin-top:16px;font-size:0.8rem;color:var(--ink-soft);font-weight:600;">Saves automatically · Sound on 🔊</p>
     </section>
 
-    <!-- HOME -->
+    <!-- HOME (exterior when idle) -->
     <section class="screen" id="screen-home">
       <div class="home-hero">
         <h1>Your Cozy Home</h1>
         <p class="home-sub" id="homeSub">Wait for pet owners to call!</p>
       </div>
-
-      <div class="house-scene" id="houseScene">
+      <div class="house-scene">
         <div class="sun">☀️</div>
         <div class="cloud c1">☁️</div>
         <div class="cloud c2">☁️</div>
@@ -932,21 +635,16 @@
           <div class="phone-label" id="phoneLabel">Phone</div>
         </div>
       </div>
-
       <div class="home-actions">
         <button class="btn btn-purple" id="btnShop">🛒 Shop</button>
         <button class="btn btn-sky" id="btnOwnPet" disabled>🏠 My Pet</button>
         <button class="btn btn-mint" id="btnAdopt" disabled style="grid-column:1/-1;">💖 Adopt a Pet!</button>
       </div>
-
       <div class="card status-card card-soft">
         <strong>Job Progress</strong>
-        <div class="progress-bar-wrap">
-          <div class="progress-bar" id="jobProgress" style="width:0%"></div>
-        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="jobProgress" style="width:0%"></div></div>
         <div class="progress-label" id="jobProgressLabel">Complete 11 jobs to adopt your own pet!</div>
       </div>
-
       <div class="card own-pet-card hidden" id="ownPetHomeCard">
         <div class="big" id="ownPetHomeEmoji">🐾</div>
         <div class="info">
@@ -976,30 +674,44 @@
       </div>
     </section>
 
-    <!-- CARE (sitting or own) -->
-    <section class="screen" id="screen-care">
-      <button class="btn btn-white btn-sm back-btn" id="btnCareBack">← Home</button>
-      <div class="pet-stage" id="petStage">
-        <div class="care-hearts" id="careHearts">💛💛💛</div>
-        <div class="pet-emoji" id="carePetEmoji">🐶</div>
-        <div class="pet-name-tag" id="carePetName">Buddy</div>
-        <div class="pet-outfit-label" id="careOutfitLabel"></div>
+    <!-- HOUSE ROOMS (care) -->
+    <section class="screen no-pad" id="screen-house">
+      <div class="house-top">
+        <button class="btn btn-white btn-sm" id="btnHouseBack">←</button>
+        <div class="room-tabs">
+          <button class="room-tab active" data-room="kitchen"><span class="rt-ico">🍳</span>Kitchen</button>
+          <button class="room-tab" data-room="bathroom"><span class="rt-ico">🛁</span>Bath</button>
+          <button class="room-tab" data-room="bedroom"><span class="rt-ico">🛏️</span>Bedroom</button>
+        </div>
       </div>
-      <div class="speech" id="careSpeech">What should we do together?</div>
-      <div class="care-status" id="careStatus">Care tasks: 0 / 7</div>
-      <div class="care-grid" id="careGrid">
-        <button class="care-btn" data-action="feed"><span class="ico">🍖</span>Feed</button>
-        <button class="care-btn" data-action="water"><span class="ico">💧</span>Water</button>
-        <button class="care-btn" data-action="treat"><span class="ico">🍪</span>Treats</button>
-        <button class="care-btn" data-action="bathe"><span class="ico">🛁</span>Bathe</button>
-        <button class="care-btn" data-action="play"><span class="ico">🎮</span>Play</button>
-        <button class="care-btn" data-action="dress"><span class="ico">👔</span>Dress Up</button>
-        <button class="care-btn" data-action="park" style="grid-column:1/-1;"><span class="ico">🌳</span>Go to the Park</button>
+      <div class="room-view">
+        <div class="room-bg room-kitchen" id="roomBg">
+          <div id="roomDecor"></div>
+          <div class="room-pet" id="roomPet">🐶</div>
+          <div class="bath-pet" id="bathPet">🐶</div>
+          <div class="tub-hint hidden" id="tubHint">👆 Double-tap the tub!</div>
+        </div>
       </div>
-      <div class="finish-area hidden" id="finishArea">
-        <button class="btn btn-pink btn-lg btn-block" id="btnFinishJob">All done! Get paid 💵</button>
+      <div class="house-bottom">
+        <div class="hearts" id="careHearts">💛💛💛</div>
+        <div class="speech" id="careSpeech">Walk to a room and care for your pet!</div>
+        <div class="care-status" id="careStatus">Care tasks: 0 / 7</div>
+        <div class="action-row" id="roomActions"></div>
+        <div class="finish-area hidden" id="finishArea" style="margin-top:10px;">
+          <button class="btn btn-pink btn-lg btn-block" id="btnFinishJob">All done! Get paid 💵</button>
+        </div>
       </div>
     </section>
+
+    <!-- FOOD PICKER overlay inside app screens handled separately -->
+    <div class="overlay" id="foodOverlay">
+      <div class="sheet">
+        <h3>🍖 Pick a snack!</h3>
+        <p style="text-align:center;color:var(--ink-soft);font-weight:600;margin-bottom:10px;font-size:0.9rem;" id="foodHint">What should we feed them?</p>
+        <div class="food-grid" id="foodGrid"></div>
+        <button class="btn btn-white btn-block" id="btnFoodCancel">Cancel</button>
+      </div>
+    </div>
 
     <!-- MINIGAME -->
     <section class="screen" id="screen-minigame">
@@ -1012,36 +724,68 @@
       <button class="btn btn-mint btn-block hidden" id="btnMgDone">Yay! Done 🎉</button>
     </section>
 
+    <!-- WALK TO PARK -->
+    <section class="screen no-pad" id="screen-walk">
+      <div class="walk-scene" id="walkScene">
+        <div class="sun" style="top:16px;right:24px;">☀️</div>
+        <div class="cloud c1">☁️</div>
+        <div class="cloud c2">☁️</div>
+        <div class="walk-tree" style="left:30%;">🌳</div>
+        <div class="walk-tree" style="left:55%;bottom:32%;font-size:2rem;">🌲</div>
+        <div class="walk-house">🏠</div>
+        <div class="walk-park-sign">🏞️<span>PARK</span></div>
+        <div class="walk-path"></div>
+        <div class="walk-actors" id="walkActors">
+          <span class="sitter">🧑</span>
+          <span class="wpet" id="walkPet">🐶</span>
+        </div>
+      </div>
+      <div class="walk-ui">
+        <p class="speech" id="walkSpeech">Time for a walk to the park! Tap to go.</p>
+        <button class="btn btn-mint btn-lg btn-block" id="btnStartWalk">🚶 Let's walk!</button>
+      </div>
+    </section>
+
     <!-- PARK -->
-    <section class="screen" id="screen-park">
-      <button class="btn btn-white btn-sm back-btn" id="btnParkBack">← Back</button>
-      <h2 class="section-title">🌳 The Park</h2>
-      <div class="park-scene">
+    <section class="screen no-pad" id="screen-park">
+      <div class="park-scene" id="parkScene">
+        <span class="sky-sun">☀️</span>
+        <span class="sky-cloud" style="top:18px;left:12%;">☁️</span>
+        <span class="sky-cloud" style="top:36px;left:50%;animation-delay:-4s;">☁️</span>
         <span class="park-tree t1">🌲</span>
         <span class="park-tree t2">🌳</span>
-        <span class="park-sparkle" style="top:20%;left:30%;">✨</span>
-        <span class="park-sparkle" style="top:25%;right:25%;animation-delay:0.5s;">⭐</span>
-        <span class="park-sparkle" style="top:15%;left:60%;animation-delay:1s;">💫</span>
+        <span class="park-tree t3">🌴</span>
+        <span class="park-bush" style="left:8%;">🌿</span>
+        <span class="park-bush" style="right:10%;">☘️</span>
+        <span class="park-flower" style="left:25%;">🌼</span>
+        <span class="park-flower" style="left:35%;">🌸</span>
+        <span class="park-flower" style="right:28%;">🌺</span>
+        <span class="park-bench">🪑</span>
+        <div class="park-path"></div>
+        <span class="park-sparkle" style="top:22%;left:30%;">✨</span>
+        <span class="park-sparkle" style="top:28%;right:28%;animation-delay:0.5s;">⭐</span>
         <div class="park-pet" id="parkPet">🐶</div>
-        <div style="font-size:1.5rem;margin-top:4px;">🦋 🌻 🦋</div>
+        <div style="position:absolute;bottom:12%;left:50%;transform:translateX(-50%);font-size:1.3rem;z-index:3;">🦋 🌻 🦋</div>
       </div>
-      <p class="speech" id="parkSpeech">What a sunny day! Running around feels great!</p>
-      <div class="btn-row">
-        <button class="btn btn-sky" id="btnParkRun">🏃 Run around</button>
-        <button class="btn btn-yellow" id="btnParkPicnic">🧺 Picnic</button>
+      <div class="park-ui">
+        <p class="speech" id="parkSpeech">What a sunny day at the park!</p>
+        <div class="btn-row">
+          <button class="btn btn-sky" id="btnParkRun">🏃 Run around</button>
+          <button class="btn btn-yellow" id="btnParkPicnic">🧺 Picnic</button>
+        </div>
+        <button class="btn btn-mint btn-block" id="btnParkDone" style="margin-top:10px;">Walk home 🏠</button>
       </div>
-      <button class="btn btn-mint btn-block" id="btnParkDone" style="margin-top:12px;">Head home 🏠</button>
     </section>
 
     <!-- DRESS -->
     <section class="screen" id="screen-dress">
       <button class="btn btn-white btn-sm back-btn" id="btnDressBack">← Back</button>
       <h2 class="section-title">👔 Dress Up!</h2>
-      <div class="pet-stage" style="min-height:140px;">
-        <div class="pet-emoji" id="dressPetEmoji" style="font-size:4.5rem;">🐶</div>
-        <div class="pet-outfit-label" id="dressPreviewLabel">No outfit</div>
+      <div class="pet-stage">
+        <div class="pet-emoji" id="dressPetEmoji">🐶</div>
+        <div class="pet-outfit-label" id="dressPreviewLabel" style="font-size:0.85rem;color:var(--ink-soft);font-weight:600;margin-top:4px;">No outfit</div>
       </div>
-      <p class="speech">Pick an outfit or accessory! Buy more in the Shop.</p>
+      <p class="speech">Pick an outfit or accessory! You already own some free starters 🎁</p>
       <div class="outfit-grid" id="outfitGrid"></div>
       <button class="btn btn-mint btn-block" id="btnDressDone">Looking great! ✓</button>
     </section>
@@ -1059,7 +803,7 @@
       <div class="shop-grid" id="shopGrid"></div>
     </section>
 
-    <!-- ADOPTION -->
+    <!-- ADOPT -->
     <section class="screen" id="screen-adopt">
       <button class="btn btn-white btn-sm back-btn" id="btnAdoptBack">← Home</button>
       <h2 class="section-title">💖 Adopt a Pet!</h2>
@@ -1072,12 +816,12 @@
       <div id="adoptContent"></div>
     </section>
 
-    <!-- CELEBRATION -->
+    <!-- CELEB -->
     <section class="screen" id="screen-celeb">
       <div class="celeb">
         <div class="celeb-emoji">🎊</div>
         <h1 style="margin:12px 0;background:linear-gradient(90deg,var(--pink),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent;">Amazing!</h1>
-        <p class="speech" id="celebMsg">You finished 11 pet-sitting jobs! You can now adopt your very own pet!</p>
+        <p class="speech" id="celebMsg">You finished 11 jobs!</p>
         <button class="btn btn-pink btn-lg btn-block" id="btnCelebOk">Let's go! 💖</button>
       </div>
     </section>
@@ -1091,17 +835,18 @@
 (function () {
   'use strict';
 
-  // ═══════════════════════════════════════
-  // DATA
-  // ═══════════════════════════════════════
-  const JOB_PAY = 250;
-  const ADOPT_FEE = 500;
-  const JOBS_NEEDED = 11;
-  const STORAGE_KEY = 'petSitterAdventure_v1';
+  const JOB_PAY = 250, ADOPT_FEE = 500, JOBS_NEEDED = 11;
+  const STORAGE_KEY = 'petSitterAdventure_v2';
+  const FREE_STARTERS = { outfits: ['sweater'], accessories: ['bow', 'collar'] };
 
   const ANIMALS = {
     cat: {
-      name: 'Cat', emoji: '🐱',
+      name: 'Cat', emoji: '🐱', sound: 'meow',
+      foods: [
+        { id: 'kibble', name: 'Cat Kibble', emoji: '🥘' },
+        { id: 'fish', name: 'Fish Treats', emoji: '🐟' },
+        { id: 'milk', name: 'Cream Bowl', emoji: '🥛' },
+      ],
       breeds: [
         { id: 'tabby', name: 'Tabby', emoji: '😺', colors: ['orange', 'gray', 'brown'] },
         { id: 'calico', name: 'Calico', emoji: '🐈', colors: ['calico', 'white'] },
@@ -1110,7 +855,12 @@
       ]
     },
     dog: {
-      name: 'Dog', emoji: '🐶',
+      name: 'Dog', emoji: '🐶', sound: 'bark',
+      foods: [
+        { id: 'kibble', name: 'Dog Food', emoji: '🍖' },
+        { id: 'bone', name: 'Bone Biscuit', emoji: '🦴' },
+        { id: 'steak', name: 'Steak Bits', emoji: '🥩' },
+      ],
       breeds: [
         { id: 'golden', name: 'Golden', emoji: '🐕', colors: ['gold', 'cream'] },
         { id: 'labrador', name: 'Labrador', emoji: '🦮', colors: ['yellow', 'black', 'chocolate'] },
@@ -1120,7 +870,12 @@
       ]
     },
     hamster: {
-      name: 'Hamster', emoji: '🐹',
+      name: 'Hamster', emoji: '🐹', sound: 'squeak',
+      foods: [
+        { id: 'seeds', name: 'Seed Mix', emoji: '🌾' },
+        { id: 'carrot', name: 'Tiny Carrot', emoji: '🥕' },
+        { id: 'apple', name: 'Apple Bits', emoji: '🍎' },
+      ],
       breeds: [
         { id: 'golden', name: 'Golden', emoji: '🐹', colors: ['gold', 'white'] },
         { id: 'winter', name: 'Winter White', emoji: '🐹', colors: ['white', 'gray'] },
@@ -1128,7 +883,12 @@
       ]
     },
     guineapig: {
-      name: 'Guinea Pig', emoji: '🐹',
+      name: 'Guinea Pig', emoji: '🐹', sound: 'wheek',
+      foods: [
+        { id: 'hay', name: 'Fresh Hay', emoji: '🌿' },
+        { id: 'pepper', name: 'Bell Pepper', emoji: '🫑' },
+        { id: 'pellets', name: 'Pellets', emoji: '🥣' },
+      ],
       breeds: [
         { id: 'american', name: 'American', emoji: '🐹', colors: ['brown', 'white', 'black'] },
         { id: 'abyssinian', name: 'Abyssinian', emoji: '🐹', colors: ['orange', 'tricolor'] },
@@ -1136,7 +896,12 @@
       ]
     },
     rabbit: {
-      name: 'Rabbit', emoji: '🐰',
+      name: 'Rabbit', emoji: '🐰', sound: 'nibble',
+      foods: [
+        { id: 'carrot', name: 'Carrot', emoji: '🥕' },
+        { id: 'lettuce', name: 'Lettuce', emoji: '🥬' },
+        { id: 'pellets', name: 'Bunny Pellets', emoji: '🥣' },
+      ],
       breeds: [
         { id: 'lop', name: 'Holland Lop', emoji: '🐇', colors: ['white', 'gray', 'brown'] },
         { id: 'dwarf', name: 'Netherland Dwarf', emoji: '🐰', colors: ['black', 'white', 'spotted'] },
@@ -1144,7 +909,12 @@
       ]
     },
     bird: {
-      name: 'Bird', emoji: '🐦',
+      name: 'Bird', emoji: '🐦', sound: 'chirp',
+      foods: [
+        { id: 'seeds', name: 'Bird Seed', emoji: '🌾' },
+        { id: 'berries', name: 'Berries', emoji: '🫐' },
+        { id: 'millet', name: 'Millet Spray', emoji: '🌿' },
+      ],
       breeds: [
         { id: 'parakeet', name: 'Parakeet', emoji: '🦜', colors: ['green', 'blue', 'yellow'] },
         { id: 'cockatiel', name: 'Cockatiel', emoji: '🐦', colors: ['gray', 'yellow'] },
@@ -1152,14 +922,24 @@
       ]
     },
     ferret: {
-      name: 'Ferret', emoji: '🦡',
+      name: 'Ferret', emoji: '🦡', sound: 'dook',
+      foods: [
+        { id: 'kibble', name: 'Ferret Kibble', emoji: '🥘' },
+        { id: 'egg', name: 'Egg Treat', emoji: '🥚' },
+        { id: 'meat', name: 'Meat Bits', emoji: '🥩' },
+      ],
       breeds: [
         { id: 'sable', name: 'Sable', emoji: '🦡', colors: ['brown', 'cream'] },
         { id: 'albino', name: 'Albino', emoji: '🦡', colors: ['white'] },
       ]
     },
     turtle: {
-      name: 'Turtle', emoji: '🐢',
+      name: 'Turtle', emoji: '🐢', sound: 'turtle',
+      foods: [
+        { id: 'lettuce', name: 'Leafy Greens', emoji: '🥬' },
+        { id: 'pellets', name: 'Turtle Pellets', emoji: '🥣' },
+        { id: 'shrimp', name: 'Dried Shrimp', emoji: '🦐' },
+      ],
       breeds: [
         { id: 'slider', name: 'Red-Eared Slider', emoji: '🐢', colors: ['green'] },
         { id: 'box', name: 'Box Turtle', emoji: '🐢', colors: ['brown', 'olive'] },
@@ -1167,13 +947,8 @@
     },
   };
 
-  const OWNER_NAMES = [
-    'Ms. Sunny', 'Mr. Bubbles', 'Aunt Maple', 'Coach Sparkle',
-    'Dr. Whiskers', 'Mrs. Rainbow', 'Uncle Zippy', 'Captain Cuddle',
-    'Miss Daisy', 'Professor Paws', 'Chef Cookie', 'Nurse Noodle'
-  ];
-  const OWNER_EMOJI = ['👩', '👨', '👩‍🦰', '👨‍🦱', '👩‍🦳', '🧑', '👵', '👴', '👩‍🔬', '👨‍🍳'];
-
+  const OWNER_NAMES = ['Ms. Sunny','Mr. Bubbles','Aunt Maple','Coach Sparkle','Dr. Whiskers','Mrs. Rainbow','Uncle Zippy','Captain Cuddle','Miss Daisy','Professor Paws','Chef Cookie','Nurse Noodle'];
+  const OWNER_EMOJI = ['👩','👨','👩‍🦰','👨‍🦱','👩‍🦳','🧑','👵','👴','👩‍🔬','👨‍🍳'];
   const DURATIONS = [
     { label: '1 day', tasks: 5 },
     { label: '2 days', tasks: 6 },
@@ -1207,146 +982,289 @@
     ],
   };
 
-  const CARE_LINES = {
-    feed: [
-      'Nom nom nom! That was delicious! 😋',
-      'Yummy! My tummy is happy!',
-      'Thanks for dinner, best sitter ever!'
-    ],
-    water: [
-      'Sip sip… ahh, refreshing! 💧',
-      'Just what I needed!',
-      'Cool water on a warm day!'
-    ],
-    treat: [
-      'A treat?! You spoil me! 🍪',
-      'Crunch crunch — so good!',
-      'Treats make everything better!'
-    ],
-    bathe: [
-      'Splash splash! I feel squeaky clean! ✨',
-      'Bubbles everywhere! That was fun!',
-      'Fresh and fluffy!'
-    ],
-    play: [
-      'That game was awesome! 🎮',
-      'You are so fun to play with!',
-      'Best playtime ever!'
-    ],
-    dress: [
-      'I look fabulous! 💅',
-      'Do you like my new look?',
-      'Dressed to impress!'
-    ],
-    park: [
-      'The park was amazing! 🌳',
-      'Fresh air and sunshine — yay!',
-      'I ran so much. Happy tired!'
-    ],
-  };
-
   const COLOR_HEX = {
-    orange: '#FF9800', gray: '#9E9E9E', brown: '#8D6E63', calico: '#FFCC80',
-    white: '#FAFAFA', cream: '#FFF8E1', black: '#424242', gold: '#FFD54F',
-    yellow: '#FFEB3B', chocolate: '#6D4C41', pink: '#F48FB1', tan: '#D7CCC8',
-    tricolor: '#A1887F', sandy: '#E6C38A', spotted: '#BDBDBD', green: '#66BB6A',
-    blue: '#42A5F5', olive: '#9E9D24'
+    orange:'#FF9800', gray:'#9E9E9E', brown:'#8D6E63', calico:'#FFCC80', white:'#FAFAFA',
+    cream:'#FFF8E1', black:'#424242', gold:'#FFD54F', yellow:'#FFEB3B', chocolate:'#6D4C41',
+    pink:'#F48FB1', tan:'#D7CCC8', tricolor:'#A1887F', sandy:'#E6C38A', spotted:'#BDBDBD',
+    green:'#66BB6A', blue:'#42A5F5', olive:'#9E9D24'
   };
 
-  // ═══════════════════════════════════════
-  // STATE
-  // ═══════════════════════════════════════
+  const ROOM_ACTIONS = {
+    kitchen: [
+      { id: 'feed', label: '🍖 Feed', room: 'kitchen' },
+      { id: 'water', label: '💧 Water', room: 'kitchen' },
+      { id: 'treat', label: '🍪 Treat', room: 'kitchen' },
+    ],
+    bathroom: [
+      { id: 'bathe', label: '🛁 Bath', room: 'bathroom' },
+    ],
+    bedroom: [
+      { id: 'play', label: '🎮 Play', room: 'bedroom' },
+      { id: 'dress', label: '👔 Dress Up', room: 'bedroom' },
+      { id: 'park', label: '🌳 Park', room: 'bedroom' },
+    ],
+  };
+
+  // ── State ──
   let state = {
-    money: 0,
-    jobsCompleted: 0,
+    money: 0, jobsCompleted: 0,
     inventory: { outfits: [], accessories: [], toys: [] },
-    ownPet: null,
-    celebrated: false,
-    phoneReady: true,
-    pendingJob: null,
-    currentCare: null, // { mode: 'job'|'own', pet, done: {}, required }
+    ownPet: null, celebrated: false, muted: false,
+    phoneReady: true, pendingJob: null,
+    currentCare: null, room: 'kitchen',
   };
+  let mgState = null, toastTimer = null, callTimer = null, ringLoop = null;
+  let bathState = null; // { step: 0-4, waitingDoubleTap }
+  let lastTubTap = 0;
 
-  let mgState = null;
-  let toastTimer = null;
-  let callTimer = null;
+  // ══════════════════════════════════════
+  // AUDIO ENGINE
+  // ══════════════════════════════════════
+  let audioCtx = null, masterGain = null, sfxGain = null, musicGain = null;
+  let musicTimer = null, musicStep = 0;
 
-  // ═══════════════════════════════════════
-  // AUDIO (Web Audio API — soft happy beeps)
-  // ═══════════════════════════════════════
-  let audioCtx = null;
   function ensureAudio() {
     if (!audioCtx) {
-      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 1;
+        masterGain.connect(audioCtx.destination);
+        sfxGain = audioCtx.createGain();
+        sfxGain.gain.value = 0.9;
+        sfxGain.connect(masterGain);
+        musicGain = audioCtx.createGain();
+        musicGain.gain.value = 0.12;
+        musicGain.connect(masterGain);
+      } catch (e) {}
     }
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   }
-  function tone(freq, dur, type, vol) {
-    if (!audioCtx) return;
+
+  function setMuted(m) {
+    state.muted = m;
+    if (masterGain) masterGain.gain.value = m ? 0 : 1;
+    $('muteBtn').textContent = m ? '🔇' : '🔊';
+    save();
+    if (!m) { ensureAudio(); startMusic(); }
+    else stopMusic();
+  }
+
+  function tone(freq, dur, type, vol, dest) {
+    if (!audioCtx || state.muted) return;
     try {
       const o = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       o.type = type || 'sine';
-      o.frequency.value = freq;
-      g.gain.value = vol || 0.08;
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start();
+      o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      g.gain.setValueAtTime(vol || 0.08, audioCtx.currentTime);
       g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
-      o.stop(audioCtx.currentTime + dur);
+      o.connect(g); g.connect(dest || sfxGain);
+      o.start(); o.stop(audioCtx.currentTime + dur);
     } catch (e) {}
   }
-  function sfx(name) {
-    ensureAudio();
-    if (name === 'tap') tone(520, 0.08, 'sine', 0.06);
-    else if (name === 'success') { tone(523, 0.1); setTimeout(() => tone(659, 0.1), 90); setTimeout(() => tone(784, 0.18), 180); }
-    else if (name === 'money') { tone(880, 0.1); setTimeout(() => tone(1175, 0.15), 100); }
-    else if (name === 'ring') { tone(800, 0.12, 'square', 0.04); setTimeout(() => tone(600, 0.12, 'square', 0.04), 150); }
-    else if (name === 'happy') { tone(392, 0.08); setTimeout(() => tone(523, 0.08), 80); setTimeout(() => tone(659, 0.12), 160); }
-    else if (name === 'pop') tone(400 + Math.random() * 200, 0.06, 'triangle', 0.07);
-    else if (name === 'buy') { tone(700, 0.08); setTimeout(() => tone(900, 0.12), 80); }
+
+  function noiseBurst(dur, vol) {
+    if (!audioCtx || state.muted) return;
+    try {
+      const n = audioCtx.createBufferSource();
+      const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * dur, audioCtx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      n.buffer = buf;
+      const g = audioCtx.createGain();
+      g.gain.value = vol || 0.04;
+      const f = audioCtx.createBiquadFilter();
+      f.type = 'bandpass'; f.frequency.value = 1200;
+      n.connect(f); f.connect(g); g.connect(sfxGain);
+      n.start();
+    } catch (e) {}
   }
 
-  // ═══════════════════════════════════════
+  // Animal-specific vocalizations
+  function animalSound(type) {
+    ensureAudio();
+    if (state.muted) return;
+    const t = type || 'dog';
+    if (t === 'cat') {
+      tone(800, 0.08, 'sine', 0.07);
+      setTimeout(() => { tone(600, 0.15, 'sine', 0.08); tone(550, 0.12, 'triangle', 0.04); }, 70);
+      setTimeout(() => tone(480, 0.2, 'sine', 0.05), 160);
+    } else if (t === 'dog') {
+      tone(180, 0.12, 'square', 0.05);
+      setTimeout(() => tone(140, 0.18, 'square', 0.06), 100);
+      setTimeout(() => tone(160, 0.1, 'square', 0.04), 240);
+    } else if (t === 'hamster' || t === 'guineapig') {
+      tone(1400, 0.05, 'sine', 0.05);
+      setTimeout(() => tone(1600, 0.05, 'sine', 0.05), 60);
+      setTimeout(() => tone(1300, 0.06, 'sine', 0.04), 120);
+    } else if (t === 'rabbit') {
+      tone(900, 0.06, 'triangle', 0.04);
+      setTimeout(() => tone(700, 0.08, 'triangle', 0.04), 80);
+    } else if (t === 'bird') {
+      tone(1800, 0.05, 'sine', 0.05);
+      setTimeout(() => tone(2200, 0.06, 'sine', 0.05), 50);
+      setTimeout(() => tone(1600, 0.05, 'sine', 0.04), 110);
+      setTimeout(() => tone(2400, 0.08, 'sine', 0.05), 170);
+    } else if (t === 'ferret') {
+      tone(500, 0.06, 'sawtooth', 0.03);
+      setTimeout(() => tone(700, 0.08, 'sawtooth', 0.03), 70);
+      setTimeout(() => tone(450, 0.1, 'sawtooth', 0.025), 150);
+    } else if (t === 'turtle') {
+      tone(220, 0.2, 'sine', 0.05);
+      setTimeout(() => tone(180, 0.25, 'triangle', 0.04), 150);
+    } else {
+      tone(400, 0.1, 'sine', 0.06);
+    }
+  }
+
+  function sfx(name) {
+    ensureAudio();
+    if (state.muted) return;
+    if (name === 'tap') tone(520, 0.07, 'sine', 0.05);
+    else if (name === 'success') { tone(523,0.1); setTimeout(()=>tone(659,0.1),90); setTimeout(()=>tone(784,0.18),180); }
+    else if (name === 'money') { tone(880,0.1); setTimeout(()=>tone(1175,0.15),100); }
+    else if (name === 'ring') {
+      tone(880, 0.15, 'square', 0.035);
+      setTimeout(() => tone(700, 0.15, 'square', 0.035), 160);
+    }
+    else if (name === 'happy') { tone(392,0.08); setTimeout(()=>tone(523,0.08),80); setTimeout(()=>tone(659,0.12),160); }
+    else if (name === 'pop') tone(400 + Math.random()*200, 0.06, 'triangle', 0.06);
+    else if (name === 'buy') { tone(700,0.08); setTimeout(()=>tone(900,0.12),80); }
+    else if (name === 'walk') {
+      tone(120, 0.05, 'triangle', 0.04);
+      setTimeout(() => tone(100, 0.05, 'triangle', 0.04), 150);
+    }
+    else if (name === 'eat') {
+      noiseBurst(0.06, 0.03);
+      tone(200, 0.08, 'triangle', 0.04);
+      setTimeout(() => { noiseBurst(0.05, 0.025); tone(180, 0.07, 'triangle', 0.035); }, 120);
+      setTimeout(() => { noiseBurst(0.05, 0.02); tone(160, 0.08, 'triangle', 0.03); }, 240);
+    }
+    else if (name === 'drink') {
+      tone(600, 0.05, 'sine', 0.04);
+      setTimeout(() => tone(500, 0.06, 'sine', 0.035), 80);
+      setTimeout(() => tone(450, 0.08, 'sine', 0.03), 160);
+      noiseBurst(0.1, 0.015);
+    }
+    else if (name === 'splash') {
+      noiseBurst(0.2, 0.06);
+      tone(400, 0.15, 'sine', 0.04);
+      setTimeout(() => tone(300, 0.1, 'sine', 0.03), 80);
+    }
+    else if (name === 'bubbles') {
+      for (let i = 0; i < 5; i++) {
+        setTimeout(() => tone(800 + Math.random()*600, 0.08, 'sine', 0.03), i * 90);
+      }
+    }
+    else if (name === 'rinse') {
+      noiseBurst(0.35, 0.04);
+      tone(900, 0.2, 'sine', 0.03);
+      setTimeout(() => tone(700, 0.2, 'sine', 0.025), 100);
+    }
+    else if (name === 'dry') {
+      noiseBurst(0.25, 0.035);
+      tone(500, 0.1, 'sawtooth', 0.02);
+      setTimeout(() => tone(600, 0.1, 'sawtooth', 0.015), 100);
+    }
+    else if (name === 'door') {
+      tone(250, 0.08, 'triangle', 0.05);
+      setTimeout(() => tone(180, 0.12, 'triangle', 0.04), 90);
+    }
+  }
+
+  // Calm background music — soft pentatonic arpeggio loop
+  const MUSIC_NOTES = [262, 294, 330, 392, 440, 392, 330, 294, 330, 392, 523, 440];
+  function startMusic() {
+    if (state.muted || musicTimer) return;
+    ensureAudio();
+    musicStep = 0;
+    musicTimer = setInterval(() => {
+      if (!audioCtx || state.muted) return;
+      const f = MUSIC_NOTES[musicStep % MUSIC_NOTES.length];
+      tone(f, 0.45, 'sine', 0.045, musicGain);
+      if (musicStep % 4 === 0) tone(f / 2, 0.6, 'triangle', 0.02, musicGain);
+      musicStep++;
+    }, 480);
+  }
+  function stopMusic() {
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+  }
+
+  // ══════════════════════════════════════
   // STORAGE
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   function save() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        money: state.money,
-        jobsCompleted: state.jobsCompleted,
-        inventory: state.inventory,
-        ownPet: state.ownPet,
-        celebrated: state.celebrated,
+        money: state.money, jobsCompleted: state.jobsCompleted,
+        inventory: state.inventory, ownPet: state.ownPet,
+        celebrated: state.celebrated, muted: state.muted,
       }));
     } catch (e) {}
   }
+
+  function giveStarters(inv) {
+    FREE_STARTERS.outfits.forEach(id => {
+      if (!inv.outfits.includes(id)) inv.outfits.push(id);
+    });
+    FREE_STARTERS.accessories.forEach(id => {
+      if (!inv.accessories.includes(id)) inv.accessories.push(id);
+    });
+    return inv;
+  }
+
   function load() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
+      let raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        // migrate v1
+        raw = localStorage.getItem('petSitterAdventure_v1');
+      }
+      if (!raw) {
+        state.inventory = giveStarters({ outfits: [], accessories: [], toys: [] });
+        return;
+      }
       const d = JSON.parse(raw);
       state.money = d.money || 0;
       state.jobsCompleted = d.jobsCompleted || 0;
-      state.inventory = d.inventory || { outfits: [], accessories: [], toys: [] };
+      state.inventory = giveStarters(d.inventory || { outfits: [], accessories: [], toys: [] });
       state.ownPet = d.ownPet || null;
       state.celebrated = !!d.celebrated;
-    } catch (e) {}
+      state.muted = !!d.muted;
+    } catch (e) {
+      state.inventory = giveStarters({ outfits: [], accessories: [], toys: [] });
+    }
   }
 
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   // HELPERS
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   function $(id) { return document.getElementById(id); }
   function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
   function pickBreed(type) {
     const a = ANIMALS[type];
     const b = rand(a.breeds);
-    const color = rand(b.colors);
-    return { type, breed: b.id, breedName: b.name, color, emoji: b.emoji || a.emoji, typeName: a.name };
+    return { type, breed: b.id, breedName: b.name, color: rand(b.colors), emoji: b.emoji || a.emoji, typeName: a.name };
   }
-  function petLabel(p) {
-    return `${p.color} ${p.breedName} ${p.typeName}`;
+  function petLabel(p) { return `${p.color} ${p.breedName} ${p.typeName}`; }
+  function petDisplay(p) {
+    let d = p.emoji;
+    if (p.accessory === 'crown') d = '👑' + p.emoji;
+    else if (p.accessory === 'bow') d = p.emoji + '🎀';
+    else if (p.accessory === 'hat') d = '🥳' + p.emoji;
+    else if (p.accessory === 'glasses') d = p.emoji + '🕶️';
+    else if (p.accessory === 'scarf') d = p.emoji + '🧣';
+    else if (p.accessory === 'collar') d = p.emoji + '💝';
+    return d;
   }
   function toast(msg, kind) {
     const el = $('toast');
@@ -1358,7 +1276,7 @@
   function confettiBurst() {
     const box = $('confetti');
     box.innerHTML = '';
-    const emojis = ['🎉', '✨', '💖', '⭐', '🎊', '🌈', '🐾', '💫'];
+    const emojis = ['🎉','✨','💖','⭐','🎊','🌈','🐾','💫'];
     for (let i = 0; i < 28; i++) {
       const s = document.createElement('span');
       s.textContent = rand(emojis);
@@ -1378,18 +1296,18 @@
     $('moneyDisplay').textContent = state.money;
     const jobs = Math.min(state.jobsCompleted, JOBS_NEEDED);
     $('jobsPill').textContent = `Jobs: ${jobs}/${JOBS_NEEDED}`;
-    const pct = Math.min(100, (state.jobsCompleted / JOBS_NEEDED) * 100);
-    $('jobProgress').style.width = pct + '%';
+    $('jobProgress').style.width = Math.min(100, (state.jobsCompleted / JOBS_NEEDED) * 100) + '%';
     if (state.jobsCompleted >= JOBS_NEEDED) {
       $('jobProgressLabel').textContent = state.ownPet
         ? '🌟 Super sitter! Keep helping pets!'
         : 'Ready to adopt! Tap “Adopt a Pet!”';
     } else {
-      $('jobProgressLabel').textContent = `${JOBS_NEEDED - state.jobsCompleted} more job${JOBS_NEEDED - state.jobsCompleted === 1 ? '' : 's'} until you can adopt!`;
+      const left = JOBS_NEEDED - state.jobsCompleted;
+      $('jobProgressLabel').textContent = `${left} more job${left === 1 ? '' : 's'} until you can adopt!`;
     }
-    const canAdopt = state.jobsCompleted >= JOBS_NEEDED && !state.ownPet;
-    $('btnAdopt').disabled = !canAdopt;
+    $('btnAdopt').disabled = !(state.jobsCompleted >= JOBS_NEEDED && !state.ownPet);
     $('btnOwnPet').disabled = !state.ownPet;
+    $('muteBtn').textContent = state.muted ? '🔇' : '🔊';
     if (state.ownPet) {
       $('homePetBadge').classList.remove('hidden');
       $('homePetBadge').textContent = state.ownPet.emoji;
@@ -1405,9 +1323,9 @@
     }
   }
 
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   // PHONE / JOBS
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   function scheduleNextCall() {
     state.phoneReady = false;
     state.pendingJob = null;
@@ -1416,9 +1334,8 @@
     phone.classList.remove('ringing');
     label.textContent = 'Phone';
     if (callTimer) clearTimeout(callTimer);
-    const delay = randInt(2500, 5000);
+    if (ringLoop) clearInterval(ringLoop);
     function tryRing() {
-      // Wait until player is free from an active sitting job
       if (state.currentCare && state.currentCare.mode === 'job') {
         callTimer = setTimeout(tryRing, 3000);
         return;
@@ -1428,23 +1345,26 @@
       phone.classList.add('ringing');
       label.textContent = 'RING!';
       sfx('ring');
+      if (ringLoop) clearInterval(ringLoop);
+      ringLoop = setInterval(() => {
+        if (!state.phoneReady) { clearInterval(ringLoop); ringLoop = null; return; }
+        sfx('ring');
+      }, 1800);
     }
-    callTimer = setTimeout(tryRing, delay);
+    callTimer = setTimeout(tryRing, randInt(2500, 5000));
   }
 
   function generateJob() {
-    const types = Object.keys(ANIMALS);
-    const type = rand(types);
+    const type = rand(Object.keys(ANIMALS));
     const pet = pickBreed(type);
-    pet.name = rand(['Buddy', 'Luna', 'Max', 'Bella', 'Charlie', 'Daisy', 'Milo', 'Coco', 'Oliver', 'Lucy', 'Rocky', 'Molly', 'Simba', 'Nala', 'Pepper', 'Honey']);
+    pet.name = rand(['Buddy','Luna','Max','Bella','Charlie','Daisy','Milo','Coco','Oliver','Lucy','Rocky','Molly','Simba','Nala','Pepper','Honey']);
     const owner = rand(OWNER_NAMES);
     const ownerEmoji = rand(OWNER_EMOJI);
     const dur = rand(DURATIONS);
     const msgs = [
-      `Hi! Could you please watch my ${pet.breedName.toLowerCase()} ${pet.typeName.toLowerCase()}, ${pet.name}, for ${dur.label}? They're the sweetest!`,
-      `Hello! I'm going on a short trip. Can you take care of ${pet.name} my ${pet.color} ${pet.typeName.toLowerCase()} for ${dur.label}?`,
+      `Hi! Could you watch my ${pet.breedName.toLowerCase()} ${pet.typeName.toLowerCase()}, ${pet.name}, for ${dur.label}? They're the sweetest!`,
+      `Hello! I'm going on a short trip. Can you take care of ${pet.name}, my ${pet.color} ${pet.typeName.toLowerCase()}, for ${dur.label}?`,
       `Hey there, super sitter! ${pet.name} needs a loving home for ${dur.label}. Will you help?`,
-      `Good day! My ${pet.typeName.toLowerCase()} ${pet.name} would love your care for ${dur.label}. They're very friendly!`,
     ];
     return { pet, owner, ownerEmoji, duration: dur, message: rand(msgs), pay: JOB_PAY };
   }
@@ -1455,6 +1375,7 @@
       return;
     }
     sfx('tap');
+    if (ringLoop) { clearInterval(ringLoop); ringLoop = null; }
     const j = state.pendingJob;
     $('callerAvatar').textContent = j.ownerEmoji;
     $('callerName').textContent = j.owner;
@@ -1472,8 +1393,9 @@
     state.phoneReady = false;
     $('phoneBtn').classList.remove('ringing');
     $('phoneLabel').textContent = 'Busy';
+    animalSound(j.pet.type);
     startCare('job', j.pet, j.duration.tasks, j);
-    toast(`${j.pet.name} is here! Be a great sitter! 🐾`, 'good');
+    toast(`${j.pet.name} is here! 🐾`, 'good');
   }
 
   function declineJob() {
@@ -1484,16 +1406,14 @@
     scheduleNextCall();
   }
 
-  // ═══════════════════════════════════════
-  // CARE
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
+  // CARE + ROOMS
+  // ══════════════════════════════════════
   function startCare(mode, pet, requiredTasks, jobMeta) {
     const allActions = ['feed', 'water', 'treat', 'bathe', 'play', 'dress', 'park'];
-    // For shorter jobs, require a subset but always include variety
     let required = allActions.slice();
     if (requiredTasks < 7) {
       required = shuffle(allActions.slice()).slice(0, requiredTasks);
-      // ensure feed + water always if possible
       if (!required.includes('feed')) required[0] = 'feed';
       if (!required.includes('water') && required.length > 1) required[1] = 'water';
     }
@@ -1504,92 +1424,396 @@
       required,
       jobMeta: jobMeta || null,
       hearts: 3,
+      bathDone: false,
     };
-    renderCare();
-    showScreen('screen-care');
+    state.room = 'kitchen';
+    bathState = null;
+    renderHouse();
+    showScreen('screen-house');
+    setTimeout(() => animalSound(pet.type), 300);
   }
 
-  function shuffle(a) {
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
-  function renderCare() {
+  function renderHouse() {
     const c = state.currentCare;
     if (!c) return;
-    const p = c.pet;
-    $('carePetEmoji').textContent = p.emoji + (p.outfitEmoji ? '' : '');
-    // show outfit as label
-    let outfitParts = [];
-    if (p.outfit) {
-      const o = SHOP.outfits.find(x => x.id === p.outfit);
-      if (o) outfitParts.push(o.emoji + ' ' + o.name);
-    }
-    if (p.accessory) {
-      const a = SHOP.accessories.find(x => x.id === p.accessory);
-      if (a) outfitParts.push(a.emoji + ' ' + a.name);
-    }
-    $('careOutfitLabel').textContent = outfitParts.length ? outfitParts.join(' · ') : '';
-    $('carePetName').textContent = p.name || 'Friend';
-    $('careHearts').textContent = '💛'.repeat(c.hearts) + '🤍'.repeat(Math.max(0, 3 - c.hearts));
+    const room = state.room;
+    const bg = $('roomBg');
+    bg.className = 'room-bg room-' + room;
+    renderRoomDecor(room);
+    updateRoomPet();
+    renderRoomActions();
+    updateCareHUD();
 
-    const doneCount = c.required.filter(a => c.done[a]).length;
-    $('careStatus').textContent = c.mode === 'own'
-      ? `Care completed: ${doneCount} / ${c.required.length}  ·  (optional fun!)`
-      : `Care tasks: ${doneCount} / ${c.required.length}`;
-
-    document.querySelectorAll('.care-btn').forEach(btn => {
-      const act = btn.dataset.action;
-      const isReq = c.required.includes(act);
-      btn.classList.toggle('done', !!c.done[act]);
-      btn.style.opacity = isReq || c.mode === 'own' ? '1' : '0.55';
+    // room tabs
+    document.querySelectorAll('.room-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.room === room);
     });
+  }
 
+  function renderRoomDecor(room) {
+    const d = $('roomDecor');
+    const hint = $('tubHint');
+    hint.classList.add('hidden');
+    $('bathPet').className = 'bath-pet';
+    $('bathPet').style.opacity = '0';
+
+    if (room === 'kitchen') {
+      d.innerHTML = '<div class="counter"></div><div class="fridge"></div>';
+    } else if (room === 'bathroom') {
+      d.innerHTML = `
+        <div class="tub" id="bathtub" role="button" aria-label="Bathtub">
+          <div class="tub-water" id="tubWater"></div>
+          <div class="tub-bubbles" id="tubBubbles">
+            <span style="left:15%;bottom:20%;">🫧</span>
+            <span style="left:40%;bottom:35%;animation-delay:0.3s;">🫧</span>
+            <span style="left:65%;bottom:25%;animation-delay:0.6s;">🫧</span>
+            <span style="left:30%;bottom:45%;animation-delay:0.9s;">🫧</span>
+            <span style="left:55%;bottom:15%;animation-delay:1.2s;">🫧</span>
+          </div>
+        </div>`;
+      const tub = $('bathtub');
+      if (bathState && bathState.active) {
+        restoreBathVisuals();
+      } else if (!state.currentCare.done.bathe) {
+        tub.classList.add('glow');
+        hint.classList.remove('hidden');
+        hint.textContent = '👆 Double-tap the tub!';
+      }
+      tub.addEventListener('click', onTubTap);
+    } else {
+      d.innerHTML = '<div class="bed"><div class="pillow"></div></div><div class="dresser"></div>';
+    }
+  }
+
+  function updateRoomPet() {
+    const c = state.currentCare;
+    const el = $('roomPet');
+    if (!c) return;
+    // hide main pet during active bath in bathroom
+    if (state.room === 'bathroom' && bathState && bathState.active && bathState.step >= 1) {
+      el.classList.add('hidden-temp');
+    } else {
+      el.classList.remove('hidden-temp');
+      el.textContent = petDisplay(c.pet);
+    }
+  }
+
+  function renderRoomActions() {
+    const c = state.currentCare;
+    const row = $('roomActions');
+    row.innerHTML = '';
+    const actions = ROOM_ACTIONS[state.room] || [];
+    actions.forEach(a => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sky' + (c.done[a.id] ? ' done' : '');
+      if (a.id === 'feed') btn.className = 'btn btn-coral' + (c.done[a.id] ? ' done' : '');
+      if (a.id === 'water') btn.className = 'btn btn-sky' + (c.done[a.id] ? ' done' : '');
+      if (a.id === 'treat') btn.className = 'btn btn-yellow' + (c.done[a.id] ? ' done' : '');
+      if (a.id === 'bathe') btn.className = 'btn btn-sky' + (c.done[a.id] ? ' done' : '');
+      if (a.id === 'play') btn.className = 'btn btn-purple' + (c.done[a.id] ? ' done' : '');
+      if (a.id === 'dress') btn.className = 'btn btn-pink' + (c.done[a.id] ? ' done' : '');
+      if (a.id === 'park') btn.className = 'btn btn-mint' + (c.done[a.id] ? ' done' : '');
+      btn.textContent = a.label + (c.done[a.id] ? ' ✓' : '');
+      btn.addEventListener('click', () => onRoomAction(a.id));
+      row.appendChild(btn);
+    });
+    if (state.room === 'bathroom' && bathState && bathState.active) {
+      // show continue button for bath steps after double-tap
+      if (bathState.step >= 1 && bathState.step < 4) {
+        const next = document.createElement('button');
+        next.className = 'btn btn-mint';
+        next.style.gridColumn = '1 / -1';
+        const labels = ['', '🫧 Add bubbles!', '🚿 Rinse!', '🧺 Dry off!'];
+        next.textContent = labels[bathState.step] || 'Next';
+        next.addEventListener('click', advanceBath);
+        row.appendChild(next);
+      }
+    }
+  }
+
+  function updateCareHUD() {
+    const c = state.currentCare;
+    if (!c) return;
+    const doneCount = c.required.filter(a => c.done[a]).length;
+    $('careHearts').textContent = '💛'.repeat(Math.min(5, c.hearts)) + '🤍'.repeat(Math.max(0, 3 - Math.min(3, c.hearts)));
+    $('careStatus').textContent = c.mode === 'own'
+      ? `Care completed: ${doneCount} / ${c.required.length} · (fun optional!)`
+      : `Care tasks: ${doneCount} / ${c.required.length}`;
     const allDone = c.required.every(a => c.done[a]);
     if (c.mode === 'job' && allDone) {
       $('finishArea').classList.remove('hidden');
-      $('careSpeech').textContent = `${p.name} had a wonderful stay! Time to get paid! 🎉`;
+      $('careSpeech').textContent = `${c.pet.name} had a wonderful stay! Time to get paid! 🎉`;
     } else {
       $('finishArea').classList.add('hidden');
-      if (!allDone) {
-        $('careSpeech').textContent = c.mode === 'own'
-          ? `What should we do with ${p.name}?`
-          : `Take great care of ${p.name}!`;
-      }
     }
-
-    // decorate emoji with accessory for fun
-    let display = p.emoji;
-    if (p.accessory === 'crown') display = '👑' + p.emoji;
-    else if (p.accessory === 'bow') display = p.emoji + '🎀';
-    else if (p.accessory === 'hat') display = '🥳' + p.emoji;
-    else if (p.accessory === 'glasses') display = p.emoji + '🕶️';
-    $('carePetEmoji').textContent = display;
   }
 
-  function doCareAction(action) {
+  function goToRoom(room) {
+    if (state.room === room) return;
+    sfx('walk');
+    sfx('door');
+    const pet = $('roomPet');
+    pet.classList.add('walking');
+    state.room = room;
+    // if leaving bathroom mid-bath without finishing, keep bath state
+    setTimeout(() => {
+      pet.classList.remove('walking');
+      renderHouse();
+      animalSound(state.currentCare.pet.type);
+      const names = { kitchen: 'Kitchen', bathroom: 'Bathroom', bedroom: 'Bedroom' };
+      $('careSpeech').textContent = `We're in the ${names[room]}!`;
+    }, 280);
+  }
+
+  function onRoomAction(action) {
     const c = state.currentCare;
     if (!c) return;
     sfx('tap');
 
-    if (action === 'play') {
-      startMiniGame();
+    if (action === 'feed') { openFoodPicker('feed'); return; }
+    if (action === 'treat') { openFoodPicker('treat'); return; }
+    if (action === 'water') { doWater(); return; }
+    if (action === 'bathe') {
+      if (c.done.bathe) { toast('Already squeaky clean! ✨'); return; }
+      if (!bathState || !bathState.active) {
+        $('careSpeech').textContent = 'Double-tap the bathtub to start the bath! 🛁';
+        const tub = $('bathtub');
+        if (tub) tub.classList.add('glow');
+        $('tubHint').classList.remove('hidden');
+        sfx('tap');
+      }
       return;
     }
-    if (action === 'dress') {
-      openDress();
-      return;
+    if (action === 'play') { startMiniGame(); return; }
+    if (action === 'dress') { openDress(); return; }
+    if (action === 'park') { startWalkToPark(); return; }
+  }
+
+  // ── Feeding ──
+  function openFoodPicker(kind) {
+    const c = state.currentCare;
+    const foods = ANIMALS[c.pet.type].foods.slice();
+    if (kind === 'treat') {
+      // slightly different labels for treats
+      foods.forEach(f => { f._kind = 'treat'; });
     }
-    if (action === 'park') {
-      openPark();
-      return;
+    $('foodHint').textContent = kind === 'treat'
+      ? `A special treat for ${c.pet.name}!`
+      : `What should ${c.pet.name} eat?`;
+    const grid = $('foodGrid');
+    grid.innerHTML = '';
+    foods.forEach(f => {
+      const card = document.createElement('div');
+      card.className = 'food-card';
+      card.innerHTML = `<span class="ico">${f.emoji}</span>${f.name}`;
+      card.addEventListener('click', () => {
+        $('foodOverlay').classList.remove('show');
+        playEatAnimation(f, kind);
+      });
+      grid.appendChild(card);
+    });
+    $('foodOverlay').classList.add('show');
+  }
+
+  function playEatAnimation(food, kind) {
+    const c = state.currentCare;
+    const pet = $('roomPet');
+    const bg = $('roomBg');
+
+    // floating food
+    const fl = document.createElement('div');
+    fl.className = 'food-float';
+    fl.textContent = food.emoji;
+    fl.style.left = '50%';
+    fl.style.bottom = '28%';
+    fl.style.marginLeft = '-16px';
+    bg.appendChild(fl);
+
+    sfx('eat');
+    pet.classList.remove('eating', 'happy');
+    void pet.offsetWidth;
+    pet.classList.add('eating');
+
+    // crumbs
+    for (let i = 0; i < 4; i++) {
+      setTimeout(() => {
+        const cr = document.createElement('div');
+        cr.className = 'crumb';
+        cr.textContent = '✨';
+        cr.style.left = (40 + Math.random() * 20) + '%';
+        cr.style.bottom = '30%';
+        cr.style.setProperty('--dx', (Math.random() * 40 - 20) + 'px');
+        bg.appendChild(cr);
+        setTimeout(() => cr.remove(), 900);
+      }, i * 150);
     }
 
-    // immediate care actions
-    completeCareAction(action);
+    setTimeout(() => {
+      fl.remove();
+      pet.classList.remove('eating');
+      pet.classList.add('happy');
+      animalSound(c.pet.type);
+      sfx('happy');
+      const action = kind === 'treat' ? 'treat' : 'feed';
+      completeCareAction(action);
+      $('careSpeech').textContent = kind === 'treat'
+        ? `Yum! ${c.pet.name} loved the ${food.name}! 😋`
+        : `Nom nom! ${c.pet.name} finished the ${food.name}! 😋`;
+      setTimeout(() => pet.classList.remove('happy'), 700);
+    }, 1400);
+  }
+
+  // ── Water ──
+  function doWater() {
+    const c = state.currentCare;
+    const pet = $('roomPet');
+    const bg = $('roomBg');
+
+    const dish = document.createElement('div');
+    dish.className = 'water-float';
+    dish.textContent = c.pet.type === 'bird' || c.pet.type === 'hamster' ? '🍼' : '🥣';
+    dish.style.left = '58%';
+    dish.style.bottom = '22%';
+    bg.appendChild(dish);
+
+    sfx('drink');
+    pet.classList.remove('drinking', 'happy');
+    void pet.offsetWidth;
+    pet.classList.add('drinking');
+
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        const dr = document.createElement('div');
+        dr.className = 'droplet';
+        dr.textContent = '💧';
+        dr.style.left = (52 + Math.random() * 12) + '%';
+        dr.style.bottom = '35%';
+        bg.appendChild(dr);
+        setTimeout(() => dr.remove(), 800);
+      }, i * 120);
+    }
+
+    setTimeout(() => {
+      dish.remove();
+      pet.classList.remove('drinking');
+      pet.classList.add('happy');
+      animalSound(c.pet.type);
+      sfx('happy');
+      completeCareAction('water');
+      $('careSpeech').textContent = `Sip sip… ${c.pet.name} feels refreshed! 💧`;
+      setTimeout(() => pet.classList.remove('happy'), 700);
+    }, 1400);
+  }
+
+  // ── Bath sequence ──
+  function onTubTap() {
+    const c = state.currentCare;
+    if (!c || c.done.bathe) return;
+    if (bathState && bathState.active && bathState.step >= 1) return;
+
+    const now = Date.now();
+    if (now - lastTubTap < 450) {
+      // double tap
+      lastTubTap = 0;
+      startBathSequence();
+    } else {
+      lastTubTap = now;
+      sfx('tap');
+      $('careSpeech').textContent = 'Tap the tub again quickly! 🛁';
+    }
+  }
+
+  function startBathSequence() {
+    const c = state.currentCare;
+    bathState = { active: true, step: 1 };
+    sfx('splash');
+    animalSound(c.pet.type);
+
+    const pet = $('roomPet');
+    pet.classList.add('hidden-temp');
+    const bp = $('bathPet');
+    bp.textContent = c.pet.emoji;
+    bp.className = 'bath-pet in-tub';
+    bp.style.opacity = '1';
+
+    const tub = $('bathtub');
+    if (tub) tub.classList.remove('glow');
+    $('tubHint').classList.add('hidden');
+    $('tubWater').classList.add('filled');
+
+    $('careSpeech').textContent = `${c.pet.name} hopped into the tub! Add bubbles next 🫧`;
+    renderRoomActions();
+  }
+
+  function advanceBath() {
+    if (!bathState || !bathState.active) return;
+    const c = state.currentCare;
+    const bp = $('bathPet');
+
+    if (bathState.step === 1) {
+      // bubbles
+      bathState.step = 2;
+      sfx('bubbles');
+      $('tubBubbles').classList.add('show');
+      $('careSpeech').textContent = 'Bubbles everywhere! Now rinse 🚿';
+      animalSound(c.pet.type);
+    } else if (bathState.step === 2) {
+      // rinse
+      bathState.step = 3;
+      sfx('rinse');
+      bp.classList.add('rinse');
+      $('careSpeech').textContent = 'Rinse rinse! Almost done — dry off 🧺';
+      // water droplets
+      for (let i = 0; i < 6; i++) {
+        setTimeout(() => {
+          const dr = document.createElement('div');
+          dr.className = 'droplet';
+          dr.textContent = '💧';
+          dr.style.left = (30 + Math.random() * 40) + '%';
+          dr.style.bottom = '40%';
+          $('roomBg').appendChild(dr);
+          setTimeout(() => dr.remove(), 800);
+        }, i * 80);
+      }
+    } else if (bathState.step === 3) {
+      // dry
+      bathState.step = 4;
+      sfx('dry');
+      bp.classList.remove('rinse');
+      bp.classList.add('dry');
+      $('tubBubbles').classList.remove('show');
+      $('tubWater').classList.remove('filled');
+      $('careSpeech').textContent = `${c.pet.name} is fluffy and clean! ✨`;
+      animalSound(c.pet.type);
+      sfx('happy');
+
+      setTimeout(() => {
+        bp.className = 'bath-pet';
+        bp.style.opacity = '0';
+        $('roomPet').classList.remove('hidden-temp');
+        $('roomPet').classList.add('happy');
+        bathState = null;
+        completeCareAction('bathe');
+        renderHouse();
+        setTimeout(() => $('roomPet').classList.remove('happy'), 700);
+      }, 900);
+      return;
+    }
+    renderRoomActions();
+  }
+
+  function restoreBathVisuals() {
+    if (!bathState) return;
+    const c = state.currentCare;
+    const bp = $('bathPet');
+    bp.textContent = c.pet.emoji;
+    if (bathState.step >= 1) {
+      bp.className = 'bath-pet in-tub' + (bathState.step >= 3 ? ' rinse' : '') + (bathState.step >= 4 ? ' dry' : '');
+      bp.style.opacity = '1';
+      $('roomPet').classList.add('hidden-temp');
+    }
+    if (bathState.step >= 1) $('tubWater').classList.add('filled');
+    if (bathState.step >= 2 && bathState.step < 4) $('tubBubbles').classList.add('show');
   }
 
   function completeCareAction(action) {
@@ -1597,25 +1821,14 @@
     if (!c) return;
     c.done[action] = true;
     if (c.hearts < 5) c.hearts = Math.min(5, c.hearts + 1);
-
-    const lines = CARE_LINES[action] || ['Yay!'];
-    $('careSpeech').textContent = rand(lines);
-    const emoji = $('carePetEmoji');
-    emoji.classList.remove('happy', 'wet');
-    void emoji.offsetWidth;
-    if (action === 'bathe') emoji.classList.add('wet');
-    emoji.classList.add('happy');
-    sfx('happy');
-
-    // own pet: persist care lightly
     if (c.mode === 'own' && state.ownPet) {
       state.ownPet.lastCare = Date.now();
       if (c.pet.outfit) state.ownPet.outfit = c.pet.outfit;
       if (c.pet.accessory) state.ownPet.accessory = c.pet.accessory;
       save();
     }
-
-    renderCare();
+    renderRoomActions();
+    updateCareHUD();
   }
 
   function finishJob() {
@@ -1625,11 +1838,11 @@
     state.money += JOB_PAY;
     state.jobsCompleted += 1;
     state.currentCare = null;
+    bathState = null;
     save();
     updateHUD();
     confettiBurst();
     toast(`+$250! Great job sitting! 💵`, 'money');
-
     if (state.jobsCompleted === JOBS_NEEDED && !state.celebrated) {
       state.celebrated = true;
       save();
@@ -1643,57 +1856,56 @@
     }
   }
 
-  // ═══════════════════════════════════════
-  // MINI-GAMES
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
+  // MINI-GAMES (animal-specific)
+  // ══════════════════════════════════════
   function startMiniGame() {
-    const games = ['memory', 'tap', 'fetch'];
-    const which = rand(games);
+    const type = state.currentCare.pet.type;
     showScreen('screen-minigame');
     $('btnMgDone').classList.add('hidden');
     $('mgArea').innerHTML = '';
     $('mgScore').textContent = 'Score: 0';
     $('mgTimer').style.width = '100%';
+    animalSound(type);
 
-    if (which === 'memory') runMemory();
-    else if (which === 'tap') runTap();
-    else runFetch();
+    if (type === 'dog') runFetch();
+    else if (type === 'cat') runLaser();
+    else if (type === 'bird') runTap('🐦 Chirp & Tap', 'Tap along with the bird song!');
+    else if (type === 'rabbit' || type === 'hamster' || type === 'guineapig') runMemory(type);
+    else if (type === 'turtle') runTap('🐢 Slow & Steady', 'Gentle taps — turtles love calm play!');
+    else if (type === 'ferret') runFetch(); // dook chase ball
+    else runMemory(type);
   }
 
   function finishMiniGame(won) {
     if (mgState && mgState.timer) clearInterval(mgState.timer);
+    if (mgState) mgState.alive = false;
     mgState = null;
     $('btnMgDone').classList.remove('hidden');
-    if (won) {
-      sfx('success');
-      $('mgInstructions').textContent = 'You did it! Your pet is so happy! 🎉';
-      completeCareAction('play');
-    } else {
-      // never punish — still complete
-      sfx('happy');
-      $('mgInstructions').textContent = 'That was fun! Your pet loved playing! 💖';
-      completeCareAction('play');
-    }
+    sfx(won ? 'success' : 'happy');
+    animalSound(state.currentCare.pet.type);
+    $('mgInstructions').textContent = won
+      ? 'You did it! Your pet is so happy! 🎉'
+      : 'That was fun! Your pet loved playing! 💖';
+    completeCareAction('play');
   }
 
-  function runMemory() {
+  function runMemory(type) {
     $('mgTitle').textContent = '🧠 Memory Match';
-    $('mgInstructions').textContent = 'Find all the matching pairs!';
-    const icons = ['🐶', '🐱', '🐰', '🐦', '🐹', '🐢'];
+    $('mgInstructions').textContent = type === 'rabbit' ? 'Match the bunny snacks!' : 'Find all the matching pairs!';
+    const icons = type === 'rabbit' ? ['🥕','🥬','🌽','🌸'] :
+                  type === 'hamster' ? ['🌾','🍎','🥜','🌻'] :
+                  type === 'guineapig' ? ['🫑','🌿','🍓','🌽'] :
+                  ['🐶','🐱','🐰','🐦'];
     const pairs = shuffle(icons.slice(0, 4));
     let cards = shuffle(pairs.concat(pairs));
-    let flipped = [];
-    let matched = 0;
-    let score = 0;
-    let lock = false;
-
+    let flipped = [], matched = 0, score = 0, lock = false;
     const grid = document.createElement('div');
     grid.className = 'memory-grid';
-    cards.forEach((icon, i) => {
+    cards.forEach((icon) => {
       const card = document.createElement('button');
       card.className = 'mem-card';
       card.dataset.icon = icon;
-      card.dataset.i = i;
       card.textContent = '❓';
       card.addEventListener('click', () => {
         if (lock || card.classList.contains('flipped') || card.classList.contains('matched')) return;
@@ -1705,18 +1917,15 @@
           lock = true;
           if (flipped[0].dataset.icon === flipped[1].dataset.icon) {
             flipped.forEach(c => c.classList.add('matched'));
-            matched++;
-            score += 10;
+            matched++; score += 10;
             $('mgScore').textContent = 'Score: ' + score;
             sfx('happy');
-            flipped = [];
-            lock = false;
+            flipped = []; lock = false;
             if (matched >= 4) setTimeout(() => finishMiniGame(true), 400);
           } else {
             setTimeout(() => {
               flipped.forEach(c => { c.classList.remove('flipped'); c.textContent = '❓'; });
-              flipped = [];
-              lock = false;
+              flipped = []; lock = false;
             }, 600);
           }
         }
@@ -1727,40 +1936,34 @@
     mgState = { timer: null };
   }
 
-  function runTap() {
-    $('mgTitle').textContent = '👆 Tap Party';
-    $('mgInstructions').textContent = 'Tap the pet as many times as you can!';
-    let score = 0;
-    let timeLeft = 8;
+  function runTap(title, instr) {
+    $('mgTitle').textContent = title || '👆 Tap Party';
+    $('mgInstructions').textContent = instr || 'Tap the pet as many times as you can!';
+    let score = 0, timeLeft = 8;
     const zone = document.createElement('div');
     zone.className = 'tap-zone';
-    zone.textContent = (state.currentCare && state.currentCare.pet.emoji) || '🐾';
+    zone.textContent = state.currentCare.pet.emoji;
     zone.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       score++;
       $('mgScore').textContent = 'Score: ' + score;
-      zone.classList.remove('pop');
-      void zone.offsetWidth;
-      zone.classList.add('pop');
+      zone.classList.remove('pop'); void zone.offsetWidth; zone.classList.add('pop');
       sfx('pop');
+      if (score % 3 === 0) animalSound(state.currentCare.pet.type);
     });
     $('mgArea').appendChild(zone);
     const t = setInterval(() => {
       timeLeft -= 0.1;
       $('mgTimer').style.width = Math.max(0, (timeLeft / 8) * 100) + '%';
-      if (timeLeft <= 0) {
-        clearInterval(t);
-        finishMiniGame(score >= 5);
-      }
+      if (timeLeft <= 0) { clearInterval(t); finishMiniGame(score >= 5); }
     }, 100);
     mgState = { timer: t };
   }
 
   function runFetch() {
-    $('mgTitle').textContent = '🎾 Catch the Ball';
-    $('mgInstructions').textContent = 'Tap the bouncing ball!';
-    let score = 0;
-    let timeLeft = 10;
+    $('mgTitle').textContent = '🎾 Fetch!';
+    $('mgInstructions').textContent = 'Tap the bouncing ball — good dog!';
+    let score = 0, timeLeft = 10;
     const area = document.createElement('div');
     area.className = 'fetch-area';
     const ball = document.createElement('div');
@@ -1768,38 +1971,29 @@
     ball.textContent = '🎾';
     const pet = document.createElement('div');
     pet.className = 'fetch-pet';
-    pet.textContent = (state.currentCare && state.currentCare.pet.emoji) || '🐶';
-    area.appendChild(ball);
-    area.appendChild(pet);
+    pet.textContent = state.currentCare.pet.emoji;
+    area.appendChild(ball); area.appendChild(pet);
     $('mgArea').appendChild(area);
-
     let x = 50, y = 40, vx = 3, vy = 2.5;
     function move() {
       if (!mgState || !mgState.alive) return;
-      const w = area.clientWidth - 40;
-      const h = area.clientHeight - 80;
+      const w = area.clientWidth - 40, h = area.clientHeight - 80;
       x += vx; y += vy;
       if (x <= 0 || x >= w) vx *= -1;
       if (y <= 0 || y >= h) vy *= -1;
-      x = Math.max(0, Math.min(w, x));
-      y = Math.max(0, Math.min(h, y));
-      ball.style.left = x + 'px';
-      ball.style.top = y + 'px';
+      x = Math.max(0, Math.min(w, x)); y = Math.max(0, Math.min(h, y));
+      ball.style.left = x + 'px'; ball.style.top = y + 'px';
       requestAnimationFrame(move);
     }
     ball.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      score++;
-      $('mgScore').textContent = 'Score: ' + score;
+      e.preventDefault(); e.stopPropagation();
+      score++; $('mgScore').textContent = 'Score: ' + score;
       vx = (Math.random() > 0.5 ? 1 : -1) * (2.5 + Math.random() * 3);
       vy = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2.5);
-      sfx('pop');
-      // happy pet bounce
+      sfx('pop'); animalSound('dog');
       pet.style.transform = 'translateX(-50%) scale(1.15)';
       setTimeout(() => { pet.style.transform = 'translateX(-50%) scale(1)'; }, 150);
     });
-
     mgState = { alive: true, timer: null };
     move();
     const t = setInterval(() => {
@@ -1814,61 +2008,152 @@
     mgState.timer = t;
   }
 
-  // ═══════════════════════════════════════
-  // PARK
-  // ═══════════════════════════════════════
+  function runLaser() {
+    $('mgTitle').textContent = '🔴 Laser Chase!';
+    $('mgInstructions').textContent = 'Tap the red laser dot — cats love this!';
+    let score = 0, timeLeft = 10;
+    const area = document.createElement('div');
+    area.className = 'laser-area';
+    const dot = document.createElement('div');
+    dot.className = 'laser-dot';
+    const pet = document.createElement('div');
+    pet.className = 'fetch-pet';
+    pet.textContent = state.currentCare.pet.emoji;
+    area.appendChild(dot); area.appendChild(pet);
+    $('mgArea').appendChild(area);
+    let x = 80, y = 60, tx = 100, ty = 80;
+    function move() {
+      if (!mgState || !mgState.alive) return;
+      // laser wanders
+      if (Math.random() < 0.03) {
+        tx = 20 + Math.random() * (area.clientWidth - 40);
+        ty = 20 + Math.random() * (area.clientHeight - 90);
+      }
+      x += (tx - x) * 0.08;
+      y += (ty - y) * 0.08;
+      dot.style.left = x + 'px';
+      dot.style.top = y + 'px';
+      // pet follows slowly
+      const pl = Math.min(area.clientWidth - 50, Math.max(10, x - 10));
+      pet.style.left = pl + 'px';
+      pet.style.transform = 'none';
+      requestAnimationFrame(move);
+    }
+    dot.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      score++;
+      $('mgScore').textContent = 'Score: ' + score;
+      sfx('pop');
+      animalSound('cat');
+      tx = 20 + Math.random() * (area.clientWidth - 40);
+      ty = 20 + Math.random() * (area.clientHeight - 90);
+    });
+    mgState = { alive: true, timer: null };
+    move();
+    const t = setInterval(() => {
+      timeLeft -= 0.1;
+      $('mgTimer').style.width = Math.max(0, (timeLeft / 10) * 100) + '%';
+      if (timeLeft <= 0) {
+        clearInterval(t);
+        if (mgState) mgState.alive = false;
+        finishMiniGame(score >= 4);
+      }
+    }, 100);
+    mgState.timer = t;
+  }
+
+  // ══════════════════════════════════════
+  // WALK + PARK
+  // ══════════════════════════════════════
+  function startWalkToPark() {
+    const c = state.currentCare;
+    $('walkPet').textContent = c.pet.emoji;
+    $('walkActors').classList.remove('going', 'bob');
+    $('walkActors').style.left = '';
+    $('walkSpeech').textContent = `Time for a walk! Take ${c.pet.name} to the park.`;
+    $('btnStartWalk').textContent = '🚶 Let\'s walk!';
+    $('btnStartWalk').disabled = false;
+    showScreen('screen-walk');
+    sfx('door');
+  }
+
+  function doWalk() {
+    const actors = $('walkActors');
+    const btn = $('btnStartWalk');
+    btn.disabled = true;
+    btn.textContent = 'Walking…';
+    $('walkSpeech').textContent = 'Left, right, left, right… almost there!';
+    actors.classList.add('bob', 'going');
+    sfx('walk');
+    let steps = 0;
+    const walkSfx = setInterval(() => {
+      sfx('walk');
+      steps++;
+      if (steps % 2 === 0) animalSound(state.currentCare.pet.type);
+    }, 400);
+    setTimeout(() => {
+      clearInterval(walkSfx);
+      actors.classList.remove('bob');
+      sfx('happy');
+      openPark();
+    }, 3200);
+  }
+
   function openPark() {
     const c = state.currentCare;
-    if (!c) return;
-    $('parkPet').textContent = c.pet.emoji;
+    $('parkPet').textContent = petDisplay(c.pet);
     $('parkSpeech').textContent = `${c.pet.name} loves the park! Look at those butterflies! 🦋`;
     showScreen('screen-park');
+    animalSound(c.pet.type);
     sfx('happy');
   }
+
   function parkActivity(kind) {
     sfx('pop');
+    animalSound(state.currentCare.pet.type);
     const p = state.currentCare.pet;
     if (kind === 'run') {
       $('parkSpeech').textContent = `${p.name} is zooming around! Zoom zoom! 💨`;
-      $('parkPet').style.animationDuration = '0.5s';
+      $('parkPet').style.animationDuration = '0.45s';
     } else {
       $('parkSpeech').textContent = `Picnic time! ${p.name} shares a cookie with you 🍪`;
       $('parkPet').style.animationDuration = '1.8s';
+      sfx('eat');
     }
   }
+
   function finishPark() {
     $('parkPet').style.animationDuration = '';
+    sfx('walk');
     completeCareAction('park');
-    showScreen('screen-care');
-    renderCare();
+    state.room = 'bedroom';
+    renderHouse();
+    showScreen('screen-house');
+    $('careSpeech').textContent = `Back home! ${state.currentCare.pet.name} is happily tired 😴`;
+    animalSound(state.currentCare.pet.type);
   }
 
-  // ═══════════════════════════════════════
-  // DRESS UP
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
+  // DRESS
+  // ══════════════════════════════════════
   function openDress() {
     const c = state.currentCare;
-    if (!c) return;
-    $('dressPetEmoji').textContent = c.pet.emoji;
+    $('dressPetEmoji').textContent = petDisplay(c.pet);
     renderOutfitGrid();
     showScreen('screen-dress');
+    sfx('tap');
   }
 
   function renderOutfitGrid() {
     const c = state.currentCare;
     const grid = $('outfitGrid');
     grid.innerHTML = '';
-
-    // none option
     const none = document.createElement('div');
     none.className = 'outfit-item' + (!c.pet.outfit && !c.pet.accessory ? ' selected' : '');
     none.innerHTML = `<span class="ico">✨</span>Natural look`;
     none.addEventListener('click', () => {
-      c.pet.outfit = null;
-      c.pet.accessory = null;
-      updateDressPreview();
-      renderOutfitGrid();
-      sfx('tap');
+      c.pet.outfit = null; c.pet.accessory = null;
+      updateDressPreview(); renderOutfitGrid(); sfx('tap');
     });
     grid.appendChild(none);
 
@@ -1876,48 +2161,26 @@
       const owned = state.inventory.outfits.includes(item.id);
       const el = document.createElement('div');
       el.className = 'outfit-item' + (owned ? ' owned' : ' locked') + (c.pet.outfit === item.id ? ' selected' : '');
-      el.innerHTML = `<span class="ico">${item.emoji}</span>${item.name}<div class="price">${owned ? 'Owned ✓' : 'Buy in Shop $' + item.price}</div>`;
-      if (owned) {
-        el.addEventListener('click', () => {
-          c.pet.outfit = item.id;
-          updateDressPreview();
-          renderOutfitGrid();
-          sfx('tap');
-        });
-      }
+      const free = FREE_STARTERS.outfits.includes(item.id);
+      el.innerHTML = `<span class="ico">${item.emoji}</span>${item.name}<div class="price">${owned ? (free ? 'Free starter ✓' : 'Owned ✓') : 'Buy in Shop $' + item.price}</div>`;
+      if (owned) el.addEventListener('click', () => { c.pet.outfit = item.id; updateDressPreview(); renderOutfitGrid(); sfx('tap'); animalSound(c.pet.type); });
       grid.appendChild(el);
     });
-
     SHOP.accessories.forEach(item => {
       const owned = state.inventory.accessories.includes(item.id);
       const el = document.createElement('div');
       el.className = 'outfit-item' + (owned ? ' owned' : ' locked') + (c.pet.accessory === item.id ? ' selected' : '');
-      el.innerHTML = `<span class="ico">${item.emoji}</span>${item.name}<div class="price">${owned ? 'Owned ✓' : 'Buy in Shop $' + item.price}</div>`;
-      if (owned) {
-        el.addEventListener('click', () => {
-          c.pet.accessory = item.id;
-          updateDressPreview();
-          renderOutfitGrid();
-          sfx('tap');
-        });
-      }
+      const free = FREE_STARTERS.accessories.includes(item.id);
+      el.innerHTML = `<span class="ico">${item.emoji}</span>${item.name}<div class="price">${owned ? (free ? 'Free starter ✓' : 'Owned ✓') : 'Buy in Shop $' + item.price}</div>`;
+      if (owned) el.addEventListener('click', () => { c.pet.accessory = item.id; updateDressPreview(); renderOutfitGrid(); sfx('tap'); animalSound(c.pet.type); });
       grid.appendChild(el);
     });
-
     updateDressPreview();
   }
 
   function updateDressPreview() {
     const c = state.currentCare;
-    let display = c.pet.emoji;
-    if (c.pet.accessory === 'crown') display = '👑' + c.pet.emoji;
-    else if (c.pet.accessory === 'bow') display = c.pet.emoji + '🎀';
-    else if (c.pet.accessory === 'hat') display = '🥳' + c.pet.emoji;
-    else if (c.pet.accessory === 'glasses') display = c.pet.emoji + '🕶️';
-    else if (c.pet.accessory === 'scarf') display = c.pet.emoji + '🧣';
-    else if (c.pet.accessory === 'collar') display = c.pet.emoji + '💝';
-    $('dressPetEmoji').textContent = display;
-
+    $('dressPetEmoji').textContent = petDisplay(c.pet);
     const parts = [];
     if (c.pet.outfit) {
       const o = SHOP.outfits.find(x => x.id === c.pet.outfit);
@@ -1932,25 +2195,24 @@
 
   function finishDress() {
     completeCareAction('dress');
-    showScreen('screen-care');
-    renderCare();
+    state.room = 'bedroom';
+    renderHouse();
+    showScreen('screen-house');
+    animalSound(state.currentCare.pet.type);
+    $('careSpeech').textContent = `${state.currentCare.pet.name} looks fabulous! 💅`;
   }
 
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   // SHOP
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   let shopTab = 'outfits';
-
   function openShop() {
     shopTab = 'outfits';
-    document.querySelectorAll('.shop-tab').forEach(t => {
-      t.classList.toggle('active', t.dataset.tab === shopTab);
-    });
+    document.querySelectorAll('.shop-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === shopTab));
     renderShop();
     showScreen('screen-shop');
     sfx('tap');
   }
-
   function renderShop() {
     const grid = $('shopGrid');
     grid.innerHTML = '';
@@ -1958,56 +2220,38 @@
     const inv = state.inventory[shopTab];
     items.forEach(item => {
       const owned = inv.includes(item.id);
+      const free = (FREE_STARTERS[shopTab] || []).includes(item.id);
       const el = document.createElement('div');
       el.className = 'shop-item' + (owned ? ' owned' : '');
       el.innerHTML = `
         <div class="ico">${item.emoji}</div>
-        <div class="name">${item.name}</div>
-        <div class="desc">${item.desc}</div>
+        <div class="name" style="font-weight:800;font-size:0.9rem;margin:6px 0 2px;">${item.name}</div>
+        <div class="desc">${item.desc}${free && owned ? ' · Free starter!' : ''}</div>
         <button class="btn btn-sm ${owned ? 'btn-white' : 'btn-pink'}" ${owned ? 'disabled' : ''}>
           ${owned ? 'Owned ✓' : '$' + item.price}
-        </button>
-      `;
-      if (!owned) {
-        el.querySelector('button').addEventListener('click', () => buyItem(shopTab, item));
-      }
+        </button>`;
+      if (!owned) el.querySelector('button').addEventListener('click', () => buyItem(shopTab, item));
       grid.appendChild(el);
     });
   }
-
   function buyItem(category, item) {
-    if (state.money < item.price) {
-      toast('Need a bit more money — keep sitting! 💪');
-      sfx('tap');
-      return;
-    }
+    if (state.money < item.price) { toast('Need a bit more money — keep sitting! 💪'); sfx('tap'); return; }
     state.money -= item.price;
     state.inventory[category].push(item.id);
-    save();
-    updateHUD();
-    sfx('buy');
+    save(); updateHUD(); sfx('buy');
     toast(`Bought ${item.emoji} ${item.name}!`, 'good');
     renderShop();
   }
 
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   // ADOPTION
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
   let adoptDraft = { step: 0, type: null, breed: null, color: null, name: '' };
 
   function openAdopt() {
-    if (state.ownPet) {
-      toast('You already have a wonderful pet!');
-      return;
-    }
-    if (state.jobsCompleted < JOBS_NEEDED) {
-      toast(`Complete ${JOBS_NEEDED} jobs first!`);
-      return;
-    }
-    if (state.money < ADOPT_FEE) {
-      toast(`Adoption costs $${ADOPT_FEE}. Keep earning! You have $${state.money}.`);
-      return;
-    }
+    if (state.ownPet) { toast('You already have a wonderful pet!'); return; }
+    if (state.jobsCompleted < JOBS_NEEDED) { toast(`Complete ${JOBS_NEEDED} jobs first!`); return; }
+    if (state.money < ADOPT_FEE) { toast(`Adoption costs $${ADOPT_FEE}. You have $${state.money}.`); return; }
     adoptDraft = { step: 0, type: null, breed: null, color: null, name: '' };
     renderAdopt();
     showScreen('screen-adopt');
@@ -2021,7 +2265,7 @@
     box.innerHTML = '';
 
     if (adoptDraft.step === 0) {
-      box.innerHTML = `<p class="speech">Which kind of animal would you love to adopt? (Fee: $${ADOPT_FEE})</p>`;
+      box.innerHTML = `<p class="speech">Which animal would you love? (Fee: $${ADOPT_FEE})</p>`;
       const grid = document.createElement('div');
       grid.className = 'type-grid';
       Object.keys(ANIMALS).forEach(key => {
@@ -2030,11 +2274,8 @@
         card.className = 'type-card' + (adoptDraft.type === key ? ' selected' : '');
         card.innerHTML = `<span class="ico">${a.emoji}</span>${a.name}`;
         card.addEventListener('click', () => {
-          adoptDraft.type = key;
-          adoptDraft.breed = null;
-          adoptDraft.color = null;
-          sfx('tap');
-          renderAdopt();
+          adoptDraft.type = key; adoptDraft.breed = null; adoptDraft.color = null;
+          sfx('tap'); animalSound(key); renderAdopt();
         });
         grid.appendChild(card);
       });
@@ -2055,10 +2296,8 @@
         card.className = 'breed-card' + (adoptDraft.breed === b.id ? ' selected' : '');
         card.innerHTML = `<span class="ico">${b.emoji}</span>${b.name}`;
         card.addEventListener('click', () => {
-          adoptDraft.breed = b.id;
-          adoptDraft.color = null;
-          sfx('tap');
-          renderAdopt();
+          adoptDraft.breed = b.id; adoptDraft.color = null;
+          sfx('tap'); animalSound(adoptDraft.type); renderAdopt();
         });
         grid.appendChild(card);
       });
@@ -2078,12 +2317,7 @@
         const sw = document.createElement('div');
         sw.className = 'color-swatch' + (adoptDraft.color === col ? ' selected' : '');
         sw.style.background = COLOR_HEX[col] || '#ccc';
-        sw.title = col;
-        sw.addEventListener('click', () => {
-          adoptDraft.color = col;
-          sfx('tap');
-          renderAdopt();
-        });
+        sw.addEventListener('click', () => { adoptDraft.color = col; sfx('tap'); renderAdopt(); });
         row.appendChild(sw);
       });
       box.appendChild(row);
@@ -2108,17 +2342,15 @@
         <p class="speech">Give your new friend a name!</p>
         <div class="pet-stage" style="min-height:100px;margin-bottom:12px;">
           <div class="pet-emoji" style="font-size:4rem;">${breed.emoji}</div>
-          <div class="pet-outfit-label" style="text-transform:capitalize;">${adoptDraft.color} ${breed.name}</div>
+          <div style="text-transform:capitalize;font-weight:700;margin-top:6px;">${adoptDraft.color} ${breed.name}</div>
         </div>
         <input class="name-input" id="petNameInput" maxlength="14" placeholder="Type a name…" value="${adoptDraft.name || ''}" />
         <div class="btn-row">
           <button class="btn btn-white" id="adBack">← Back</button>
           <button class="btn btn-pink btn-lg" id="adConfirm">Adopt for $${ADOPT_FEE}! 💖</button>
-        </div>
-      `;
+        </div>`;
       const input = box.querySelector('#petNameInput');
       input.addEventListener('input', () => { adoptDraft.name = input.value.trim(); });
-      // focus for mobile after paint
       setTimeout(() => input.focus(), 200);
       box.querySelector('#adBack').onclick = () => { adoptDraft.step = 2; renderAdopt(); };
       box.querySelector('#adConfirm').onclick = confirmAdopt;
@@ -2127,71 +2359,70 @@
 
   function confirmAdopt() {
     const name = (adoptDraft.name || '').trim();
-    if (!name) {
-      toast('Please pick a name! ✏️');
-      return;
-    }
-    if (state.money < ADOPT_FEE) {
-      toast(`Need $${ADOPT_FEE} to adopt.`);
-      return;
-    }
+    if (!name) { toast('Please pick a name! ✏️'); return; }
+    if (state.money < ADOPT_FEE) { toast(`Need $${ADOPT_FEE} to adopt.`); return; }
     const breed = ANIMALS[adoptDraft.type].breeds.find(b => b.id === adoptDraft.breed);
     state.money -= ADOPT_FEE;
     state.ownPet = {
-      type: adoptDraft.type,
-      typeName: ANIMALS[adoptDraft.type].name,
-      breed: breed.id,
-      breedName: breed.name,
-      color: adoptDraft.color,
-      emoji: breed.emoji,
-      name,
-      outfit: null,
-      accessory: null,
-      lastCare: Date.now(),
+      type: adoptDraft.type, typeName: ANIMALS[adoptDraft.type].name,
+      breed: breed.id, breedName: breed.name, color: adoptDraft.color,
+      emoji: breed.emoji, name, outfit: null, accessory: null, lastCare: Date.now(),
     };
-    save();
-    updateHUD();
-    confettiBurst();
-    sfx('success');
-    $('celebMsg').textContent = `Welcome home, ${name}! 🏠 Your new ${adoptDraft.color} ${breed.name} is so happy to be yours!`;
+    save(); updateHUD(); confettiBurst(); sfx('success');
+    animalSound(adoptDraft.type);
+    $('celebMsg').textContent = `Welcome home, ${name}! 🏠 Your new ${adoptDraft.color} ${breed.name} is so happy!`;
     showScreen('screen-celeb');
     toast(`${name} is family now! 💖`, 'good');
   }
 
-  // ═══════════════════════════════════════
-  // OWN PET CARE
-  // ═══════════════════════════════════════
   function careOwnPet() {
     if (!state.ownPet) return;
     sfx('tap');
     startCare('own', state.ownPet, 7, null);
   }
 
-  // ═══════════════════════════════════════
-  // WIRE EVENTS
-  // ═══════════════════════════════════════
+  // ══════════════════════════════════════
+  // WIRE
+  // ══════════════════════════════════════
   function wire() {
     $('btnStart').addEventListener('click', () => {
       ensureAudio();
       sfx('success');
+      if (!state.muted) startMusic();
       showScreen('screen-home');
       updateHUD();
       scheduleNextCall();
+      if (state.inventory.outfits.includes('sweater')) {
+        // gentle tip once
+      }
+    });
+
+    $('muteBtn').addEventListener('click', () => {
+      ensureAudio();
+      setMuted(!state.muted);
+      sfx('tap');
     });
 
     $('phoneBtn').addEventListener('click', openCall);
     $('btnAccept').addEventListener('click', acceptJob);
     $('btnDecline').addEventListener('click', declineJob);
 
-    $('careGrid').addEventListener('click', (e) => {
-      const btn = e.target.closest('.care-btn');
-      if (!btn) return;
-      doCareAction(btn.dataset.action);
+    document.querySelectorAll('.room-tab').forEach(tab => {
+      tab.addEventListener('click', () => goToRoom(tab.dataset.room));
+    });
+
+    $('roomPet').addEventListener('click', () => {
+      if (state.currentCare) {
+        animalSound(state.currentCare.pet.type);
+        $('roomPet').classList.remove('happy');
+        void $('roomPet').offsetWidth;
+        $('roomPet').classList.add('happy');
+        setTimeout(() => $('roomPet').classList.remove('happy'), 600);
+      }
     });
 
     $('btnFinishJob').addEventListener('click', finishJob);
-    $('btnCareBack').addEventListener('click', () => {
-      // allow leaving own-pet care anytime; warn lightly on job
+    $('btnHouseBack').addEventListener('click', () => {
       if (state.currentCare && state.currentCare.mode === 'job') {
         const done = state.currentCare.required.filter(a => state.currentCare.done[a]).length;
         if (done < state.currentCare.required.length) {
@@ -2200,83 +2431,74 @@
         }
       }
       if (state.currentCare && state.currentCare.mode === 'own' && state.ownPet) {
-        // sync outfits
         state.ownPet.outfit = state.currentCare.pet.outfit || null;
         state.ownPet.accessory = state.currentCare.pet.accessory || null;
         save();
       }
       state.currentCare = null;
+      bathState = null;
       showScreen('screen-home');
       updateHUD();
       if (!state.phoneReady && !state.pendingJob) scheduleNextCall();
+    });
+
+    $('btnFoodCancel').addEventListener('click', () => {
+      $('foodOverlay').classList.remove('show');
+      sfx('tap');
     });
 
     $('btnMgBack').addEventListener('click', () => {
       if (mgState && mgState.timer) clearInterval(mgState.timer);
       if (mgState) mgState.alive = false;
       mgState = null;
-      showScreen('screen-care');
+      showScreen('screen-house');
+      renderHouse();
     });
     $('btnMgDone').addEventListener('click', () => {
-      showScreen('screen-care');
-      renderCare();
+      showScreen('screen-house');
+      renderHouse();
+      $('careSpeech').textContent = 'That game was so fun! 🎮';
     });
 
+    $('btnStartWalk').addEventListener('click', doWalk);
     $('btnParkRun').addEventListener('click', () => parkActivity('run'));
     $('btnParkPicnic').addEventListener('click', () => parkActivity('picnic'));
     $('btnParkDone').addEventListener('click', finishPark);
-    $('btnParkBack').addEventListener('click', () => {
-      showScreen('screen-care');
-    });
 
-    $('btnDressBack').addEventListener('click', () => showScreen('screen-care'));
+    $('btnDressBack').addEventListener('click', () => { showScreen('screen-house'); renderHouse(); });
     $('btnDressDone').addEventListener('click', finishDress);
 
     $('btnShop').addEventListener('click', openShop);
-    $('btnShopBack').addEventListener('click', () => {
-      showScreen('screen-home');
-      updateHUD();
-    });
+    $('btnShopBack').addEventListener('click', () => { showScreen('screen-home'); updateHUD(); });
     document.querySelectorAll('.shop-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         shopTab = tab.dataset.tab;
         document.querySelectorAll('.shop-tab').forEach(t => t.classList.toggle('active', t === tab));
-        renderShop();
-        sfx('tap');
+        renderShop(); sfx('tap');
       });
     });
 
     $('btnAdopt').addEventListener('click', openAdopt);
-    $('btnAdoptBack').addEventListener('click', () => {
-      showScreen('screen-home');
-      updateHUD();
-    });
+    $('btnAdoptBack').addEventListener('click', () => { showScreen('screen-home'); updateHUD(); });
     $('btnOwnPet').addEventListener('click', careOwnPet);
     $('ownPetHomeCard').addEventListener('click', careOwnPet);
-
     $('btnCelebOk').addEventListener('click', () => {
       showScreen('screen-home');
       updateHUD();
       if (!state.phoneReady && !state.pendingJob) scheduleNextCall();
       sfx('tap');
     });
-
-    // prevent pull-to-refresh bounce annoyance a bit
-    document.addEventListener('touchmove', (e) => {
-      // allow scroll inside screens
-    }, { passive: true });
   }
 
-  // ═══════════════════════════════════════
   // INIT
-  // ═══════════════════════════════════════
   load();
   wire();
   updateHUD();
-  // if returning player with save, still show welcome for polish, but money visible
   if (state.jobsCompleted > 0 || state.ownPet || state.money > 0) {
     $('btnStart').textContent = 'Continue Adventure! 🎉';
   }
+  // persist starters for brand-new players
+  save();
 })();
 </script>
 </body>
