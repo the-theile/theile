@@ -11,11 +11,15 @@
 <meta name="description" content="A sparkly fashion styling game for kids — create your avatar, style clients, unlock looks, and glow up together!" />
 <meta property="og:title" content="Glow Up Studio" />
 <meta property="og:description" content="Kid-friendly fashion studio game. Style clients, earn sparkles, unlock outfits — pure fun, no ads." />
+<meta property="og:image" content="https://theile.me/glow-up-studio/assets/og-hero.jpg" />
+<meta property="og:image:width" content="1920" />
+<meta property="og:image:height" content="1080" />
 <meta property="og:url" content="https://theile.me/glow-up-studio/" />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Glow Up Studio" />
 <meta name="twitter:description" content="Kid-friendly fashion studio game. Style clients, earn sparkles, unlock outfits!" />
+<meta name="twitter:image" content="https://theile.me/glow-up-studio/assets/og-hero.jpg" />
 <style>
 :root {
   --pink: #FF6BB5; --pink-dark: #E91E8C; --pink-soft: #FFD6EC;
@@ -440,10 +444,21 @@ p { line-height: 1.45; }
 #screen-welcome {
   justify-content: center; align-items: center; text-align: center;
   background: linear-gradient(165deg, #FFE0F4, #EDE0FF, #D8FFF0);
-  padding: 20px 16px 28px;
+  padding: 16px 16px 28px;
+}
+.welcome-hero {
+  width: min(92%, 360px);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 20px;
+  border: 3px solid #fff;
+  box-shadow: 0 12px 32px rgba(233,30,140,0.22);
+  margin: 0 auto 12px;
+  display: block;
+  background: linear-gradient(145deg, #FFE0F4, #EDE0FF);
 }
 .welcome-sparkle {
-  font-size: 2.4rem; margin-bottom: 6px;
+  font-size: 2rem; margin-bottom: 4px;
   animation: floaty 2.4s ease-in-out infinite;
 }
 @keyframes floaty {
@@ -459,7 +474,37 @@ p { line-height: 1.45; }
   color: var(--ink-soft); font-weight: 600; max-width: 300px;
   margin: 0 auto 20px; font-size: 0.95rem;
 }
-.logo-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; font-size: 1.6rem; }
+.logo-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; font-size: 1.4rem; }
+.client-photo {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 12px;
+  display: block;
+}
+.mission-card .mc-avatar.has-photo {
+  background: #f5eef5; padding: 0; overflow: hidden;
+}
+.char-stage.studio-bg {
+  background:
+    linear-gradient(180deg, rgba(255,248,252,0.35) 0%, rgba(255,245,250,0.72) 100%),
+    var(--studio-bg, none) center / cover no-repeat;
+  border: 2px solid rgba(255,224,240,0.7);
+}
+.ba-pair {
+  width: min(100%, 340px);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 3px solid #fff;
+  box-shadow: 0 8px 24px rgba(233,30,140,0.18);
+  margin: 8px auto 12px;
+  display: block;
+  background: #f8eef5;
+}
+.ba-pair.hidden { display: none; }
+.item-card .ico-img {
+  width: 48px; height: 48px; object-fit: cover; border-radius: 12px;
+  border: 2px solid #f5e6f0; margin-bottom: 2px;
+  box-shadow: 0 2px 6px rgba(58,37,72,0.08);
+}
 
 /* Avatar creator */
 .gender-row { display: flex; gap: 12px; justify-content: center; margin: 10px 0 16px; }
@@ -685,6 +730,7 @@ p { line-height: 1.45; }
   <div class="screens">
     <!-- WELCOME -->
     <section class="screen active" id="screen-welcome">
+      <img class="welcome-hero" id="welcomeHero" alt="Glow Up Studio" width="1920" height="1080" />
       <div class="welcome-sparkle">💄✨💅</div>
       <div class="logo-row"><span>👗</span><span>💇</span><span>💍</span><span>🌟</span></div>
       <h1 class="welcome-title">Glow Up Studio</h1>
@@ -777,6 +823,7 @@ p { line-height: 1.45; }
       <div class="result-emoji" id="resultEmoji">🎉</div>
       <h1 class="result-title grad-text" id="resultTitle">Amazing!</h1>
       <p class="result-msg" id="resultMsg">Your client loves the look!</p>
+      <img class="ba-pair hidden" id="resultPair" alt="Before and after glow-up" />
       <div class="char-stage sm" id="resultStage">
         <div class="char sm" id="resultChar" data-hair="bob"></div>
       </div>
@@ -802,6 +849,25 @@ p { line-height: 1.45; }
   const PRICE_HAIR = 500;
   const PRICE_OUTFIT = 300;
   const PRICE_JEWELRY = 250;
+
+  /** Resolve asset URLs against the game folder (works with/without trailing slash). */
+  function assetBase() {
+    try {
+      let p = (window.location && window.location.pathname) || '/';
+      if (/\.html?$/i.test(p)) p = p.replace(/[^/]+$/, '');
+      else if (p !== '/' && !p.endsWith('/')) p = p + '/';
+      return p;
+    } catch (e) {
+      return './';
+    }
+  }
+  const ASSET_BASE = assetBase();
+  function assetUrl(file) {
+    if (!file) return '';
+    if (/^https?:\/\//i.test(file) || file.startsWith('data:')) return file;
+    if (file.startsWith('/')) return file;
+    return ASSET_BASE + String(file).replace(/^\.\//, '');
+  }
 
   // ══════════════════════════════════════
   // COLOR PALETTE
@@ -1095,23 +1161,36 @@ p { line-height: 1.45; }
   // CLIENTS / MISSIONS
   // ══════════════════════════════════════
   const CLIENT_POOL = [
-    { name: 'Mia', gender: 'female', age: 'teen', personality: 'bubbly', skin: '#F5C9A8', hair: 'brown' },
-    { name: 'Ava', gender: 'female', age: 'kid', personality: 'sweet', skin: '#E8B898', hair: 'blonde' },
-    { name: 'Zoe', gender: 'female', age: 'teen', personality: 'bold', skin: '#C68642', hair: 'black' },
-    { name: 'Luna', gender: 'female', age: 'adult', personality: 'dreamy', skin: '#F5C9A8', hair: 'lavender' },
-    { name: 'Nova', gender: 'female', age: 'teen', personality: 'sparkly', skin: '#D4A574', hair: 'pink' },
-    { name: 'Ivy', gender: 'female', age: 'adult', personality: 'chill', skin: '#E0AC69', hair: 'auburn' },
-    { name: 'Ruby', gender: 'female', age: 'teen', personality: 'glam', skin: '#F5C9A8', hair: 'red' },
-    { name: 'Sage', gender: 'female', age: 'kid', personality: 'fun', skin: '#FFDBAC', hair: 'mint' },
-    { name: 'Leo', gender: 'male', age: 'teen', personality: 'cool', skin: '#E8B898', hair: 'brown' },
-    { name: 'Kai', gender: 'male', age: 'kid', personality: 'playful', skin: '#C68642', hair: 'black' },
-    { name: 'Max', gender: 'male', age: 'adult', personality: 'classic', skin: '#F5C9A8', hair: 'blonde' },
-    { name: 'Jay', gender: 'male', age: 'teen', personality: 'bold', skin: '#D4A574', hair: 'blue' },
-    { name: 'Sam', gender: 'female', age: 'adult', personality: 'elegant', skin: '#E8B898', hair: 'black' },
-    { name: 'Quinn', gender: 'female', age: 'teen', personality: 'soft', skin: '#FFDBAC', hair: 'pink' },
-    { name: 'Ellie', gender: 'female', age: 'kid', personality: 'rainbow', skin: '#F5C9A8', hair: 'rainbow' },
-    { name: 'Priya', gender: 'female', age: 'adult', personality: 'glam', skin: '#C68642', hair: 'black' },
+    { name: 'Nova', gender: 'female', age: 'teen', personality: 'sparkly', skin: '#D4A574', hair: 'black', photo: 'assets/client-nova.jpg', before: 'assets/ba-nova-before.jpg', after: 'assets/ba-nova-after.jpg', pair: 'assets/ba-nova-pair.jpg' },
+    { name: 'Priya', gender: 'female', age: 'adult', personality: 'glam', skin: '#C68642', hair: 'black', photo: 'assets/client-priya.jpg', before: 'assets/ba-priya-before.jpg', after: 'assets/ba-priya-after.jpg', pair: 'assets/ba-priya-pair.jpg' },
+    { name: 'Ruby', gender: 'female', age: 'teen', personality: 'glam', skin: '#F5C9A8', hair: 'blonde', photo: 'assets/client-ruby.jpg', before: 'assets/ba-ruby-before.jpg', after: 'assets/ba-ruby-after.jpg', pair: 'assets/ba-ruby-pair.jpg' },
+    { name: 'Leo', gender: 'male', age: 'teen', personality: 'cool', skin: '#E8B898', hair: 'brown', photo: 'assets/client-leo.jpg', before: 'assets/ba-leo-before.jpg', after: 'assets/ba-leo-after.jpg', pair: 'assets/ba-leo-pair.jpg' },
+    { name: 'Layla', gender: 'female', age: 'adult', personality: 'elegant', skin: '#E8B898', hair: 'brown', photo: 'assets/client-layla.jpg' },
+    { name: 'Kenji', gender: 'male', age: 'adult', personality: 'classic', skin: '#F5C9A8', hair: 'black', photo: 'assets/client-kenji.jpg' },
+    { name: 'Sofia', gender: 'female', age: 'teen', personality: 'bubbly', skin: '#D4A574', hair: 'brown', photo: 'assets/client-sofia.jpg' },
+    { name: 'Marcus', gender: 'male', age: 'teen', personality: 'cool', skin: '#C68642', hair: 'black', photo: 'assets/client-marcus.jpg' },
+    { name: 'Mia', gender: 'female', age: 'teen', personality: 'bubbly', skin: '#F5C9A8', hair: 'brown', photo: 'assets/client-priya.jpg', before: 'assets/ba-priya-before.jpg', pair: 'assets/ba-priya-pair.jpg' },
+    { name: 'Ava', gender: 'female', age: 'teen', personality: 'sweet', skin: '#E8B898', hair: 'blonde', photo: 'assets/client-ruby.jpg', before: 'assets/ba-ruby-before.jpg', pair: 'assets/ba-ruby-pair.jpg' },
+    { name: 'Zoe', gender: 'female', age: 'teen', personality: 'bold', skin: '#C68642', hair: 'black', photo: 'assets/client-nova.jpg', before: 'assets/ba-nova-before.jpg', pair: 'assets/ba-nova-pair.jpg' },
+    { name: 'Ivy', gender: 'female', age: 'adult', personality: 'chill', skin: '#E0AC69', hair: 'auburn', photo: 'assets/client-layla.jpg' },
+    { name: 'Kai', gender: 'male', age: 'teen', personality: 'playful', skin: '#C68642', hair: 'black', photo: 'assets/client-marcus.jpg' },
+    { name: 'Jay', gender: 'male', age: 'teen', personality: 'bold', skin: '#D4A574', hair: 'black', photo: 'assets/client-kenji.jpg' },
+    { name: 'Sam', gender: 'female', age: 'adult', personality: 'elegant', skin: '#E8B898', hair: 'black', photo: 'assets/client-nova.jpg', before: 'assets/ba-nova-before.jpg', pair: 'assets/ba-nova-pair.jpg' },
+    { name: 'Quinn', gender: 'female', age: 'teen', personality: 'soft', skin: '#FFDBAC', hair: 'pink', photo: 'assets/client-sofia.jpg' },
+    { name: 'Ellie', gender: 'female', age: 'teen', personality: 'rainbow', skin: '#F5C9A8', hair: 'rainbow', photo: 'assets/client-ruby.jpg', before: 'assets/ba-ruby-before.jpg', pair: 'assets/ba-ruby-pair.jpg' },
+    { name: 'Max', gender: 'male', age: 'adult', personality: 'classic', skin: '#F5C9A8', hair: 'brown', photo: 'assets/client-leo.jpg', before: 'assets/ba-leo-before.jpg', pair: 'assets/ba-leo-pair.jpg' },
   ];
+
+  const PRODUCT_ICONS = {
+    lipstick: 'assets/icons/lipstick.jpg',
+    eyeshadow: 'assets/icons/eyeshadow.jpg',
+    nailpolish: 'assets/icons/nail-polish.jpg',
+    hair: 'assets/icons/hairbrush.jpg',
+    earrings: 'assets/icons/earrings.jpg',
+    necklace: 'assets/icons/necklace.jpg',
+    serum: 'assets/icons/serum.jpg',
+    mascara: 'assets/icons/mascara.jpg',
+  };
 
   const REQUEST_TEMPLATES = [
     { text: 'I need something red in my outfit!', colors: ['red'], tags: [], nails: false, nailsOnly: false },
@@ -1799,8 +1878,14 @@ p { line-height: 1.45; }
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'mission-card' + (m.req.nailsOnly ? ' nails-only' : '');
+      // Prefer "before" look on the board (client arrives needing a glow-up)
+      const photoPath = m.client.before || m.client.photo;
+      const photo = photoPath ? assetUrl(photoPath) : '';
+      const avatarInner = photo
+        ? '<img class="client-photo" src="' + photo + '" alt="' + m.client.name + '" />'
+        : '<div class="char sm" data-mid="' + m.id + '"></div>';
       card.innerHTML =
-        '<div class="mc-avatar"><div class="char sm" data-mid="' + m.id + '"></div></div>' +
+        '<div class="mc-avatar' + (photo ? ' has-photo' : '') + '">' + avatarInner + '</div>' +
         '<div>' +
           '<div class="mc-name">' + m.client.name + (m.req.nailsOnly ? ' · Nails' : '') + '</div>' +
           '<div class="mc-req">"' + m.req.text + '"</div>' +
@@ -1809,7 +1894,7 @@ p { line-height: 1.45; }
       card.addEventListener('click', () => { sfx('tap'); startMission(m); });
       list.appendChild(card);
       const ch = card.querySelector('.char');
-      applyLook(ch, clientBaseLook(m.client));
+      if (ch) applyLook(ch, clientBaseLook(m.client));
     });
   }
 
@@ -1833,6 +1918,11 @@ p { line-height: 1.45; }
     $('studioName').textContent = m.client.name + (m.req.nailsOnly ? ' · Nails Only' : '');
     $('studioReq').textContent = m.req.text;
     $('reqBanner').textContent = '💬 "' + m.req.text + '"';
+    const stage = $('studioStage');
+    if (stage) {
+      stage.classList.add('studio-bg');
+      stage.style.setProperty('--studio-bg', 'url("' + assetUrl('assets/studio-bg.jpg') + '")');
+    }
     renderStudio();
   }
 
@@ -1886,10 +1976,13 @@ p { line-height: 1.45; }
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'item-card' + (opts.selected ? ' selected' : '') + (opts.locked ? ' locked' : '');
+    const ico = opts.iconUrl
+      ? '<img class="ico-img" src="' + opts.iconUrl + '" alt="" />'
+      : '<span class="ico">' + (opts.emoji || '✨') + '</span>';
     b.innerHTML =
       (opts.locked ? '<span class="lock-badge">🔒</span>' : '') +
       (opts.ownedBadge ? '<span class="owned-badge">OWNED</span>' : '') +
-      '<span class="ico">' + (opts.emoji || '✨') + '</span>' +
+      ico +
       '<span class="name">' + opts.name + '</span>' +
       (opts.priceText ? '<span class="price">' + opts.priceText + '</span>' : '');
     if (opts.colorDot) {
@@ -1897,6 +1990,21 @@ p { line-height: 1.45; }
     }
     if (opts.onClick) b.addEventListener('click', opts.onClick);
     return b;
+  }
+
+  function iconForShop(cat, item) {
+    if (cat === 'lipstick' || (item && item.id && item.id.indexOf('lip_') === 0)) return assetUrl(PRODUCT_ICONS.lipstick);
+    if (cat === 'eyeshadow') return assetUrl(PRODUCT_ICONS.eyeshadow);
+    if (cat === 'mascara') return assetUrl(PRODUCT_ICONS.mascara);
+    if (cat === 'skincare') return assetUrl(PRODUCT_ICONS.serum);
+    if (cat === 'earrings') return assetUrl(PRODUCT_ICONS.earrings);
+    if (cat === 'necklaces') return assetUrl(PRODUCT_ICONS.necklace);
+    if (cat === 'hair') return assetUrl(PRODUCT_ICONS.hair);
+    if (cat === 'nailDesigns' || cat === 'nailShapes') return assetUrl(PRODUCT_ICONS.nailpolish);
+    if (item && item.tags) {
+      if (item.tags.indexOf('sparkle') >= 0 && cat === 'lipstick') return assetUrl(PRODUCT_ICONS.lipstick);
+    }
+    return '';
   }
 
   function renderColorRow(colorIds, selected, onPick) {
@@ -2180,6 +2288,11 @@ p { line-height: 1.45; }
     applyLook($('resultChar'), clientLook);
     lastResultOk = !!result.ok;
 
+    const pairEl = $('resultPair');
+    const stageEl = $('resultStage');
+    const pairSrc = currentMission && currentMission.client && currentMission.client.pair
+      ? assetUrl(currentMission.client.pair) : '';
+
     if (result.ok) {
       $('resultEmoji').textContent = pick(['🎉', '💖', '🌟', '✨', '🥳']);
       $('resultTitle').textContent = pick(['Amazing!', 'You glow!', 'So fabulous!', 'Perfect!', 'Stunning!']);
@@ -2189,6 +2302,14 @@ p { line-height: 1.45; }
         currentMission.client.name + ' is sparkling with joy!',
         'You\'re a styling superstar!',
       ]);
+      if (pairSrc && pairEl) {
+        pairEl.src = pairSrc;
+        pairEl.classList.remove('hidden');
+        if (stageEl) stageEl.classList.add('hidden');
+      } else {
+        if (pairEl) pairEl.classList.add('hidden');
+        if (stageEl) stageEl.classList.remove('hidden');
+      }
       $('resultPay').classList.remove('hidden');
       $('resultPay').textContent = '💵 +$' + result.pay;
       $('resultTips').classList.add('hidden');
@@ -2201,6 +2322,8 @@ p { line-height: 1.45; }
       setTimeout(() => sfx('money'), 300);
       confetti(32);
     } else {
+      if (pairEl) pairEl.classList.add('hidden');
+      if (stageEl) stageEl.classList.remove('hidden');
       $('resultEmoji').textContent = '💭';
       $('resultTitle').textContent = 'Almost!';
       $('resultMsg').textContent = 'So close — try a few tweaks and you\'ll nail it!';
@@ -2512,9 +2635,11 @@ p { line-height: 1.45; }
     entries.forEach(({ cat, item }) => {
       const owned = owns(cat, item.id);
       const price = priceOf(cat);
+      const iconUrl = iconForShop(cat, item);
       grid.appendChild(makeItemCard({
         name: item.name,
         emoji: item.emoji,
+        iconUrl: iconUrl || undefined,
         locked: !owned && !item.free,
         ownedBadge: owned,
         priceText: owned ? '✓ Yours' : (item.free ? 'FREE' : '$' + price),
@@ -2671,6 +2796,8 @@ p { line-height: 1.45; }
     updateMoney();
     $('muteBtn').textContent = state.muted ? '🔇' : '🔊';
     bindEvents();
+    const hero = $('welcomeHero');
+    if (hero) hero.src = assetUrl('assets/welcome-hero.jpg');
     // prebuild avatar char shell
     applyLook($('avatarChar'), state.avatar);
     applyLook($('clientChar'), defaultLook('female'));
