@@ -210,7 +210,7 @@ input[type=text] {
 }
 .doll-stage svg { width: min(200px, 52vw); height: auto; max-height: 340px; filter: drop-shadow(0 8px 16px rgba(45,27,78,0.12)); }
 .doll-stage.big svg { width: min(240px, 68vw); max-height: 400px; }
-.doll-stage.nails-zoom svg { width: min(280px, 88vw); max-height: 280px; }
+.doll-stage.nails-zoom svg { width: min(300px, 92vw); max-height: 320px; }
 
 .hub-stats {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0;
@@ -224,7 +224,7 @@ input[type=text] {
 .hub-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .avatar-row { display: flex; align-items: center; gap: 12px; }
 .avatar-mini { width: 72px; height: 72px; border-radius: 20px; overflow: hidden; background: linear-gradient(145deg,#FCE7F3,#E9D5FF); border: 3px solid #fff; box-shadow: 0 4px 12px rgba(45,27,78,0.1); flex-shrink: 0; }
-.avatar-mini svg { width: 100%; height: 100%; transform: translateY(8%) scale(1.35); }
+.avatar-mini svg { width: 170%; height: 170%; transform: translate(-20%, -8%); }
 
 /* Mission board */
 .mission-list { display: flex; flex-direction: column; gap: 12px; }
@@ -239,7 +239,7 @@ input[type=text] {
   width: 72px; height: 90px; border-radius: 14px; overflow: hidden;
   background: linear-gradient(160deg,#FCE7F3,#DDD6FE); flex-shrink: 0;
 }
-.mission-card .por svg { width: 100%; height: 100%; transform: translateY(10%) scale(1.5); }
+.mission-card .por svg { width: 160%; height: 160%; transform: translate(-18%, -6%); }
 .mission-card .info { flex: 1; min-width: 0; }
 .mission-card .name { font-weight: 900; font-size: 1.05rem; }
 .mission-card .tease { font-size: 0.88rem; color: var(--gss-ink-soft); margin-top: 4px; font-weight: 600; }
@@ -646,12 +646,12 @@ const ALL_HAIR_COLORS = Object.assign({}, HAIR_NATURAL, HAIR_FANTASY);
 const FANTASY_KEYS = Object.keys(HAIR_FANTASY).concat(['rainbow']);
 
 const SKIN_TONES = [
-  { id:'porcelain', name:'Porcelain', color:'#FDEBD0' },
-  { id:'peach', name:'Peach', color:'#F5CBA7' },
-  { id:'honey', name:'Honey', color:'#E0AC69' },
-  { id:'caramel', name:'Caramel', color:'#C68642' },
-  { id:'mocha', name:'Mocha', color:'#8D5524' },
-  { id:'espresso', name:'Espresso', color:'#5C3317' }
+  { id:'porcelain', name:'Porcelain', color:'#F6D9C8', shade:'#E8C4B0', blush:'#F0B8A8' },
+  { id:'peach', name:'Peach', color:'#E8B896', shade:'#D4A07E', blush:'#E8A090' },
+  { id:'honey', name:'Honey', color:'#C9956C', shade:'#B07D55', blush:'#C88878' },
+  { id:'caramel', name:'Caramel', color:'#A67B52', shade:'#8B6340', blush:'#B07060' },
+  { id:'mocha', name:'Mocha', color:'#7A4F32', shade:'#5E3A24', blush:'#8A5045' },
+  { id:'espresso', name:'Espresso', color:'#4A2F1F', shade:'#352015', blush:'#5A3830' }
 ];
 const FACE_SHAPES = [
   { id:'round', name:'Round' },
@@ -679,62 +679,132 @@ function rect(x, y, w, h, rx, fill, extra) {
 }
 
 /* ── Body drawing (fixed proportions, viewBox 0 0 300 500) ───────────────── */
-function drawBody(skin, bodyType, faceId) {
-  const outline = '#2D1B4E';
-  // Legs
-  let s = '';
-  s += path('M118 255 L108 400 L128 402 L138 260 Z', skin);
-  s += path('M182 255 L192 400 L172 402 L162 260 Z', skin);
-  // Torso silhouette differs slightly
-  if (bodyType === 'masc') {
-    s += path('M105 125 L95 145 L100 255 L200 255 L205 145 L195 125 Z', skin);
-  } else {
-    s += path('M110 125 L100 150 L105 255 L195 255 L200 150 L190 125 Z', skin);
+function skinMeta(skinHex) {
+  const t = SKIN_TONES.find(s => s.color === skinHex);
+  return t || { color: skinHex, shade: skinHex, blush: skinHex };
+}
+
+/** Head geometry — shared by body + hair so hair always sits on the skull */
+const HEAD = {
+  cx: 150, cy: 68,
+  // outer face bounds (approx)
+  top: 18, bottom: 118, left: 100, right: 200,
+  // crown ellipse used by hair cap
+  crownCy: 52, crownRx: 50, crownRy: 42
+};
+
+function headPath(faceId, skin) {
+  // More natural jaw / cheek proportions per face shape
+  if (faceId === 'oval') {
+    return path('M150 18 C118 18 102 42 100 68 C98 94 112 112 150 118 C188 112 202 94 200 68 C198 42 182 18 150 18 Z', skin);
   }
-  // Arms
-  s += path('M100 140 L70 145 L55 250 L75 255 L100 175 Z', skin);
-  s += path('M200 140 L230 145 L245 250 L225 255 L200 175 Z', skin);
-  // Hands
-  s += ellipse(62, 262, 14, 16, skin);
-  s += ellipse(238, 262, 14, 16, skin);
+  if (faceId === 'heart') {
+    return path('M150 20 C122 18 104 38 102 62 C100 88 118 110 150 116 C182 110 200 88 198 62 C196 38 178 18 150 20 Z', skin);
+  }
+  if (faceId === 'soft') {
+    return path('M150 20 C120 22 104 44 102 70 C100 96 118 114 150 118 C182 114 200 96 198 70 C196 44 180 22 150 20 Z', skin);
+  }
+  // round (default)
+  return path('M150 20 C122 20 104 40 102 68 C100 96 118 114 150 118 C182 114 200 96 198 68 C196 40 178 20 150 20 Z', skin);
+}
+
+function drawFaceFeatures(skin, faceId, shade, blush) {
+  let s = '';
+  const ink = '#3A2A28';
+  // Soft cheek warmth
+  s += ellipse(118, 82, 14, 9, blush, ' opacity="0.28"');
+  s += ellipse(182, 82, 14, 9, blush, ' opacity="0.28"');
+  // Temple / jaw shade
+  s += ellipse(108, 72, 8, 18, shade, ' opacity="0.18"');
+  s += ellipse(192, 72, 8, 18, shade, ' opacity="0.18"');
+  // Brows — soft natural arches
+  s += path('M118 54 Q132 48 145 53', 'none', ` stroke="${ink}" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.55"`);
+  s += path('M155 53 Q168 48 182 54', 'none', ` stroke="${ink}" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.55"`);
+  // Eye sockets (subtle)
+  s += ellipse(132, 68, 11, 7, shade, ' opacity="0.12"');
+  s += ellipse(168, 68, 11, 7, shade, ' opacity="0.12"');
+  // Eyes — almond, realistic
+  s += path('M120 68 Q132 60 144 68 Q132 76 120 68 Z', '#FBF8F5');
+  s += path('M156 68 Q168 60 180 68 Q168 76 156 68 Z', '#FBF8F5');
+  // Iris + pupil
+  s += ellipse(132, 68, 5.2, 5.5, '#5D4037');
+  s += ellipse(168, 68, 5.2, 5.5, '#5D4037');
+  s += circle(132, 68, 2.4, '#1A120F');
+  s += circle(168, 68, 2.4, '#1A120F');
+  s += circle(133.5, 66.5, 1.4, 'rgba(255,255,255,0.85)');
+  s += circle(169.5, 66.5, 1.4, 'rgba(255,255,255,0.85)');
+  // Upper lash line
+  s += path('M120 66 Q132 59 144 66', 'none', ` stroke="${ink}" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.7"`);
+  s += path('M156 66 Q168 59 180 66', 'none', ` stroke="${ink}" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.7"`);
+  // Nose — soft bridge + tip shade
+  s += path('M150 72 L148 88', 'none', ` stroke="${shade}" stroke-width="2" stroke-linecap="round" opacity="0.45"`);
+  s += ellipse(147, 90, 3.5, 2.2, shade, ' opacity="0.28"');
+  s += ellipse(153, 90, 3.5, 2.2, shade, ' opacity="0.28"');
+  // Lips — natural filled shape (makeup can override)
+  s += path('M136 100 Q150 96 164 100 Q150 110 136 100 Z', '#C4787A', ' opacity="0.75"');
+  s += path('M138 100 Q150 103 162 100', 'none', ` stroke="rgba(255,255,255,0.25)" stroke-width="1" fill="none"`);
+  return s;
+}
+
+function drawBody(skin, bodyType, faceId) {
+  const meta = skinMeta(skin);
+  const shade = meta.shade || skin;
+  const blush = meta.blush || skin;
+  let s = '';
+  // Legs with soft calf shape
+  s += path('M120 252 C112 300 108 360 110 400 L132 402 C134 360 136 300 140 255 Z', skin);
+  s += path('M180 252 C188 300 192 360 190 400 L168 402 C166 360 164 300 160 255 Z', skin);
+  s += path('M120 340 C118 370 116 390 118 400 L128 400 C128 380 130 360 132 340 Z', shade, ' opacity="0.15"');
+  s += path('M180 340 C182 370 184 390 182 400 L172 400 C172 380 170 360 168 340 Z', shade, ' opacity="0.15"');
+  // Torso
+  if (bodyType === 'masc') {
+    s += path('M108 128 C98 140 96 170 100 252 L200 252 C204 170 202 140 192 128 C175 122 150 120 108 128 Z', skin);
+  } else {
+    s += path('M112 128 C100 145 100 175 106 252 L194 252 C200 175 200 145 188 128 C170 120 150 118 112 128 Z', skin);
+  }
+  // Soft torso shade
+  s += ellipse(150, 190, 28, 40, shade, ' opacity="0.1"');
+  // Arms — continuous from shoulder to hand
+  s += path('M108 138 C85 145 68 190 58 248 C55 258 62 268 72 266 C82 264 88 250 92 230 C96 200 100 165 112 148 Z', skin);
+  s += path('M192 138 C215 145 232 190 242 248 C245 258 238 268 228 266 C218 264 212 250 208 230 C204 200 200 165 188 148 Z', skin);
+  // Hands attached to wrists
+  s += path('M58 248 C50 252 48 262 54 272 C60 280 72 280 78 272 C82 266 80 258 72 254 C68 250 62 248 58 248 Z', skin);
+  s += path('M242 248 C250 252 252 262 246 272 C240 280 228 280 222 272 C218 266 220 258 228 254 C232 250 238 248 242 248 Z', skin);
   // Neck
-  s += rect(135, 105, 30, 28, 6, skin);
-  // Head by face shape
-  let head;
-  if (faceId === 'oval') head = ellipse(150, 70, 48, 55, skin);
-  else if (faceId === 'heart') head = path('M150 20 C120 20 102 50 105 75 C108 100 130 118 150 120 C170 118 192 100 195 75 C198 50 180 20 150 20 Z', skin);
-  else if (faceId === 'soft') head = ellipse(150, 72, 50, 52, skin);
-  else head = ellipse(150, 72, 52, 50, skin); // round
-  s += head;
-  // Ears
-  s += ellipse(100, 72, 8, 12, skin);
-  s += ellipse(200, 72, 8, 12, skin);
-  // Eyes (base)
-  s += ellipse(132, 68, 8, 9, '#fff');
-  s += ellipse(168, 68, 8, 9, '#fff');
-  s += circle(133, 69, 4.5, '#3E2723');
-  s += circle(169, 69, 4.5, '#3E2723');
-  s += circle(134, 67, 1.5, '#fff');
-  s += circle(170, 67, 1.5, '#fff');
-  // Brows
-  s += path('M120 54 Q132 48 144 54', 'none', ` stroke="${outline}" stroke-width="2.5" stroke-linecap="round" fill="none"`);
-  s += path('M156 54 Q168 48 180 54', 'none', ` stroke="${outline}" stroke-width="2.5" stroke-linecap="round" fill="none"`);
-  // Nose
-  s += path('M150 78 Q154 88 148 90', 'none', ` stroke="${outline}" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.4"`);
-  // Mouth base
-  s += path('M138 100 Q150 108 162 100', 'none', ` stroke="#C2185B" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.7"`);
-  // Soft outline
-  s += `<g fill="none" stroke="${outline}" stroke-width="2.2" opacity="0.15">
-    <ellipse cx="150" cy="72" rx="52" ry="50"/>
-  </g>`;
+  s += path('M136 108 C134 118 134 128 136 134 L164 134 C166 128 166 118 164 108 C158 112 142 112 136 108 Z', skin);
+  s += ellipse(150, 122, 12, 6, shade, ' opacity="0.15"');
+  // Ears (under hair side, on head sides)
+  s += ellipse(102, 70, 7, 11, skin);
+  s += ellipse(198, 70, 7, 11, skin);
+  s += ellipse(102, 70, 4, 7, shade, ' opacity="0.2"');
+  s += ellipse(198, 70, 4, 7, shade, ' opacity="0.2"');
+  // Head
+  s += headPath(faceId || 'round', skin);
+  // Soft face light (more natural, less flat cartoon)
+  s += ellipse(142, 60, 28, 32, 'rgba(255,255,255,0.14)');
+  // Face features
+  s += drawFaceFeatures(skin, faceId || 'round', shade, blush);
+  // Soft head rim
+  s += path('M150 20 C122 20 104 40 102 68 C100 96 118 114 150 118 C182 114 200 96 198 68 C196 40 178 20 150 20 Z',
+    'none', ` stroke="${shade}" stroke-width="1.4" fill="none" opacity="0.22"`);
   return s;
 }
 
 function drawSkinGlow(level) {
   if (!level) return '';
-  const opac = 0.06 + level * 0.05;
-  return ellipse(150, 72, 54, 56, `rgba(255,255,200,${opac})`) +
-    ellipse(150, 180, 55, 70, `rgba(255,240,200,${opac * 0.6})`);
+  const opac = 0.05 + level * 0.045;
+  return ellipse(150, 68, 52, 52, `rgba(255,248,220,${opac})`) +
+    ellipse(150, 180, 50, 65, `rgba(255,240,210,${opac * 0.55})`);
+}
+
+/** Crown fill — sits on top of the skull. Stops above the brows so eyes stay visible. */
+function hairSkullCap(c) {
+  return path('M101 52 C99 30 120 12 150 10 C180 12 201 30 199 52 C186 40 168 32 150 31 C132 32 114 40 101 52 Z', c);
+}
+/** Side locks that frame the face (front layer) without covering eyes */
+function hairSideFrames(c) {
+  return path('M100 48 C96 70 98 95 104 112 C108 95 108 72 106 55 C104 50 102 48 100 48 Z', c) +
+    path('M200 48 C204 70 202 95 196 112 C192 95 192 72 194 55 C196 50 198 48 200 48 Z', c);
 }
 
 /* ── Clothing draw functions ─────────────────────────────────────────────── */
@@ -1011,95 +1081,141 @@ function sweaterBell(c) {
   return path('M95 120 L55 155 L80 200 L100 175 L105 255 L195 255 L200 175 L220 200 L245 155 L205 120 L188 138 L150 128 L112 138 Z', c);
 }
 
-/* Hair */
+/* Hair — every style starts with a skull cap so the crown is never bald.
+   Back layer: volume behind shoulders. Front layer: bangs + side frames over face. */
 function hairBobBack(c) {
-  return path('M100 55 Q95 110 105 130 L120 125 Q150 135 180 125 L195 130 Q205 110 200 55 Q175 40 150 38 Q125 40 100 55 Z', c);
+  return hairSkullCap(c) +
+    path('M98 55 C90 90 92 120 100 128 C115 138 140 142 150 142 C160 142 185 138 200 128 C208 120 210 90 202 55 C185 28 115 28 98 55 Z', c) +
+    path('M100 100 C95 125 100 145 115 148 L120 120 Z', c) +
+    path('M200 100 C205 125 200 145 185 148 L180 120 Z', c);
 }
 function hairBobFront(c) {
-  return path('M105 50 Q120 70 130 55', c) + path('M170 55 Q180 70 195 50', c) +
-    path('M115 45 Q150 55 185 45 L180 58 Q150 68 120 58 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M108 38 C125 22 175 22 192 38 C186 50 172 56 150 57 C128 56 114 50 108 38 Z', c);
 }
 function hairLongBack(c) {
-  return path('M98 50 Q85 100 90 200 Q95 280 110 300 L125 280 Q130 200 120 120 L120 80 Q150 95 180 80 L180 120 Q170 200 175 280 L190 300 Q205 280 210 200 Q215 100 202 50 Q175 30 150 28 Q125 30 98 50 Z', c);
+  return hairSkullCap(c) +
+    path('M96 50 C82 90 78 160 85 240 C90 300 105 330 118 335 L128 300 C120 240 115 160 112 90 L115 55 Z', c) +
+    path('M204 50 C218 90 222 160 215 240 C210 300 195 330 182 335 L172 300 C180 240 185 160 188 90 L185 55 Z', c) +
+    path('M98 45 C110 22 190 22 202 45 C208 70 200 100 190 105 C170 95 130 95 110 105 C100 100 92 70 98 45 Z', c);
 }
 function hairLongFront(c) {
-  return path('M110 42 Q130 65 140 50', c) + path('M160 50 Q170 65 190 42', c) +
-    path('M112 40 Q150 58 188 40 L185 55 Q150 72 115 55 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M108 36 C126 20 174 20 192 36 C185 48 170 54 150 55 C130 54 115 48 108 36 Z', c) +
+    path('M103 50 C99 85 100 115 106 135 C110 110 112 80 110 58 Z', c) +
+    path('M197 50 C201 85 200 115 194 135 C190 110 188 80 190 58 Z', c);
 }
 function hairPonyBack(c) {
-  return path('M105 50 Q100 90 110 110 L190 110 Q200 90 195 50 Q170 35 150 34 Q130 35 105 50 Z', c) +
-    path('M155 100 Q170 160 165 220 Q160 250 150 260 Q140 250 135 220 Q130 160 145 100 Z', c);
+  return hairSkullCap(c) +
+    path('M102 48 C108 30 192 30 198 48 C200 75 190 100 175 105 L125 105 C110 100 100 75 102 48 Z', c) +
+    path('M145 100 C155 100 168 130 170 190 C172 240 165 280 150 290 C135 280 128 240 130 190 C132 130 140 100 145 100 Z', c);
 }
 function hairPonyFront(c) {
-  return path('M115 42 Q150 60 185 42 L182 55 Q150 70 118 55 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M110 38 C128 24 172 24 190 38 C182 50 168 55 150 56 C132 55 118 50 110 38 Z', c);
 }
 function hairPixieBack(c) {
-  return path('M110 48 Q105 85 120 100 L180 100 Q195 85 190 48 Q170 35 150 34 Q130 35 110 48 Z', c);
+  return hairSkullCap(c) +
+    path('M108 48 C112 30 188 30 192 48 C194 72 185 95 170 100 L130 100 C115 95 106 72 108 48 Z', c);
 }
 function hairPixieFront(c) {
-  return path('M118 42 Q150 52 182 42 L178 55 Q150 62 122 55 Z', c);
+  return hairSkullCap(c) +
+    path('M112 38 C130 26 170 26 188 38 C180 48 165 52 150 53 C135 52 120 48 112 38 Z', c);
 }
 function hairWavesBack(c) {
-  return path('M96 52 Q80 120 95 220 Q100 290 120 310 L130 290 Q125 200 115 120 L118 75 Q150 90 182 75 L185 120 Q175 200 170 290 L180 310 Q200 290 205 220 Q220 120 204 52 Q175 28 150 26 Q125 28 96 52 Z', c);
+  return hairSkullCap(c) +
+    path('M94 48 C78 100 72 180 88 270 C98 320 115 340 125 338 L132 300 C120 250 112 170 110 100 L112 55 Z', c) +
+    path('M206 48 C222 100 228 180 212 270 C202 320 185 340 175 338 L168 300 C180 250 188 170 190 100 L188 55 Z', c) +
+    path('M96 42 C115 18 185 18 204 42 C210 68 200 95 188 100 C165 88 135 88 112 100 C100 95 90 68 96 42 Z', c);
 }
 function hairWavesFront(c) {
-  return path('M112 40 Q135 70 145 48', c) + path('M155 48 Q165 70 188 40', c) +
-    path('M112 38 Q150 55 188 38 L184 52 Q150 68 116 52 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M108 34 C126 18 174 18 192 34 C186 48 172 54 160 50 C150 56 140 50 128 54 C116 48 110 42 108 34 Z', c) +
+    path('M102 50 C98 90 100 120 108 140 C112 115 112 85 110 60 Z', c) +
+    path('M198 50 C202 90 200 120 192 140 C188 115 188 85 190 60 Z', c);
 }
 function hairBraidsBack(c) {
-  return path('M105 50 Q100 90 115 115 L185 115 Q200 90 195 50 Q170 34 150 32 Q130 34 105 50 Z', c) +
-    path('M115 110 Q110 200 115 280 L130 280 Q125 200 130 115 Z', c) +
-    path('M170 115 Q175 200 170 280 L185 280 Q190 200 185 110 Z', c);
+  return hairSkullCap(c) +
+    path('M102 48 C110 28 190 28 198 48 C200 78 188 105 175 108 L125 108 C112 105 100 78 102 48 Z', c) +
+    path('M118 108 C112 180 114 250 120 295 L138 295 C132 250 130 180 135 110 Z', c) +
+    path('M182 108 C188 180 186 250 180 295 L162 295 C168 250 170 180 165 110 Z', c);
 }
 function hairBraidsFront(c) {
-  return path('M115 42 Q150 58 185 42 L180 55 Q150 68 120 55 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M110 38 C128 24 172 24 190 38 C182 50 168 55 150 56 C132 55 118 50 110 38 Z', c);
 }
 function hairBunBack(c) {
-  return path('M108 55 Q105 95 120 110 L180 110 Q195 95 192 55 Q170 38 150 36 Q130 38 108 55 Z', c) +
-    ellipse(150, 30, 28, 22, c);
+  return hairSkullCap(c) +
+    path('M105 50 C112 32 188 32 195 50 C197 78 185 100 170 104 L130 104 C115 100 103 78 105 50 Z', c) +
+    ellipse(150, 28, 26, 20, c) +
+    ellipse(150, 26, 18, 12, 'rgba(255,255,255,0.12)');
 }
 function hairBunFront(c) {
-  return path('M118 45 Q150 58 182 45 L178 56 Q150 66 122 56 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M112 40 C130 28 170 28 188 40 C180 50 165 54 150 55 C135 54 120 50 112 40 Z', c);
 }
 function hairSpaceBunsBack(c) {
-  return path('M108 55 Q105 95 120 108 L180 108 Q195 95 192 55 Q170 40 150 38 Q130 40 108 55 Z', c) +
-    ellipse(118, 35, 18, 16, c) + ellipse(182, 35, 18, 16, c);
+  return hairSkullCap(c) +
+    path('M105 50 C112 34 188 34 195 50 C197 78 185 100 170 103 L130 103 C115 100 103 78 105 50 Z', c) +
+    ellipse(118, 30, 18, 16, c) +
+    ellipse(182, 30, 18, 16, c);
 }
 function hairSpaceBunsFront(c) {
-  return path('M118 45 Q150 58 182 45 L178 56 Q150 66 122 56 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M112 40 C130 28 170 28 188 40 C180 50 165 54 150 55 C135 54 120 50 112 40 Z', c);
 }
 function hairAfroBack(c) {
-  return ellipse(150, 55, 72, 65, c);
+  return ellipse(150, 55, 74, 68, c) + hairSkullCap(c);
 }
 function hairAfroFront(c) {
-  return path('M95 70 Q150 95 205 70 L195 55 Q150 70 105 55 Z', c);
+  // Afro frames the face with a soft opening for features
+  return hairSkullCap(c) +
+    path('M92 50 C95 28 205 28 208 50 C205 72 185 88 150 90 C115 88 95 72 92 50 Z', c) +
+    // leave face open — subtract by not covering center below hairline
+    path('M100 55 C105 70 120 82 150 84 C180 82 195 70 200 55 C190 48 170 42 150 42 C130 42 110 48 100 55 Z', c);
 }
 function hairCurlyBack(c) {
-  return path('M95 50 Q75 100 90 180 Q100 250 120 270 L135 250 Q125 180 115 100 L120 70 Q150 85 180 70 L185 100 Q175 180 165 250 L180 270 Q200 250 210 180 Q225 100 205 50 Q175 25 150 24 Q125 25 95 50 Z', c);
+  return hairSkullCap(c) +
+    path('M92 48 C72 90 70 170 88 250 C100 300 118 325 130 322 L138 285 C120 240 112 170 112 100 L110 55 Z', c) +
+    path('M208 48 C228 90 230 170 212 250 C200 300 182 325 170 322 L162 285 C180 240 188 170 188 100 L190 55 Z', c) +
+    // curly bumps
+    circle(105, 45, 14, c) + circle(150, 28, 16, c) + circle(195, 45, 14, c) +
+    circle(120, 70, 12, c) + circle(180, 70, 12, c);
 }
 function hairCurlyFront(c) {
-  return path('M110 40 Q130 75 142 50', c) + path('M158 50 Q170 75 190 40', c) +
-    path('M110 38 Q150 58 190 38 L185 55 Q150 72 115 55 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M108 34 C126 16 174 16 192 34 C186 48 170 54 150 55 C130 54 114 48 108 34 Z', c) +
+    circle(122, 44, 7, c) + circle(150, 38, 8, c) + circle(178, 44, 7, c) +
+    path('M102 52 C98 90 100 120 108 145 C112 120 112 85 110 60 Z', c) +
+    path('M198 52 C202 90 200 120 192 145 C188 120 188 85 190 60 Z', c);
 }
 function hairStraightBack(c) {
-  return path('M100 48 Q92 100 95 250 Q98 320 115 340 L128 320 Q120 200 118 100 L120 70 Q150 80 180 70 L182 100 Q180 200 172 320 L185 340 Q202 320 205 250 Q208 100 200 48 Q175 30 150 28 Q125 30 100 48 Z', c);
+  return hairSkullCap(c) +
+    path('M98 45 C88 100 86 200 92 300 C96 340 110 355 122 352 L130 310 C120 250 118 150 118 90 L115 55 Z', c) +
+    path('M202 45 C212 100 214 200 208 300 C204 340 190 355 178 352 L170 310 C180 250 182 150 182 90 L185 55 Z', c) +
+    path('M98 42 C115 18 185 18 202 42 C205 65 198 90 188 95 C165 85 135 85 112 95 C102 90 95 65 98 42 Z', c);
 }
 function hairStraightFront(c) {
-  return path('M112 40 Q150 52 188 40 L185 55 Q150 65 115 55 Z', c) +
-    path('M125 42 L122 80', 'none', ` stroke="${c}" stroke-width="6" fill="none"`) +
-    path('M175 42 L178 80', 'none', ` stroke="${c}" stroke-width="6" fill="none"`);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M110 36 C128 22 172 22 190 36 C184 48 170 53 150 54 C130 53 116 48 110 36 Z', c) +
+    path('M116 40 C114 75 112 105 114 130 C118 105 120 75 120 48 Z', c) +
+    path('M184 40 C186 75 188 105 186 130 C182 105 180 75 180 48 Z', c);
 }
 function hairHalfUpBack(c) {
-  return hairLongBack(c) + ellipse(150, 42, 22, 14, c);
+  return hairLongBack(c) + ellipse(150, 34, 22, 14, c);
 }
 function hairHalfUpFront(c) {
   return hairLongFront(c);
 }
 function hairTwistsBack(c) {
-  return path('M100 50 Q95 100 105 200 Q110 280 125 300 L140 280 Q130 200 125 110 L130 70 Q150 85 170 70 L175 110 Q170 200 160 280 L175 300 Q190 280 195 200 Q205 100 200 50 Q175 32 150 30 Q125 32 100 50 Z', c);
+  return hairSkullCap(c) +
+    path('M98 48 C88 100 90 200 100 290 C108 325 125 340 135 335 L142 300 C130 250 125 160 122 95 L118 55 Z', c) +
+    path('M202 48 C212 100 210 200 200 290 C192 325 175 340 165 335 L158 300 C170 250 175 160 178 95 L182 55 Z', c) +
+    path('M100 45 C118 22 182 22 200 45 C202 70 195 95 185 100 C160 90 140 90 115 100 C105 95 98 70 100 45 Z', c);
 }
 function hairTwistsFront(c) {
-  return path('M115 42 Q150 60 185 42 L180 56 Q150 70 120 56 Z', c);
+  return hairSkullCap(c) + hairSideFrames(c) +
+    path('M110 38 C128 24 172 24 190 38 C182 50 168 55 150 56 C132 55 118 50 110 38 Z', c);
 }
 
 /* Jewelry */
@@ -1350,102 +1466,123 @@ function nailShapePath(x, y, length, shape, color) {
   return path(`M${x-w/2} ${y} L${x-1} ${y+h} L${x+1} ${y+h} L${x+w/2} ${y} Z`, color);
 }
 
+function nailDesignDecor(x, y, h, w, design, length) {
+  let s = '';
+  if (design === 'french') s += rect(x - w * 0.4, y + h - Math.min(8, h * 0.35), w * 0.8, Math.min(7, h * 0.3), 2, '#FFFEF8');
+  else if (design === 'glitter') {
+    s += circle(x, y + h * 0.3, 1.5, 'rgba(255,255,255,0.9)');
+    s += circle(x - 2, y + h * 0.5, 1.2, 'rgba(255,255,255,0.8)');
+    s += circle(x + 2, y + h * 0.65, 1, 'rgba(255,255,255,0.75)');
+  } else if (design === 'polka') {
+    s += circle(x, y + h * 0.3, 1.8, 'rgba(255,255,255,0.85)');
+    s += circle(x, y + h * 0.6, 1.8, 'rgba(255,255,255,0.85)');
+  } else if (design === 'stripes') {
+    s += rect(x - w * 0.35, y + h * 0.25, w * 0.7, 2, 0, 'rgba(255,255,255,0.75)');
+    s += rect(x - w * 0.35, y + h * 0.5, w * 0.7, 2, 0, 'rgba(255,255,255,0.75)');
+  } else if (design === 'hearts') {
+    s += path(`M${x} ${y+h*0.35} C${x-3} ${y+h*0.25} ${x-4} ${y+h*0.45} ${x} ${y+h*0.6} C${x+4} ${y+h*0.45} ${x+3} ${y+h*0.25} ${x} ${y+h*0.35}`, 'rgba(255,120,140,0.95)');
+  } else if (design === 'stars') {
+    s += path(`M${x} ${y+h*0.25} L${x+1.5} ${y+h*0.4} L${x+5} ${y+h*0.4} L${x+2} ${y+h*0.52} L${x+3} ${y+h*0.7} L${x} ${y+h*0.58} L${x-3} ${y+h*0.7} L${x-2} ${y+h*0.52} L${x-5} ${y+h*0.4} L${x-1.5} ${y+h*0.4} Z`, 'rgba(255,255,180,0.95)');
+  } else if (design === 'ombre') {
+    s += path(`M${x-w/2} ${y+h*0.45} L${x-w/2} ${y+h*0.7} Q${x} ${y+h} ${x+w/2} ${y+h*0.7} L${x+w/2} ${y+h*0.45} Z`, 'rgba(255,255,255,0.4)');
+  } else if (design === 'flowers') {
+    s += circle(x, y + h * 0.45, 3, 'rgba(255,255,255,0.8)');
+    s += circle(x, y + h * 0.45, 1.2, 'rgba(255,200,50,0.95)');
+  } else if (design === 'gems') {
+    s += path(`M${x} ${y+h*0.3} L${x+3} ${y+h*0.5} L${x} ${y+h*0.7} L${x-3} ${y+h*0.5} Z`, 'rgba(200,230,255,0.95)');
+  }
+  return s;
+}
+
+function drawNailAt(x, y, length, shape, color, design, scale) {
+  scale = scale || 1;
+  const h = (length === 'short' ? 10 : length === 'medium' ? 15 : length === 'long' ? 21 : 27) * scale;
+  const w = 6 * scale;
+  let s = '';
+  if (shape === 'square') s += rect(x - w/2, y, w, h, 1.2 * scale, color);
+  else if (shape === 'round') s += path(`M${x-w/2} ${y} L${x-w/2} ${y+h*0.65} Q${x} ${y+h} ${x+w/2} ${y+h*0.65} L${x+w/2} ${y} Z`, color);
+  else if (shape === 'almond') s += path(`M${x-w/2} ${y} L${x-w/2+1*scale} ${y+h*0.55} Q${x} ${y+h} ${x+w/2-1*scale} ${y+h*0.55} L${x+w/2} ${y} Z`, color);
+  else if (shape === 'coffin') s += path(`M${x-w/2} ${y} L${x-w/2+1*scale} ${y+h*0.7} L${x-w/2+2*scale} ${y+h} L${x+w/2-2*scale} ${y+h} L${x+w/2-1*scale} ${y+h*0.7} L${x+w/2} ${y} Z`, color);
+  else s += path(`M${x-w/2} ${y} L${x-1*scale} ${y+h} L${x+1*scale} ${y+h} L${x+w/2} ${y} Z`, color);
+  s += nailDesignDecor(x, y, h, w, design, length);
+  return s;
+}
+
 function drawNails(look, skin) {
   if (!look || !look.color) return '';
   const { length, shape, color, design } = look;
-  const fingersL = [
-    [48, 255], [55, 250], [62, 248], [70, 252]
-  ];
-  const fingersR = [
-    [230, 252], [238, 248], [245, 250], [252, 255]
+  // Nails rest on fingertip pads of body hands
+  const tips = [
+    [52, 258], [58, 254], [66, 252], [74, 256],
+    [226, 256], [234, 252], [242, 254], [248, 258]
   ];
   let s = '';
-  const drawHand = (fingers) => {
-    fingers.forEach(([x, y], i) => {
-      s += nailShapePath(x, y, length, shape, color);
-      // designs
-      if (design === 'french') {
-        const tipY = y + (length === 'short' ? 6 : length === 'medium' ? 10 : length === 'long' ? 15 : 20);
-        s += rect(x - 2.5, tipY, 5, 4, 1, '#fff');
-      } else if (design === 'glitter') {
-        s += circle(x, y + 6, 1.2, 'rgba(255,255,255,0.85)');
-        s += circle(x - 1.5, y + 10, 1, 'rgba(255,255,255,0.7)');
-      } else if (design === 'polka') {
-        s += circle(x, y + 5, 1.2, 'rgba(255,255,255,0.8)');
-        s += circle(x, y + 11, 1.2, 'rgba(255,255,255,0.8)');
-      } else if (design === 'stripes') {
-        s += rect(x - 2, y + 4, 4, 1.5, 0, 'rgba(255,255,255,0.7)');
-        s += rect(x - 2, y + 9, 4, 1.5, 0, 'rgba(255,255,255,0.7)');
-      } else if (design === 'hearts') {
-        s += path(`M${x} ${y+6} C${x-2} ${y+4} ${x-3} ${y+7} ${x} ${y+10} C${x+3} ${y+7} ${x+2} ${y+4} ${x} ${y+6}`, 'rgba(255,100,120,0.9)');
-      } else if (design === 'stars') {
-        s += path(`M${x} ${y+4} L${x+1} ${y+7} L${x+4} ${y+7} L${x+1.5} ${y+9} L${x+2.5} ${y+12} L${x} ${y+10} L${x-2.5} ${y+12} L${x-1.5} ${y+9} L${x-4} ${y+7} L${x-1} ${y+7} Z`, 'rgba(255,255,200,0.9)');
-      } else if (design === 'ombre') {
-        s += nailShapePath(x, y + (length === 'short' ? 5 : 8), length, shape, 'rgba(255,255,255,0.35)');
-      } else if (design === 'flowers') {
-        s += circle(x, y + 7, 2, 'rgba(255,255,255,0.75)');
-        s += circle(x, y + 7, 0.8, 'rgba(255,200,50,0.9)');
-      } else if (design === 'gems') {
-        s += path(`M${x} ${y+5} L${x+2} ${y+8} L${x} ${y+11} L${x-2} ${y+8} Z`, 'rgba(200,230,255,0.95)');
-      }
-    });
-  };
-  drawHand(fingersL);
-  drawHand(fingersR);
+  tips.forEach(([x, y]) => { s += drawNailAt(x, y, length, shape, color, design, 1); });
   return s;
 }
 
 function drawNailsCloseup(look, skin) {
-  // Zoomed hand view for nails step — viewBox focused on hands area
+  // One continuous hand — palm, fingers, and nails all connected
   if (!look) look = { length: 'medium', shape: 'round', color: '#EC407A', design: 'plain' };
   const { length, shape, color, design } = look;
+  const meta = skinMeta(skin);
+  const shade = meta.shade || skin;
   let s = '';
-  // Palm
-  s += ellipse(150, 200, 70, 55, skin);
-  s += ellipse(150, 160, 50, 40, skin);
-  // Fingers
-  const tips = [
-    [90, 80], [120, 55], [150, 45], [180, 55], [210, 85]
-  ];
-  tips.forEach(([x, y], i) => {
-    const fh = 70 + (i === 2 ? 10 : 0);
-    s += path(`M${x-12} ${y+fh} Q${x-14} ${y} ${x} ${y-5} Q${x+14} ${y} ${x+12} ${y+fh} Z`, skin);
-    // nail on tip
-    const ny = y - 2;
-    const h = length === 'short' ? 14 : length === 'medium' ? 22 : length === 'long' ? 30 : 38;
-    const w = 12;
-    if (shape === 'square') s += rect(x - w/2, ny, w, h, 2, color);
-    else if (shape === 'round') s += path(`M${x-w/2} ${ny} L${x-w/2} ${ny+h*0.65} Q${x} ${ny+h} ${x+w/2} ${ny+h*0.65} L${x+w/2} ${ny} Z`, color);
-    else if (shape === 'almond') s += path(`M${x-w/2} ${ny} L${x-w/2+2} ${ny+h*0.55} Q${x} ${ny+h} ${x+w/2-2} ${ny+h*0.55} L${x+w/2} ${ny} Z`, color);
-    else if (shape === 'coffin') s += path(`M${x-w/2} ${ny} L${x-w/2+2} ${ny+h*0.7} L${x-w/2+3} ${ny+h} L${x+w/2-3} ${ny+h} L${x+w/2-2} ${ny+h*0.7} L${x+w/2} ${ny} Z`, color);
-    else s += path(`M${x-w/2} ${ny} L${x-1.5} ${ny+h} L${x+1.5} ${ny+h} L${x+w/2} ${ny} Z`, color);
 
-    if (design === 'french') s += rect(x - 5, ny + h - 8, 10, 7, 2, '#fff');
-    else if (design === 'glitter') {
-      s += circle(x, ny + 8, 2, 'rgba(255,255,255,0.9)');
-      s += circle(x - 3, ny + 14, 1.5, 'rgba(255,255,255,0.8)');
-      s += circle(x + 2, ny + 18, 1.2, 'rgba(255,255,255,0.8)');
-    } else if (design === 'polka') {
-      s += circle(x, ny + 8, 2.2, 'rgba(255,255,255,0.85)');
-      s += circle(x, ny + 16, 2.2, 'rgba(255,255,255,0.85)');
-    } else if (design === 'stripes') {
-      s += rect(x - 4, ny + 6, 8, 2.5, 0, 'rgba(255,255,255,0.75)');
-      s += rect(x - 4, ny + 13, 8, 2.5, 0, 'rgba(255,255,255,0.75)');
-      s += rect(x - 4, ny + 20, 8, 2.5, 0, 'rgba(255,255,255,0.75)');
-    } else if (design === 'hearts') {
-      s += path(`M${x} ${ny+10} C${x-4} ${ny+6} ${x-6} ${ny+12} ${x} ${ny+18} C${x+6} ${ny+12} ${x+4} ${ny+6} ${x} ${ny+10}`, 'rgba(255,120,140,0.95)');
-    } else if (design === 'stars') {
-      s += path(`M${x} ${ny+6} L${x+2} ${ny+12} L${x+8} ${ny+12} L${x+3} ${ny+16} L${x+5} ${ny+22} L${x} ${ny+18} L${x-5} ${ny+22} L${x-3} ${ny+16} L${x-8} ${ny+12} L${x-2} ${ny+12} Z`, 'rgba(255,255,180,0.95)');
-    } else if (design === 'ombre') {
-      s += path(`M${x-w/2} ${ny+h*0.4} L${x-w/2} ${ny+h*0.65} Q${x} ${ny+h} ${x+w/2} ${ny+h*0.65} L${x+w/2} ${ny+h*0.4} Z`, 'rgba(255,255,255,0.4)');
-    } else if (design === 'flowers') {
-      s += circle(x, ny + 12, 4, 'rgba(255,255,255,0.8)');
-      s += circle(x, ny + 12, 1.5, 'rgba(255,200,50,0.95)');
-    } else if (design === 'gems') {
-      s += path(`M${x} ${ny+8} L${x+4} ${ny+14} L${x} ${ny+20} L${x-4} ${ny+14} Z`, 'rgba(200,230,255,0.95)');
-      s += circle(x, ny + 14, 1.5, 'rgba(255,255,255,0.9)');
-    }
+  // Soft backdrop
+  s += ellipse(150, 200, 120, 90, 'rgba(255,255,255,0.35)');
+
+  // Wrist
+  s += path('M110 280 C115 300 130 310 150 310 C170 310 185 300 190 280 L185 250 L115 250 Z', skin);
+  s += ellipse(150, 275, 38, 14, shade, ' opacity="0.12"');
+
+  // Palm — continuous rounded shape
+  s += path('M108 250 C95 230 92 195 100 165 C108 145 125 138 145 140 L155 140 C175 138 192 145 200 165 C208 195 205 230 192 250 C180 262 160 268 150 268 C140 268 120 262 108 250 Z', skin);
+  // Palm crease / shade
+  s += path('M125 200 Q150 215 175 200', 'none', ` stroke="${shade}" stroke-width="1.5" fill="none" opacity="0.2"`);
+  s += ellipse(150, 210, 35, 28, shade, ' opacity="0.08"');
+
+  // Fingers as continuous tubes from palm (base y~150) to tips — no gaps
+  // [cx, tipY, baseHalfW, tipHalfW, lengthBoost]
+  const fingers = [
+    { cx: 95,  tipY: 78,  bw: 13, tw: 9,  lean: -8 },  // pinky
+    { cx: 122, tipY: 52,  bw: 14, tw: 10, lean: -3 },  // ring
+    { cx: 150, tipY: 40,  bw: 15, tw: 10, lean: 0 },   // middle
+    { cx: 178, tipY: 52,  bw: 14, tw: 10, lean: 3 },   // index
+    { cx: 208, tipY: 95,  bw: 14, tw: 10, lean: 10 }   // thumb
+  ];
+
+  fingers.forEach((f, i) => {
+    const baseY = i === 4 ? 175 : 148;
+    const midY = (baseY + f.tipY) / 2;
+    const tipX = f.cx + f.lean;
+    // Outer finger silhouette — one solid path from palm into tip
+    s += path(
+      `M${f.cx - f.bw} ${baseY}
+       C${f.cx - f.bw - 1} ${midY} ${tipX - f.tw} ${f.tipY + 18} ${tipX - f.tw} ${f.tipY + 8}
+       Q${tipX} ${f.tipY - 4} ${tipX + f.tw} ${f.tipY + 8}
+       C${tipX + f.tw} ${f.tipY + 18} ${f.cx + f.bw + 1} ${midY} ${f.cx + f.bw} ${baseY}
+       Z`,
+      skin
+    );
+    // Knuckle shade
+    s += ellipse(f.cx, baseY - 4, f.bw * 0.7, 5, shade, ' opacity="0.12"');
+    s += ellipse((f.cx + tipX) / 2, midY, f.tw * 0.7, 4, shade, ' opacity="0.1"');
+    // Nail plate on fingertip
+    const ny = f.tipY + 2;
+    const nh = length === 'short' ? 16 : length === 'medium' ? 24 : length === 'long' ? 32 : 40;
+    const nw = f.tw * 1.5;
+    if (shape === 'square') s += rect(tipX - nw/2, ny, nw, nh, 2, color);
+    else if (shape === 'round') s += path(`M${tipX-nw/2} ${ny} L${tipX-nw/2} ${ny+nh*0.65} Q${tipX} ${ny+nh} ${tipX+nw/2} ${ny+nh*0.65} L${tipX+nw/2} ${ny} Z`, color);
+    else if (shape === 'almond') s += path(`M${tipX-nw/2} ${ny} L${tipX-nw/2+2} ${ny+nh*0.55} Q${tipX} ${ny+nh} ${tipX+nw/2-2} ${ny+nh*0.55} L${tipX+nw/2} ${ny} Z`, color);
+    else if (shape === 'coffin') s += path(`M${tipX-nw/2} ${ny} L${tipX-nw/2+2} ${ny+nh*0.7} L${tipX-nw/2+3} ${ny+nh} L${tipX+nw/2-3} ${ny+nh} L${tipX+nw/2-2} ${ny+nh*0.7} L${tipX+nw/2} ${ny} Z`, color);
+    else s += path(`M${tipX-nw/2} ${ny} L${tipX-1.5} ${ny+nh} L${tipX+1.5} ${ny+nh} L${tipX+nw/2} ${ny} Z`, color);
+    // Nail shine
+    s += path(`M${tipX-nw*0.25} ${ny+3} Q${tipX} ${ny+nh*0.35} ${tipX-nw*0.15} ${ny+nh*0.5}`, 'none',
+      ' stroke="rgba(255,255,255,0.45)" stroke-width="1.5" fill="none" stroke-linecap="round"');
+    s += nailDesignDecor(tipX, ny, nh, nw, design, length);
   });
+
   return s;
 }
 
@@ -2022,44 +2159,51 @@ function renderDollSVG(opts) {
   const skin = (SKIN_TONES.find(s => s.id === skinId) || SKIN_TONES[1]).color;
 
   if (nailsZoom) {
-    const bg = `<rect width="300" height="500" fill="url(#gssBg)"/>`;
+    const nid = 'n' + Math.random().toString(36).slice(2, 7);
     const defs = `<defs>
-      <linearGradient id="gssBg" x1="0" y1="0" x2="0" y2="1">
+      <linearGradient id="${nid}bg" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#FDF2F8"/><stop offset="100%" stop-color="#E9D5FF"/>
       </linearGradient>
     </defs>`;
-    return `<svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">${defs}<g>${drawNailsCloseup(look.nails, skin)}</g></svg>`;
+    return `<svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">${defs}<rect width="300" height="320" fill="url(#${nid}bg)"/>${drawNailsCloseup(look.nails, skin)}</svg>`;
   }
 
+  // Unique ids so multiple dolls on one screen don't clash
+  const uid = 'g' + Math.random().toString(36).slice(2, 8);
   const defs = `<defs>
-    <linearGradient id="gssBg" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="${uid}bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#FCE7F3"/><stop offset="50%" stop-color="#EDE9FE"/><stop offset="100%" stop-color="#CCFBF1"/>
     </linearGradient>
-    <linearGradient id="gssRainbow" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="${uid}rb" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#FF6B9A"/><stop offset="25%" stop-color="#FFD93D"/>
       <stop offset="50%" stop-color="#6BCB77"/><stop offset="75%" stop-color="#4D96FF"/>
       <stop offset="100%" stop-color="#C77DFF"/>
     </linearGradient>
+    <radialGradient id="${uid}skin" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
   </defs>`;
 
   let layers = '';
   // 1 backdrop
   if (backdrop) {
-    layers += `<g class="layer-backdrop">${rect(0,0,300,500,0,'url(#gssBg)')}${ellipse(150, 430, 90, 18, 'rgba(45,27,78,0.08)')}</g>`;
+    layers += `<g class="layer-backdrop">${rect(0,0,300,500,0,`url(#${uid}bg)`)}${ellipse(150, 430, 90, 18, 'rgba(45,27,78,0.08)')}</g>`;
   } else {
     layers += `<g class="layer-backdrop"></g>`;
   }
 
-  const hairColor = look.hair && look.hair.color === 'rainbow' ? 'url(#gssRainbow)' : (look.hair && look.hair.color) || HAIR_NATURAL.darkBrown;
-  const hairItem = look.hair ? findItem('hairs', look.hair.id) : null;
+  const hairColor = look.hair && look.hair.color === 'rainbow' ? `url(#${uid}rb)` : (look.hair && look.hair.color) || HAIR_NATURAL.darkBrown;
+  const hairItem = (look.hair && findItem('hairs', look.hair.id)) || findItem('hairs', 'long') || findItem('hairs', 'bob');
 
   // 2 hair back
   layers += `<g class="layer-hair-back">`;
   if (hairItem && hairItem.drawBack) layers += hairItem.drawBack(hairColor);
+  else layers += hairLongBack(hairColor);
   layers += `</g>`;
 
   // 3 body
-  layers += `<g class="layer-body">${drawBody(skin, bodyType, faceId)}</g>`;
+  layers += `<g class="layer-body">${drawBody(skin, bodyType, faceId || 'round')}</g>`;
 
   // 4 skin glow
   layers += `<g class="layer-skin-glow">${drawSkinGlow(look.skincare || 0)}</g>`;
@@ -2113,9 +2257,10 @@ function renderDollSVG(opts) {
   // 10 makeup
   layers += `<g class="layer-makeup">${drawMakeup(look.makeup || {})}</g>`;
 
-  // 11 hair front
+  // 11 hair front (crown + bangs — always drawn so scalp is never bare)
   layers += `<g class="layer-hair-front">`;
   if (hairItem && hairItem.drawFront) layers += hairItem.drawFront(hairColor);
+  else layers += hairLongFront(hairColor);
   layers += `</g>`;
 
   // 12 jewelry
