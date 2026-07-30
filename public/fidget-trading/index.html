@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#1a0b2e" />
+<title>Fidget Trade</title>
+<meta name="description" content="Collect fidget toys, spin &amp; pop them, then trade your way to a legendary collection." />
+<meta property="og:title" content="Fidget Trade" />
+<meta property="og:description" content="Collect fidget toys, spin &amp; pop them, then trade your way to a legendary collection." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://theile.me/fidget-trading/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Fidget Trade" />
+<meta name="twitter:description" content="Collect fidget toys, spin &amp; pop them, then trade your way to a legendary collection." />
+<style>
+  :root {
+    --bg0: #12081f;
+    --bg1: #1a0b2e;
+    --bg2: #2a1248;
+    --panel: rgba(36, 18, 64, 0.92);
+    --panel-border: rgba(180, 120, 255, 0.22);
+    --ink: #f3eaff;
+    --ink-dim: #b9a3d4;
+    --accent: #c77dff;
+    --accent2: #7b2cbf;
+    --mint: #5efc8d;
+    --gold: #ffd166;
+    --coral: #ff6b9d;
+    --sky: #4cc9f0;
+    --orange: #ff9f1c;
+    --common: #9aa0a6;
+    --uncommon: #5efc8d;
+    --rare: #4cc9f0;
+    --epic: #c77dff;
+    --legendary: #ffd166;
+    --mythic: #ff6b9d;
+    --shadow: 0 8px 24px rgba(0,0,0,0.35);
+    --radius: 18px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    background: var(--bg0); color: var(--ink);
+    touch-action: manipulation;
+    user-select: none; -webkit-user-select: none;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 10%, rgba(123,44,191,0.35), transparent 55%),
+      radial-gradient(ellipse 70% 45% at 90% 80%, rgba(76,201,240,0.18), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 50% 50%, rgba(255,107,157,0.08), transparent 60%),
+      linear-gradient(165deg, #12081f 0%, #1a0b2e 45%, #0f1b2d 100%);
+  }
+  #app {
+    position: fixed; inset: 0; z-index: 1;
+    display: flex; flex-direction: column;
+    max-width: 480px; margin: 0 auto;
+    padding: var(--safe-top) 0 var(--safe-bot);
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, rgba(123,44,191,0.55), rgba(76,201,240,0.25));
+    border-bottom: 1px solid var(--panel-border);
+    backdrop-filter: blur(12px);
+    z-index: 40;
+  }
+  .brand {
+    font-weight: 900; font-size: 1rem; letter-spacing: 0.02em;
+    background: linear-gradient(90deg, #ffd166, #ff6b9d, #c77dff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .top-stats { display: flex; align-items: center; gap: 6px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px; padding: 5px 10px; font-weight: 800; font-size: 0.82rem;
+  }
+  .pill.coins { color: var(--gold); }
+  .pill.xp { color: var(--sky); }
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.25); color: var(--ink); font-size: 1.05rem;
+    cursor: pointer; display: grid; place-items: center;
+  }
+  .icon-btn:active { transform: scale(0.94); }
+
+  /* ── Screens ── */
+  .screens { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+  .screen {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+    padding: 12px 14px 18px;
+  }
+  .screen.active { display: flex; animation: fadeIn 0.22s ease; }
+  .screen.no-scroll { overflow: hidden; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  h1, h2, h3 { font-weight: 800; line-height: 1.2; }
+  h2 { font-size: 1.15rem; margin-bottom: 8px; }
+  p { line-height: 1.45; color: var(--ink-dim); font-size: 0.92rem; }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .section-head h2 { margin: 0; }
+  .muted { color: var(--ink-dim); font-size: 0.8rem; font-weight: 600; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: none; border-radius: 14px; padding: 12px 16px;
+    font-size: 0.95rem; font-weight: 800; font-family: inherit; cursor: pointer;
+    color: white; box-shadow: var(--shadow); min-height: 48px; text-align: center;
+    transition: transform 0.1s, filter 0.15s;
+  }
+  .btn:active { transform: translateY(2px) scale(0.98); }
+  .btn:disabled { opacity: 0.4; pointer-events: none; }
+  .btn-block { width: 100%; }
+  .btn-accent { background: linear-gradient(180deg, #c77dff, #7b2cbf); }
+  .btn-mint { background: linear-gradient(180deg, #7dffa8, #1f9d55); color: #0a1f12; }
+  .btn-gold { background: linear-gradient(180deg, #ffe08a, #e09f00); color: #2a1a00; }
+  .btn-sky { background: linear-gradient(180deg, #7dd8ff, #118ab2); }
+  .btn-coral { background: linear-gradient(180deg, #ff8fb3, #d6286e); }
+  .btn-ghost {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: none; color: var(--ink);
+  }
+  .btn-sm { min-height: 36px; padding: 8px 12px; font-size: 0.82rem; border-radius: 10px; }
+
+  /* ── Cards / panels ── */
+  .panel {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* ── Fidget cards ── */
+  .fidget-card {
+    position: relative; border-radius: 16px; padding: 10px 8px 12px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(0,0,0,0.15));
+    border: 1.5px solid rgba(255,255,255,0.1);
+    cursor: pointer; text-align: center;
+    transition: transform 0.12s, border-color 0.15s, box-shadow 0.15s;
+    min-height: 118px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  }
+  .fidget-card:active { transform: scale(0.96); }
+  .fidget-card .emoji { font-size: 2rem; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35)); }
+  .fidget-card .name { font-size: 0.72rem; font-weight: 800; line-height: 1.15; }
+  .fidget-card .rarity {
+    font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .fidget-card .qty {
+    position: absolute; top: 6px; right: 6px;
+    background: rgba(0,0,0,0.45); border-radius: 999px; padding: 2px 7px;
+    font-size: 0.68rem; font-weight: 800; color: var(--gold);
+  }
+  .fidget-card.owned-0 { opacity: 0.35; filter: grayscale(0.6); }
+  .fidget-card.r-common { border-color: rgba(154,160,166,0.45); }
+  .fidget-card.r-uncommon { border-color: rgba(94,252,141,0.5); box-shadow: 0 0 12px rgba(94,252,141,0.12); }
+  .fidget-card.r-rare { border-color: rgba(76,201,240,0.55); box-shadow: 0 0 14px rgba(76,201,240,0.15); }
+  .fidget-card.r-epic { border-color: rgba(199,125,255,0.6); box-shadow: 0 0 16px rgba(199,125,255,0.2); }
+  .fidget-card.r-legendary { border-color: rgba(255,209,102,0.7); box-shadow: 0 0 18px rgba(255,209,102,0.28); }
+  .fidget-card.r-mythic {
+    border-color: rgba(255,107,157,0.75);
+    box-shadow: 0 0 20px rgba(255,107,157,0.3);
+    background: linear-gradient(160deg, rgba(255,107,157,0.18), rgba(123,44,191,0.2));
+  }
+  .rarity-common { color: var(--common); }
+  .rarity-uncommon { color: var(--uncommon); }
+  .rarity-rare { color: var(--rare); }
+  .rarity-epic { color: var(--epic); }
+  .rarity-legendary { color: var(--legendary); }
+  .rarity-mythic { color: var(--mythic); }
+
+  /* ── Bottom nav ── */
+  .nav {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: rgba(12, 6, 22, 0.92); border-top: 1px solid var(--panel-border);
+    backdrop-filter: blur(14px); z-index: 40;
+  }
+  .nav-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: transparent; border: none; color: var(--ink-dim);
+    font-family: inherit; font-size: 0.62rem; font-weight: 700;
+    padding: 6px 2px; border-radius: 12px; cursor: pointer;
+  }
+  .nav-btn .ni { font-size: 1.25rem; line-height: 1; }
+  .nav-btn.active {
+    color: var(--ink);
+    background: linear-gradient(180deg, rgba(199,125,255,0.25), rgba(123,44,191,0.15));
+  }
+
+  /* ── Hero / home ── */
+  .hero {
+    text-align: center; padding: 18px 10px 8px;
+  }
+  .hero h1 {
+    font-size: 1.65rem;
+    background: linear-gradient(90deg, #ffd166, #ff6b9d 40%, #c77dff 75%, #4cc9f0);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin-bottom: 6px;
+  }
+  .hero p { margin-bottom: 14px; }
+  .stat-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0;
+  }
+  .stat-box {
+    background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 10px 6px; text-align: center;
+  }
+  .stat-box .v { font-size: 1.15rem; font-weight: 900; color: var(--ink); }
+  .stat-box .l { font-size: 0.68rem; color: var(--ink-dim); font-weight: 700; margin-top: 2px; }
+
+  /* ── Fidget play stage ── */
+  .play-stage {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 0; position: relative; padding: 8px;
+  }
+  .play-meta {
+    width: 100%; display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px; gap: 8px;
+  }
+  .play-title { font-weight: 900; font-size: 1.05rem; }
+  .fidget-arena {
+    width: min(100%, 320px); aspect-ratio: 1; position: relative;
+    display: grid; place-items: center;
+    border-radius: 28px;
+    background:
+      radial-gradient(circle at 50% 40%, rgba(199,125,255,0.18), transparent 55%),
+      linear-gradient(160deg, rgba(255,255,255,0.06), rgba(0,0,0,0.2));
+    border: 1px solid var(--panel-border);
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.25), var(--shadow);
+    overflow: hidden; touch-action: none;
+  }
+  .fidget-arena canvas { width: 100%; height: 100%; display: block; }
+  .combo-bar {
+    width: min(100%, 320px); margin-top: 12px;
+    display: flex; flex-direction: column; gap: 6px; align-items: center;
+  }
+  .combo-label { font-weight: 800; font-size: 0.85rem; color: var(--gold); min-height: 1.2em; }
+  .xp-track {
+    width: 100%; height: 8px; border-radius: 999px; background: rgba(0,0,0,0.35);
+    overflow: hidden; border: 1px solid rgba(255,255,255,0.08);
+  }
+  .xp-fill {
+    height: 100%; width: 0%; border-radius: 999px;
+    background: linear-gradient(90deg, #4cc9f0, #c77dff, #ffd166);
+    transition: width 0.2s ease;
+  }
+  .play-actions {
+    width: min(100%, 320px); display: flex; gap: 8px; margin-top: 12px;
+  }
+  .play-actions .btn { flex: 1; }
+
+  /* Floating coins */
+  .float-coin {
+    position: absolute; pointer-events: none; font-weight: 900; font-size: 0.95rem;
+    color: var(--gold); text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    animation: floatUp 0.85s ease-out forwards; z-index: 20;
+  }
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -60px) scale(1.2); }
+  }
+
+  /* ── Shop / market ── */
+  .shop-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; border-radius: 14px;
+    background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 8px;
+  }
+  .shop-item .emoji { font-size: 2rem; width: 48px; text-align: center; }
+  .shop-item .info { flex: 1; min-width: 0; }
+  .shop-item .info h3 { font-size: 0.92rem; margin-bottom: 2px; }
+  .shop-item .info p { font-size: 0.75rem; }
+  .shop-item .price { color: var(--gold); font-weight: 900; font-size: 0.85rem; white-space: nowrap; }
+
+  /* ── Trade NPC ── */
+  .npc-card {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px; border-radius: 16px;
+    background: linear-gradient(135deg, rgba(76,201,240,0.12), rgba(199,125,255,0.12));
+    border: 1px solid var(--panel-border); margin-bottom: 10px;
+  }
+  .npc-avatar {
+    width: 52px; height: 52px; border-radius: 16px;
+    display: grid; place-items: center; font-size: 1.8rem;
+    background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1);
+    flex-shrink: 0;
+  }
+  .npc-body { flex: 1; min-width: 0; }
+  .npc-body h3 { font-size: 0.95rem; margin-bottom: 2px; }
+  .npc-body .want {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(0,0,0,0.25); border-radius: 8px; padding: 4px 8px;
+    font-size: 0.78rem; font-weight: 700; margin: 6px 0;
+  }
+  .npc-body .offer { color: var(--mint); font-weight: 800; font-size: 0.85rem; }
+
+  /* ── Pack open ── */
+  .pack-zone {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding: 20px 10px; text-align: center;
+  }
+  .pack-visual {
+    width: 140px; height: 180px; border-radius: 18px;
+    background: linear-gradient(160deg, #c77dff, #7b2cbf 50%, #4a148c);
+    border: 3px solid rgba(255,209,102,0.5);
+    box-shadow: 0 12px 40px rgba(123,44,191,0.5), 0 0 30px rgba(255,209,102,0.2);
+    display: grid; place-items: center; font-size: 3.5rem;
+    cursor: pointer; transition: transform 0.15s;
+    position: relative; overflow: hidden;
+  }
+  .pack-visual::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%);
+    animation: shine 2.5s ease-in-out infinite;
+  }
+  @keyframes shine {
+    0%, 100% { transform: translateX(-100%); }
+    50% { transform: translateX(100%); }
+  }
+  .pack-visual:active { transform: scale(0.96) rotate(-2deg); }
+  .pack-visual.opening { animation: packShake 0.5s ease; }
+  @keyframes packShake {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-8deg) scale(1.05); }
+    50% { transform: rotate(8deg) scale(1.08); }
+    75% { transform: rotate(-4deg) scale(1.04); }
+  }
+  .reveal-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%;
+    margin-top: 8px;
+  }
+  .reveal-card {
+    border-radius: 14px; padding: 14px 8px; text-align: center;
+    background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.12);
+    animation: revealPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    opacity: 0;
+  }
+  @keyframes revealPop {
+    from { opacity: 0; transform: scale(0.4) rotateY(90deg); }
+    to { opacity: 1; transform: scale(1) rotateY(0); }
+  }
+  .reveal-card .emoji { font-size: 2.2rem; display: block; margin-bottom: 4px; }
+  .reveal-card .name { font-size: 0.72rem; font-weight: 800; }
+  .reveal-card .rarity { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; }
+
+  /* ── Modal ── */
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+    display: none; align-items: flex-end; justify-content: center;
+    padding: 16px; padding-bottom: calc(16px + var(--safe-bot));
+  }
+  .modal-bg.show { display: flex; animation: fadeIn 0.18s ease; }
+  .modal {
+    width: 100%; max-width: 440px; max-height: 85vh; overflow-y: auto;
+    background: linear-gradient(180deg, #2a1248, #1a0b2e);
+    border: 1px solid var(--panel-border); border-radius: 22px 22px 18px 18px;
+    padding: 18px 16px 16px; box-shadow: 0 -8px 40px rgba(0,0,0,0.5);
+  }
+  .modal h2 { margin-bottom: 6px; }
+  .modal .detail-emoji {
+    font-size: 4rem; text-align: center; margin: 8px 0 12px;
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4));
+  }
+  .modal-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .modal-actions .row { display: flex; gap: 8px; }
+  .modal-actions .row .btn { flex: 1; }
+
+  /* ── Toast ── */
+  #toasts {
+    position: fixed; top: calc(12px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+    z-index: 200; display: flex; flex-direction: column; gap: 6px; width: min(92%, 360px);
+    pointer-events: none;
+  }
+  .toast {
+    background: rgba(26, 11, 46, 0.95); border: 1px solid rgba(199,125,255,0.4);
+    border-radius: 12px; padding: 10px 14px; font-weight: 700; font-size: 0.85rem;
+    text-align: center; box-shadow: var(--shadow);
+    animation: toastIn 0.25s ease, toastOut 0.3s ease 2.2s forwards;
+  }
+  .toast.good { border-color: rgba(94,252,141,0.5); }
+  .toast.bad { border-color: rgba(255,107,157,0.5); }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+  @keyframes toastOut { to { opacity: 0; transform: translateY(-8px); } }
+
+  /* ── Filters ── */
+  .filters {
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 4px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .chip {
+    flex-shrink: 0; border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.25); color: var(--ink-dim);
+    border-radius: 999px; padding: 6px 12px; font-size: 0.75rem; font-weight: 800;
+    font-family: inherit; cursor: pointer;
+  }
+  .chip.active { background: rgba(199,125,255,0.3); color: var(--ink); border-color: var(--accent); }
+
+  .empty {
+    text-align: center; padding: 28px 16px; color: var(--ink-dim);
+  }
+  .empty .big { font-size: 2.5rem; margin-bottom: 8px; }
+
+  .progress-ring-wrap {
+    display: flex; align-items: center; gap: 12px; margin: 8px 0 4px;
+  }
+  .level-badge {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, #c77dff, #4cc9f0);
+    display: grid; place-items: center; font-weight: 900; font-size: 1.1rem;
+    box-shadow: 0 4px 16px rgba(199,125,255,0.4);
+  }
+  .level-info { flex: 1; }
+  .level-info .bar {
+    height: 8px; border-radius: 999px; background: rgba(0,0,0,0.35);
+    overflow: hidden; margin-top: 4px;
+  }
+  .level-info .bar > i {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, #4cc9f0, #c77dff);
+    border-radius: 999px; transition: width 0.3s;
+  }
+
+  .tips { font-size: 0.78rem; color: var(--ink-dim); line-height: 1.4; margin-top: 8px; }
+
+  /* Collection grid denser on small */
+  .collection-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  @media (min-width: 400px) {
+    .collection-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">✨ Fidget Trade</div>
+    <div class="top-stats">
+      <div class="pill coins" title="Coins">🪙 <span id="coinDisplay">0</span></div>
+      <div class="pill xp" title="Level">Lv <span id="lvlDisplay">1</span></div>
+      <button class="icon-btn" id="muteBtn" type="button" aria-label="Mute">🔊</button>
+    </div>
+  </header>
+
+  <main class="screens">
+    <!-- HOME -->
+    <section class="screen active" id="screen-home" data-screen="home">
+      <div class="hero">
+        <h1>Fidget Trade</h1>
+        <p>Collect, fidget, and trade rare toys. Spin, pop, click — then cash in.</p>
+      </div>
+      <div class="panel">
+        <div class="progress-ring-wrap">
+          <div class="level-badge" id="homeLevel">1</div>
+          <div class="level-info">
+            <div style="display:flex;justify-content:space-between;font-size:0.8rem;font-weight:700">
+              <span>Collector Level</span>
+              <span class="muted" id="homeXpText">0 / 100 XP</span>
+            </div>
+            <div class="bar"><i id="homeXpBar"></i></div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box"><div class="v" id="statOwned">0</div><div class="l">Owned</div></div>
+          <div class="stat-box"><div class="v" id="statUnique">0</div><div class="l">Unique</div></div>
+          <div class="stat-box"><div class="v" id="statFidgets">0</div><div class="l">Fidgets</div></div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:12px">
+        <button class="btn btn-accent" type="button" data-go="fidget">🎮 Fidget</button>
+        <button class="btn btn-gold" type="button" data-go="packs">📦 Packs</button>
+        <button class="btn btn-sky" type="button" data-go="market">🏪 Market</button>
+        <button class="btn btn-mint" type="button" data-go="trade">🤝 Trade</button>
+      </div>
+      <div class="panel">
+        <h2 style="font-size:0.95rem;margin-bottom:6px">Daily Deal</h2>
+        <div id="dailyDeal"></div>
+        <p class="tips">Fidget with toys to earn coins. Higher rarities pay more. Open packs &amp; complete NPC trades for rare finds.</p>
+      </div>
+    </section>
+
+    <!-- COLLECTION -->
+    <section class="screen" id="screen-collection" data-screen="collection">
+      <div class="section-head">
+        <h2>Collection</h2>
+        <span class="muted" id="collectionCount">0/0</span>
+      </div>
+      <div class="filters" id="rarityFilters"></div>
+      <div class="collection-grid" id="collectionGrid"></div>
+    </section>
+
+    <!-- FIDGET -->
+    <section class="screen no-scroll" id="screen-fidget" data-screen="fidget">
+      <div class="play-meta">
+        <div>
+          <div class="play-title" id="playName">Pick a fidget</div>
+          <div class="muted" id="playHint">Choose from your collection</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" id="pickFidgetBtn">Switch</button>
+      </div>
+      <div class="play-stage">
+        <div class="fidget-arena" id="fidgetArena">
+          <canvas id="fidgetCanvas" width="320" height="320"></canvas>
+        </div>
+        <div class="combo-bar">
+          <div class="combo-label" id="comboLabel">Tap to fidget!</div>
+          <div class="xp-track"><div class="xp-fill" id="sessionXpFill"></div></div>
+          <div class="muted" id="sessionEarn">Session: +0 🪙</div>
+        </div>
+        <div class="play-actions">
+          <button class="btn btn-ghost" type="button" data-go="collection">📚 Pick Toy</button>
+          <button class="btn btn-accent" type="button" id="autoFidgetBtn">⚡ Burst</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- MARKET -->
+    <section class="screen" id="screen-market" data-screen="market">
+      <div class="section-head">
+        <h2>Market</h2>
+        <button class="btn btn-ghost btn-sm" type="button" id="refreshShopBtn">🔄 Refresh · 25🪙</button>
+      </div>
+      <div class="panel" style="padding:10px 12px;margin-bottom:10px">
+        <div style="display:flex;gap:8px">
+          <button class="chip active" type="button" data-market-tab="buy">Buy</button>
+          <button class="chip" type="button" data-market-tab="sell">Sell</button>
+        </div>
+      </div>
+      <div id="marketList"></div>
+    </section>
+
+    <!-- TRADE -->
+    <section class="screen" id="screen-trade" data-screen="trade">
+      <div class="section-head">
+        <h2>Traders</h2>
+        <button class="btn btn-ghost btn-sm" type="button" id="refreshTradersBtn">🔄 New deals</button>
+      </div>
+      <p style="margin-bottom:12px">Hand over what they want. Score bigger rewards for rarer asks.</p>
+      <div id="traderList"></div>
+    </section>
+
+    <!-- PACKS -->
+    <section class="screen" id="screen-packs" data-screen="packs">
+      <div class="section-head">
+        <h2>Booster Packs</h2>
+      </div>
+      <div class="pack-zone" id="packZone">
+        <div class="pack-visual" id="packVisual" role="button" tabindex="0" aria-label="Open pack">📦</div>
+        <div>
+          <h3 style="margin-bottom:4px">Mystery Fidget Pack</h3>
+          <p>3 random fidgets · better odds at higher level</p>
+        </div>
+        <button class="btn btn-gold btn-block" type="button" id="buyPackBtn">Open Pack · 75🪙</button>
+        <button class="btn btn-coral btn-block" type="button" id="buyPremiumBtn">Premium Pack · 200🪙</button>
+        <p class="tips">Premium packs exclude commons and boost epic+ rates.</p>
+        <div class="reveal-grid" id="revealGrid" hidden></div>
+        <button class="btn btn-ghost btn-block" type="button" id="claimRevealBtn" hidden>Claim All</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="nav">
+    <button class="nav-btn active" type="button" data-go="home"><span class="ni">🏠</span>Home</button>
+    <button class="nav-btn" type="button" data-go="collection"><span class="ni">📚</span>Collect</button>
+    <button class="nav-btn" type="button" data-go="fidget"><span class="ni">🎮</span>Fidget</button>
+    <button class="nav-btn" type="button" data-go="market"><span class="ni">🏪</span>Market</button>
+    <button class="nav-btn" type="button" data-go="trade"><span class="ni">🤝</span>Trade</button>
+  </nav>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+// ═══════════════════════════════════════════════════════════
+// CATALOG
+// ═══════════════════════════════════════════════════════════
+const RARITIES = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
+const RARITY_WEIGHT = { common: 48, uncommon: 28, rare: 14, epic: 7, legendary: 2.5, mythic: 0.5 };
+const RARITY_VALUE = { common: 12, uncommon: 28, rare: 65, epic: 160, legendary: 420, mythic: 1200 };
+const RARITY_FIDGET = { common: 1, uncommon: 1.4, rare: 2, epic: 3.2, legendary: 5, mythic: 8 };
+const XP_PER_LEVEL = (lv) => 80 + lv * 40;
+
+const CATALOG = [
+  { id: "spinner_classic", name: "Classic Spinner", emoji: "🌀", rarity: "common", type: "spinner", color: "#4cc9f0" },
+  { id: "spinner_neon", name: "Neon Spinner", emoji: "💫", rarity: "uncommon", type: "spinner", color: "#5efc8d" },
+  { id: "spinner_galaxy", name: "Galaxy Spinner", emoji: "🌌", rarity: "epic", type: "spinner", color: "#c77dff" },
+  { id: "spinner_void", name: "Void Spinner", emoji: "🕳️", rarity: "mythic", type: "spinner", color: "#ff6b9d" },
+  { id: "popit_rainbow", name: "Rainbow Pop-It", emoji: "🌈", rarity: "common", type: "popit", color: "#ff6b9d" },
+  { id: "popit_slime", name: "Slime Pop-It", emoji: "🟢", rarity: "uncommon", type: "popit", color: "#5efc8d" },
+  { id: "popit_crystal", name: "Crystal Pop-It", emoji: "💎", rarity: "rare", type: "popit", color: "#4cc9f0" },
+  { id: "popit_dragon", name: "Dragon Pop-It", emoji: "🐉", rarity: "legendary", type: "popit", color: "#ff9f1c" },
+  { id: "cube_basic", name: "Fidget Cube", emoji: "🎲", rarity: "common", type: "cube", color: "#9aa0a6" },
+  { id: "cube_metal", name: "Metal Cube", emoji: "⬜", rarity: "rare", type: "cube", color: "#c0c0c0" },
+  { id: "cube_prism", name: "Prism Cube", emoji: "🔷", rarity: "epic", type: "cube", color: "#c77dff" },
+  { id: "switch_clicky", name: "Clicky Switch", emoji: "🔘", rarity: "common", type: "switch", color: "#ffd166" },
+  { id: "switch_mech", name: "Mech Switch", emoji: "⌨️", rarity: "uncommon", type: "switch", color: "#ff9f1c" },
+  { id: "switch_plasma", name: "Plasma Switch", emoji: "⚡", rarity: "legendary", type: "switch", color: "#4cc9f0" },
+  { id: "slime_blob", name: "Stress Blob", emoji: "🫧", rarity: "common", type: "slime", color: "#ff6b9d" },
+  { id: "slime_glitter", name: "Glitter Goo", emoji: "✨", rarity: "rare", type: "slime", color: "#ffd166" },
+  { id: "slime_cosmic", name: "Cosmic Goo", emoji: "🔮", rarity: "epic", type: "slime", color: "#7b2cbf" },
+  { id: "ring_spin", name: "Spinner Ring", emoji: "💍", rarity: "uncommon", type: "spinner", color: "#ffd166" },
+  { id: "pad_bubble", name: "Bubble Pad", emoji: "🟣", rarity: "common", type: "popit", color: "#c77dff" },
+  { id: "gyro_orbit", name: "Orbit Gyro", emoji: "🪐", rarity: "rare", type: "spinner", color: "#4cc9f0" },
+  { id: "chain_fidget", name: "Fidget Chain", emoji: "🔗", rarity: "uncommon", type: "switch", color: "#9aa0a6" },
+  { id: "infinity_cube", name: "Infinity Cube", emoji: "♾️", rarity: "epic", type: "cube", color: "#5efc8d" },
+  { id: "marble_mesh", name: "Marble Mesh", emoji: "🔮", rarity: "rare", type: "slime", color: "#c77dff" },
+  { id: "tornado_spin", name: "Tornado Top", emoji: "🌪️", rarity: "legendary", type: "spinner", color: "#4cc9f0" },
+  { id: "phoenix_pop", name: "Phoenix Pop", emoji: "🔥", rarity: "mythic", type: "popit", color: "#ff6b9d" },
+  { id: "quantum_cube", name: "Quantum Cube", emoji: "🧊", rarity: "mythic", type: "cube", color: "#4cc9f0" },
+];
+
+const byId = Object.fromEntries(CATALOG.map((f) => [f.id, f]));
+
+const NPCS = [
+  { id: "zara", name: "Zara", avatar: "😎", blurb: "Street-market flipper. Loves flashy rares." },
+  { id: "milo", name: "Milo", avatar: "🤓", blurb: "Completionist. Pays extra for missing pieces." },
+  { id: "nova", name: "Nova", avatar: "👽", blurb: "Cosmic collector from the night market." },
+  { id: "bea", name: "Bea", avatar: "🐝", blurb: "Busy trader. Quick deals, fair prices." },
+  { id: "rex", name: "Rex", avatar: "🦖", blurb: "Hoarder of legendary noise-makers." },
+  { id: "kim", name: "Kim", avatar: "🎤", blurb: "ASMR streamer. Wants the clickiest toys." },
+];
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const SAVE_KEY = "fidget-trade-v1";
+const defaultState = () => ({
+  coins: 100,
+  xp: 0,
+  level: 1,
+  inventory: { spinner_classic: 1, popit_rainbow: 1, cube_basic: 1 },
+  totalFidgets: 0,
+  sessionEarn: 0,
+  activeFidgetId: "spinner_classic",
+  shop: [],
+  traders: [],
+  daily: null,
+  dailyDay: "",
+  muted: false,
+  packsOpened: 0,
+});
+
+let state = load();
+let marketTab = "buy";
+let collectionFilter = "all";
+let combo = 0;
+let comboTimer = 0;
+let sessionXp = 0;
+let lastFidgetAt = 0;
+
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return defaultState();
+    const parsed = { ...defaultState(), ...JSON.parse(raw) };
+    if (!parsed.inventory || typeof parsed.inventory !== "object") parsed.inventory = defaultState().inventory;
+    return parsed;
+  } catch {
+    return defaultState();
+  }
+}
+function save() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUDIO (tiny WebAudio beeps)
+// ═══════════════════════════════════════════════════════════
+let audioCtx = null;
+function ensureAudio() {
+  if (state.muted) return null;
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+function beep(freq = 440, dur = 0.06, type = "sine", gain = 0.04) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = gain;
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(); o.stop(ctx.currentTime + dur);
+}
+function sfxPop() { beep(520 + Math.random() * 180, 0.05, "triangle", 0.05); }
+function sfxClick() { beep(280 + Math.random() * 80, 0.04, "square", 0.03); }
+function sfxSpin() { beep(180 + Math.random() * 40, 0.08, "sawtooth", 0.02); }
+function sfxCoin() { beep(880, 0.07, "sine", 0.045); beep(1175, 0.1, "sine", 0.03); }
+function sfxRare() {
+  [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.12, "sine", 0.05), i * 70));
+}
+function sfxBad() { beep(120, 0.15, "sawtooth", 0.04); }
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function qty(id) { return state.inventory[id] || 0; }
+function addItem(id, n = 1) {
+  state.inventory[id] = (state.inventory[id] || 0) + n;
+}
+function removeItem(id, n = 1) {
+  const q = qty(id);
+  if (q < n) return false;
+  state.inventory[id] = q - n;
+  if (state.inventory[id] <= 0) delete state.inventory[id];
+  return true;
+}
+function uniqueOwned() {
+  return CATALOG.filter((f) => qty(f.id) > 0).length;
+}
+function totalOwned() {
+  return Object.values(state.inventory).reduce((a, b) => a + b, 0);
+}
+function sellPrice(id) {
+  const f = byId[id];
+  if (!f) return 0;
+  return Math.max(1, Math.floor(RARITY_VALUE[f.rarity] * 0.55));
+}
+function buyPrice(id) {
+  const f = byId[id];
+  if (!f) return 9999;
+  return Math.floor(RARITY_VALUE[f.rarity] * (1.1 + Math.random() * 0.25));
+}
+function xpForLevel(lv) { return XP_PER_LEVEL(lv); }
+function addXp(n) {
+  state.xp += n;
+  let leveled = false;
+  while (state.xp >= xpForLevel(state.level)) {
+    state.xp -= xpForLevel(state.level);
+    state.level += 1;
+    state.coins += 25 + state.level * 5;
+    leveled = true;
+  }
+  if (leveled) {
+    toast(`Level up! You're Lv ${state.level} · bonus coins`, "good");
+    sfxRare();
+  }
+}
+function pickWeighted(weights) {
+  const entries = Object.entries(weights);
+  const total = entries.reduce((s, [, w]) => s + w, 0);
+  let r = Math.random() * total;
+  for (const [k, w] of entries) {
+    r -= w;
+    if (r <= 0) return k;
+  }
+  return entries[entries.length - 1][0];
+}
+function randomFidget(opts = {}) {
+  const { premium = false, minRarity = null } = opts;
+  let weights = { ...RARITY_WEIGHT };
+  if (premium) {
+    weights.common = 0;
+    weights.uncommon *= 0.7;
+    weights.rare *= 1.4;
+    weights.epic *= 1.8;
+    weights.legendary *= 2.2;
+    weights.mythic *= 2.5;
+  }
+  // Level soft pity
+  const lv = state.level;
+  weights.epic += lv * 0.15;
+  weights.legendary += lv * 0.08;
+  weights.mythic += lv * 0.03;
+
+  if (minRarity) {
+    const idx = RARITIES.indexOf(minRarity);
+    RARITIES.forEach((r, i) => { if (i < idx) weights[r] = 0; });
+  }
+  const rarity = pickWeighted(weights);
+  const pool = CATALOG.filter((f) => f.rarity === rarity);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function toast(msg, kind = "") {
+  const el = document.createElement("div");
+  el.className = "toast" + (kind ? " " + kind : "");
+  el.textContent = msg;
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+function floatCoin(x, y, text) {
+  const arena = document.getElementById("fidgetArena");
+  if (!arena) return;
+  const el = document.createElement("div");
+  el.className = "float-coin";
+  el.textContent = text;
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+  arena.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SHOP / TRADERS / DAILY
+// ═══════════════════════════════════════════════════════════
+function genShop() {
+  const items = [];
+  const used = new Set();
+  for (let i = 0; i < 6; i++) {
+    let f, tries = 0;
+    do { f = randomFidget({ premium: i >= 4 }); tries++; } while (used.has(f.id) && tries < 20);
+    used.add(f.id);
+    items.push({ id: f.id, price: buyPrice(f.id), stock: 1 + (f.rarity === "common" ? 2 : 0) });
+  }
+  state.shop = items;
+}
+function genTraders() {
+  const shuffled = [...NPCS].sort(() => Math.random() - 0.5).slice(0, 4);
+  state.traders = shuffled.map((npc) => {
+    const want = randomFidget({ premium: Math.random() > 0.55 });
+    const offerCoins = Math.floor(RARITY_VALUE[want.rarity] * (1.35 + Math.random() * 0.5));
+    let bonus = null;
+    if (Math.random() > 0.45) {
+      bonus = randomFidget({ minRarity: want.rarity === "common" ? "uncommon" : want.rarity });
+    }
+    return {
+      npcId: npc.id,
+      wantId: want.id,
+      wantQty: 1 + (want.rarity === "common" && Math.random() > 0.5 ? 1 : 0),
+      offerCoins,
+      bonusId: bonus ? bonus.id : null,
+    };
+  });
+}
+function ensureDaily() {
+  const key = todayKey();
+  if (state.dailyDay === key && state.daily) return;
+  const f = randomFidget({ premium: true });
+  state.daily = {
+    id: f.id,
+    price: Math.floor(buyPrice(f.id) * 0.72),
+    claimed: false,
+  };
+  state.dailyDay = key;
+}
+function ensureEconomy() {
+  if (!state.shop || !state.shop.length) genShop();
+  if (!state.traders || !state.traders.length) genTraders();
+  ensureDaily();
+}
+
+// ═══════════════════════════════════════════════════════════
+// FIDGET ENGINE (canvas)
+// ═══════════════════════════════════════════════════════════
+const canvas = document.getElementById("fidgetCanvas");
+const ctx = canvas.getContext("2d");
+let animId = 0;
+let fx = {
+  type: "spinner",
+  angle: 0,
+  spinVel: 0,
+  pops: [], // {x,y,r,popped,phase}
+  cubeFace: 0,
+  switches: [false, false, false, false],
+  slime: 0.5,
+  slimeVel: 0,
+  particles: [],
+  pulse: 0,
+  color: "#c77dff",
+  emoji: "🌀",
+};
+
+function resizeCanvas() {
+  const arena = document.getElementById("fidgetArena");
+  const size = Math.min(arena.clientWidth, arena.clientHeight) || 320;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(size * dpr);
+  canvas.height = Math.floor(size * dpr);
+  canvas.style.width = size + "px";
+  canvas.style.height = size + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function setActiveFidget(id) {
+  if (!byId[id] || qty(id) <= 0) return;
+  state.activeFidgetId = id;
+  const f = byId[id];
+  fx.type = f.type;
+  fx.color = f.color;
+  fx.emoji = f.emoji;
+  fx.angle = 0;
+  fx.spinVel = 0;
+  fx.cubeFace = 0;
+  fx.switches = [false, false, false, false];
+  fx.slime = 0.5;
+  fx.slimeVel = 0;
+  fx.pulse = 0;
+  initPops();
+  save();
+  updatePlayMeta();
+}
+function initPops() {
+  fx.pops = [];
+  const cols = 4, rows = 4;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      fx.pops.push({
+        c, r,
+        popped: Math.random() > 0.5,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+}
+function updatePlayMeta() {
+  const f = byId[state.activeFidgetId];
+  const nameEl = document.getElementById("playName");
+  const hintEl = document.getElementById("playHint");
+  if (!f || qty(f.id) <= 0) {
+    nameEl.textContent = "No fidget equipped";
+    hintEl.textContent = "Open a pack or buy from the market";
+    return;
+  }
+  nameEl.textContent = `${f.emoji} ${f.name}`;
+  const hints = {
+    spinner: "Drag or tap to spin",
+    popit: "Tap bubbles to pop",
+    cube: "Tap faces · clicky sides",
+    switch: "Flip the switches",
+    slime: "Squish & stretch the goo",
+  };
+  hintEl.textContent = hints[f.type] || "Tap to fidget";
+  hintEl.className = "muted rarity-" + f.rarity;
+}
+
+function onFidgetAction(intensity = 1, clientX, clientY) {
+  const f = byId[state.activeFidgetId];
+  if (!f || qty(f.id) <= 0) {
+    toast("Equip a fidget first", "bad");
+    return;
+  }
+  const now = performance.now();
+  // Soft rate limit
+  if (now - lastFidgetAt < 40) return;
+  lastFidgetAt = now;
+
+  combo = Math.min(combo + 1, 50);
+  comboTimer = now + 1400;
+  const mult = 1 + Math.floor(combo / 5) * 0.15;
+  const base = RARITY_FIDGET[f.rarity] * intensity;
+  const earn = Math.max(1, Math.round(base * mult * (0.85 + Math.random() * 0.3)));
+  state.coins += earn;
+  state.totalFidgets += 1;
+  state.sessionEarn = (state.sessionEarn || 0) + earn;
+  sessionXp = Math.min(100, sessionXp + 2 + intensity);
+  if (sessionXp >= 100) {
+    sessionXp = 0;
+    addXp(8 + Math.floor(state.level / 2));
+    toast("Session bonus! +XP", "good");
+  }
+  addXp(Math.max(1, Math.floor(earn / 4)));
+
+  // Visual float
+  const arena = document.getElementById("fidgetArena");
+  const rect = arena.getBoundingClientRect();
+  const x = clientX != null ? clientX - rect.left : rect.width / 2 + (Math.random() - 0.5) * 80;
+  const y = clientY != null ? clientY - rect.top : rect.height / 2 + (Math.random() - 0.5) * 40;
+  floatCoin(x, y, `+${earn}`);
+
+  // particles
+  for (let i = 0; i < 4; i++) {
+    fx.particles.push({
+      x: x, y: y,
+      vx: (Math.random() - 0.5) * 4,
+      vy: -1 - Math.random() * 3,
+      life: 1,
+      color: f.color,
+    });
+  }
+  fx.pulse = 1;
+
+  document.getElementById("comboLabel").textContent =
+    combo >= 5 ? `COMBO x${Math.floor(combo / 5) + 1} · +${earn}🪙` : `+${earn} 🪙`;
+  document.getElementById("sessionEarn").textContent = `Session: +${state.sessionEarn} 🪙`;
+  document.getElementById("sessionXpFill").style.width = sessionXp + "%";
+  updateHud();
+  if (Math.random() < 0.08) save();
+}
+
+function drawSpinner(w, h, t) {
+  const cx = w / 2, cy = h / 2;
+  const r = Math.min(w, h) * 0.32;
+  fx.angle += fx.spinVel;
+  fx.spinVel *= 0.985;
+  if (Math.abs(fx.spinVel) < 0.002) fx.spinVel = 0;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(fx.angle);
+
+  // glow
+  const g = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.4);
+  g.addColorStop(0, fx.color + "55");
+  g.addColorStop(1, "transparent");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2); ctx.fill();
+
+  // arms
+  for (let i = 0; i < 3; i++) {
+    ctx.save();
+    ctx.rotate((i * Math.PI * 2) / 3);
+    ctx.fillStyle = fx.color;
+    ctx.beginPath();
+    ctx.ellipse(r * 0.55, 0, r * 0.42, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.arc(r * 0.55, 0, r * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // hub
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = fx.color;
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.12, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // emoji badge
+  ctx.font = `${Math.floor(r * 0.35)}px serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(fx.emoji, cx, cy + r * 1.15);
+}
+
+function drawPopit(w, h, t) {
+  const cols = 4, rows = 4;
+  const pad = w * 0.12;
+  const gw = w - pad * 2;
+  const gh = h - pad * 2;
+  const bw = gw / cols;
+  const bh = gh / rows;
+
+  // tray
+  roundRect(ctx, pad * 0.5, pad * 0.5, w - pad, h - pad, 20);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fill();
+  roundRect(ctx, pad * 0.5, pad * 0.5, w - pad, h - pad, 20);
+  ctx.strokeStyle = fx.color + "88";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  fx.pops.forEach((p, i) => {
+    const x = pad + p.c * bw + bw / 2;
+    const y = pad + p.r * bh + bh / 2;
+    const baseR = Math.min(bw, bh) * 0.32;
+    const bob = Math.sin(t * 0.003 + p.phase) * 1.5;
+    const rad = p.popped ? baseR * 0.55 : baseR;
+
+    ctx.beginPath();
+    ctx.arc(x, y + (p.popped ? 2 : bob), rad, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(x - rad * 0.3, y - rad * 0.3, 1, x, y, rad);
+    if (p.popped) {
+      grad.addColorStop(0, "rgba(255,255,255,0.15)");
+      grad.addColorStop(1, fx.color + "44");
+    } else {
+      grad.addColorStop(0, "#fff");
+      grad.addColorStop(0.35, fx.color);
+      grad.addColorStop(1, shade(fx.color, -40));
+    }
+    ctx.fillStyle = grad;
+    ctx.fill();
+    if (!p.popped) {
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.beginPath();
+      ctx.arc(x - rad * 0.25, y - rad * 0.25 + bob, rad * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+}
+
+function drawCube(w, h, t) {
+  const cx = w / 2, cy = h / 2;
+  const s = Math.min(w, h) * 0.28;
+  const faces = ["🔘", "🎚️", "🔄", "⬇️", "🎯", "✨"];
+  const bounce = Math.sin(t * 0.008) * 3 + fx.pulse * 8;
+
+  ctx.save();
+  ctx.translate(cx, cy + bounce * 0.2);
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.ellipse(0, s * 1.2, s * 0.9, s * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // isometric-ish cube
+  const face = fx.cubeFace % 6;
+  ctx.fillStyle = fx.color;
+  roundRect(ctx, -s, -s, s * 2, s * 2, 16);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 3;
+  roundRect(ctx, -s, -s, s * 2, s * 2, 16);
+  ctx.stroke();
+
+  // face content
+  ctx.font = `${Math.floor(s * 0.9)}px serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(faces[face], 0, 0);
+
+  // side buttons
+  const btns = [
+    [-s * 1.45, 0, "◀"], [s * 1.45, 0, "▶"],
+    [0, -s * 1.45, "▲"], [0, s * 1.45, "▼"],
+  ];
+  btns.forEach(([x, y, lab], i) => {
+    ctx.fillStyle = fx.switches[i] ? "#fff" : "rgba(255,255,255,0.2)";
+    ctx.beginPath(); ctx.arc(x, y, s * 0.28, 0, Math.PI * 2); ctx.fill();
+    ctx.font = `${Math.floor(s * 0.28)}px sans-serif`;
+    ctx.fillStyle = fx.switches[i] ? "#1a0b2e" : "#fff";
+    ctx.fillText(lab, x, y + 1);
+  });
+  ctx.restore();
+}
+
+function drawSwitch(w, h, t) {
+  const n = 4;
+  const pad = w * 0.15;
+  const gap = (h - pad * 2) / n;
+  for (let i = 0; i < n; i++) {
+    const y = pad + gap * i + gap / 2;
+    const x = w / 2;
+    const on = fx.switches[i];
+    // track
+    roundRect(ctx, x - w * 0.28, y - 18, w * 0.56, 36, 18);
+    ctx.fillStyle = on ? fx.color : "rgba(255,255,255,0.12)";
+    ctx.fill();
+    // knob
+    const kx = on ? x + w * 0.14 : x - w * 0.14;
+    ctx.beginPath();
+    ctx.arc(kx, y, 14, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.font = "16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = on ? "#0a0" : "#666";
+    ctx.fillText(on ? "ON" : "OFF", x, y - 32);
+  }
+}
+
+function drawSlime(w, h, t) {
+  const cx = w / 2, cy = h / 2;
+  fx.slimeVel += (0.5 - fx.slime) * 0.02;
+  fx.slimeVel *= 0.92;
+  fx.slime += fx.slimeVel;
+  fx.slime = Math.max(0.2, Math.min(0.9, fx.slime));
+
+  const stretch = 0.7 + fx.slime * 0.7;
+  const squash = 1.3 - fx.slime * 0.5;
+  const r = Math.min(w, h) * 0.28 * (1 + fx.pulse * 0.15);
+
+  ctx.save();
+  ctx.translate(cx, cy + Math.sin(t * 0.004) * 4);
+  ctx.scale(squash, stretch);
+
+  const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.2);
+  g.addColorStop(0, "#fff");
+  g.addColorStop(0.25, fx.color);
+  g.addColorStop(1, shade(fx.color, -50));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r, r * 0.95, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // shine
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.25, -r * 0.3, r * 0.2, r * 0.12, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // eyes
+  ctx.fillStyle = "#1a0b2e";
+  ctx.beginPath(); ctx.arc(-r * 0.25, -r * 0.05, r * 0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r * 0.25, -r * 0.05, r * 0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(-r * 0.22, -r * 0.08, r * 0.04, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r * 0.28, -r * 0.08, r * 0.04, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  ctx.font = "28px serif";
+  ctx.textAlign = "center";
+  ctx.fillText(fx.emoji, cx, h * 0.88);
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.replace("#", ""), 16);
+  let r = (n >> 16) + amt, g = ((n >> 8) & 0xff) + amt, b = (n & 0xff) + amt;
+  r = Math.max(0, Math.min(255, r));
+  g = Math.max(0, Math.min(255, g));
+  b = Math.max(0, Math.min(255, b));
+  return `rgb(${r},${g},${b})`;
+}
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
+function drawParticles(dt) {
+  for (let i = fx.particles.length - 1; i >= 0; i--) {
+    const p = fx.particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.08;
+    p.life -= 0.03;
+    if (p.life <= 0) { fx.particles.splice(i, 1); continue; }
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3 + p.life * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function loop(t) {
+  animId = requestAnimationFrame(loop);
+  const arena = document.getElementById("fidgetArena");
+  if (!arena) return;
+  const w = arena.clientWidth || 320;
+  const h = arena.clientHeight || 320;
+  ctx.clearRect(0, 0, w, h);
+
+  // bg dots
+  ctx.fillStyle = "rgba(255,255,255,0.03)";
+  for (let i = 0; i < 12; i++) {
+    const x = (Math.sin(t * 0.0003 + i * 1.7) * 0.5 + 0.5) * w;
+    const y = (Math.cos(t * 0.0004 + i * 2.1) * 0.5 + 0.5) * h;
+    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  fx.pulse *= 0.9;
+  if (performance.now() > comboTimer && combo > 0) {
+    combo = Math.max(0, combo - 1);
+    if (combo === 0) document.getElementById("comboLabel").textContent = "Tap to fidget!";
+  }
+
+  const f = byId[state.activeFidgetId];
+  if (!f || qty(f.id) <= 0) {
+    ctx.font = "48px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("📦", w / 2, h / 2 - 10);
+    ctx.font = "14px sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.fillText("Get a fidget to play", w / 2, h / 2 + 30);
+  } else {
+    if (fx.type === "spinner") drawSpinner(w, h, t);
+    else if (fx.type === "popit") drawPopit(w, h, t);
+    else if (fx.type === "cube") drawCube(w, h, t);
+    else if (fx.type === "switch") drawSwitch(w, h, t);
+    else if (fx.type === "slime") drawSlime(w, h, t);
+    else drawSpinner(w, h, t);
+
+    // passive spin earn
+    if (fx.type === "spinner" && Math.abs(fx.spinVel) > 0.05 && Math.random() < 0.02) {
+      onFidgetAction(0.4);
+      sfxSpin();
+    }
+  }
+  drawParticles();
+}
+
+// Input on arena
+function setupFidgetInput() {
+  const arena = document.getElementById("fidgetArena");
+  let dragging = false;
+  let lastX = 0, lastY = 0;
+
+  function handleAt(clientX, clientY, isDown) {
+    const f = byId[state.activeFidgetId];
+    if (!f || qty(f.id) <= 0) return;
+    const rect = arena.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const w = rect.width, h = rect.height;
+
+    if (fx.type === "spinner") {
+      if (isDown) {
+        const dx = x - lastX, dy = y - lastY;
+        const force = Math.hypot(dx, dy);
+        if (force > 2) {
+          fx.spinVel += (dx + dy) * 0.004;
+          if (Math.abs(fx.spinVel) > 0.08) {
+            onFidgetAction(0.6 + Math.min(1.5, force / 40), clientX, clientY);
+            sfxSpin();
+          }
+        } else {
+          fx.spinVel += (Math.random() > 0.5 ? 1 : -1) * (0.15 + Math.random() * 0.2);
+          onFidgetAction(1, clientX, clientY);
+          sfxSpin();
+        }
+      }
+    } else if (fx.type === "popit") {
+      if (!isDown) return;
+      const cols = 4, rows = 4;
+      const pad = w * 0.12;
+      const bw = (w - pad * 2) / cols;
+      const bh = (h - pad * 2) / rows;
+      const c = Math.floor((x - pad) / bw);
+      const r = Math.floor((y - pad) / bh);
+      if (c >= 0 && c < cols && r >= 0 && r < rows) {
+        const p = fx.pops[r * cols + c];
+        if (p) {
+          p.popped = !p.popped;
+          onFidgetAction(1, clientX, clientY);
+          sfxPop();
+          // reset all if all same
+          if (fx.pops.every((q) => q.popped) || fx.pops.every((q) => !q.popped)) {
+            setTimeout(() => fx.pops.forEach((q) => { q.popped = Math.random() > 0.5; }), 200);
+          }
+        }
+      }
+    } else if (fx.type === "cube") {
+      if (!isDown) return;
+      fx.cubeFace = (fx.cubeFace + 1) % 6;
+      const i = Math.floor(Math.random() * 4);
+      fx.switches[i] = !fx.switches[i];
+      onFidgetAction(1, clientX, clientY);
+      sfxClick();
+    } else if (fx.type === "switch") {
+      if (!isDown) return;
+      const pad = h * 0.15;
+      const gap = (h - pad * 2) / 4;
+      const i = Math.floor((y - pad) / gap);
+      if (i >= 0 && i < 4) {
+        fx.switches[i] = !fx.switches[i];
+        onFidgetAction(1, clientX, clientY);
+        sfxClick();
+      }
+    } else if (fx.type === "slime") {
+      if (!isDown) return;
+      fx.slimeVel += (Math.random() - 0.5) * 0.25;
+      fx.slime += (Math.random() - 0.5) * 0.15;
+      onFidgetAction(1, clientX, clientY);
+      sfxPop();
+    }
+    lastX = x; lastY = y;
+  }
+
+  arena.addEventListener("pointerdown", (e) => {
+    dragging = true;
+    arena.setPointerCapture(e.pointerId);
+    lastX = e.clientX - arena.getBoundingClientRect().left;
+    lastY = e.clientY - arena.getBoundingClientRect().top;
+    handleAt(e.clientX, e.clientY, true);
+  });
+  arena.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    if (fx.type === "spinner") handleAt(e.clientX, e.clientY, true);
+    else if (fx.type === "slime") {
+      fx.slimeVel += (e.movementY || 0) * 0.002;
+    }
+    lastX = e.clientX - arena.getBoundingClientRect().left;
+    lastY = e.clientY - arena.getBoundingClientRect().top;
+  });
+  arena.addEventListener("pointerup", () => { dragging = false; });
+  arena.addEventListener("pointercancel", () => { dragging = false; });
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI RENDER
+// ═══════════════════════════════════════════════════════════
+function updateHud() {
+  document.getElementById("coinDisplay").textContent = formatNum(state.coins);
+  document.getElementById("lvlDisplay").textContent = state.level;
+  document.getElementById("muteBtn").textContent = state.muted ? "🔇" : "🔊";
+}
+function formatNum(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (n >= 1e4) return (n / 1e3).toFixed(1) + "k";
+  return String(Math.floor(n));
+}
+
+function go(screen) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === screen));
+  document.querySelectorAll(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.go === screen));
+  if (screen === "home") renderHome();
+  if (screen === "collection") renderCollection();
+  if (screen === "fidget") {
+    resizeCanvas();
+    updatePlayMeta();
+    if (qty(state.activeFidgetId) <= 0) {
+      const first = CATALOG.find((f) => qty(f.id) > 0);
+      if (first) setActiveFidget(first.id);
+    }
+  }
+  if (screen === "market") renderMarket();
+  if (screen === "trade") renderTrade();
+  if (screen === "packs") { /* static */ }
+  save();
+}
+
+function renderHome() {
+  document.getElementById("homeLevel").textContent = state.level;
+  const need = xpForLevel(state.level);
+  document.getElementById("homeXpText").textContent = `${state.xp} / ${need} XP`;
+  document.getElementById("homeXpBar").style.width = Math.min(100, (state.xp / need) * 100) + "%";
+  document.getElementById("statOwned").textContent = totalOwned();
+  document.getElementById("statUnique").textContent = `${uniqueOwned()}/${CATALOG.length}`;
+  document.getElementById("statFidgets").textContent = formatNum(state.totalFidgets);
+  ensureDaily();
+  const box = document.getElementById("dailyDeal");
+  const d = state.daily;
+  const f = byId[d.id];
+  if (!f) { box.innerHTML = ""; return; }
+  if (d.claimed) {
+    box.innerHTML = `<p style="color:var(--mint);font-weight:700">✓ Today's deal claimed. Come back tomorrow!</p>`;
+    return;
+  }
+  box.innerHTML = `
+    <div class="shop-item" style="margin:0">
+      <div class="emoji">${f.emoji}</div>
+      <div class="info">
+        <h3>${f.name}</h3>
+        <p class="rarity-${f.rarity}">${f.rarity} · daily discount</p>
+      </div>
+      <button class="btn btn-gold btn-sm" type="button" id="dailyBuyBtn">${d.price}🪙</button>
+    </div>`;
+  document.getElementById("dailyBuyBtn").onclick = () => {
+    if (state.coins < d.price) { toast("Not enough coins", "bad"); sfxBad(); return; }
+    state.coins -= d.price;
+    addItem(d.id, 1);
+    state.daily.claimed = true;
+    sfxCoin();
+    toast(`Bought ${f.emoji} ${f.name}!`, "good");
+    if (["legendary", "mythic", "epic"].includes(f.rarity)) sfxRare();
+    updateHud();
+    renderHome();
+    save();
+  };
+}
+
+function renderCollection() {
+  const filters = document.getElementById("rarityFilters");
+  const opts = ["all", ...RARITIES];
+  filters.innerHTML = opts.map((r) =>
+    `<button type="button" class="chip ${collectionFilter === r ? "active" : ""}" data-filter="${r}">${r === "all" ? "All" : r}</button>`
+  ).join("");
+  filters.querySelectorAll(".chip").forEach((chip) => {
+    chip.onclick = () => { collectionFilter = chip.dataset.filter; renderCollection(); };
+  });
+
+  const list = CATALOG.filter((f) => collectionFilter === "all" || f.rarity === collectionFilter);
+  const ownedUnique = list.filter((f) => qty(f.id) > 0).length;
+  document.getElementById("collectionCount").textContent = `${ownedUnique}/${list.length}`;
+
+  const grid = document.getElementById("collectionGrid");
+  grid.innerHTML = list.map((f) => {
+    const q = qty(f.id);
+    return `
+      <button type="button" class="fidget-card r-${f.rarity} ${q ? "" : "owned-0"}" data-id="${f.id}">
+        ${q ? `<span class="qty">×${q}</span>` : ""}
+        <span class="emoji">${q ? f.emoji : "❓"}</span>
+        <span class="name">${q ? f.name : "???"}</span>
+        <span class="rarity rarity-${f.rarity}">${f.rarity}</span>
+      </button>`;
+  }).join("");
+
+  grid.querySelectorAll(".fidget-card").forEach((card) => {
+    card.onclick = () => openDetail(card.dataset.id);
+  });
+}
+
+function openDetail(id) {
+  const f = byId[id];
+  if (!f) return;
+  const q = qty(id);
+  const modal = document.getElementById("modal");
+  const bg = document.getElementById("modalBg");
+  modal.innerHTML = `
+    <div class="detail-emoji">${q ? f.emoji : "❓"}</div>
+    <h2 style="text-align:center">${q ? f.name : "Unknown Fidget"}</h2>
+    <p style="text-align:center" class="rarity-${f.rarity}">${f.rarity.toUpperCase()} · ${f.type}</p>
+    <p style="text-align:center;margin-top:8px">${q ? `You own ×${q}` : "Not collected yet"}</p>
+    <p style="text-align:center;margin-top:4px">Sell value: ${sellPrice(id)}🪙 · Fidget power: ×${RARITY_FIDGET[f.rarity]}</p>
+    <div class="modal-actions">
+      ${q ? `
+        <button class="btn btn-accent btn-block" type="button" id="mEquip">🎮 Fidget with this</button>
+        <div class="row">
+          <button class="btn btn-ghost" type="button" id="mSell1">Sell 1 · ${sellPrice(id)}🪙</button>
+          <button class="btn btn-ghost" type="button" id="mSellAll" ${q < 2 ? "disabled" : ""}>Sell all</button>
+        </div>
+      ` : `<p class="tips" style="text-align:center">Find it in packs, the market, or trades.</p>`}
+      <button class="btn btn-ghost btn-block" type="button" id="mClose">Close</button>
+    </div>`;
+  bg.classList.add("show");
+  document.getElementById("mClose").onclick = closeModal;
+  bg.onclick = (e) => { if (e.target === bg) closeModal(); };
+  if (q) {
+    document.getElementById("mEquip").onclick = () => {
+      setActiveFidget(id);
+      closeModal();
+      go("fidget");
+      toast(`Equipped ${f.emoji} ${f.name}`);
+    };
+    document.getElementById("mSell1").onclick = () => {
+      if (!removeItem(id, 1)) return;
+      state.coins += sellPrice(id);
+      sfxCoin();
+      toast(`Sold ${f.name} for ${sellPrice(id)}🪙`, "good");
+      updateHud();
+      if (qty(id) <= 0) closeModal();
+      else openDetail(id);
+      renderCollection();
+      save();
+    };
+    const sellAll = document.getElementById("mSellAll");
+    if (sellAll) sellAll.onclick = () => {
+      const n = qty(id);
+      if (n <= 0) return;
+      removeItem(id, n);
+      const gain = sellPrice(id) * n;
+      state.coins += gain;
+      sfxCoin();
+      toast(`Sold ×${n} for ${gain}🪙`, "good");
+      updateHud();
+      closeModal();
+      renderCollection();
+      save();
+    };
+  }
+}
+function closeModal() {
+  document.getElementById("modalBg").classList.remove("show");
+}
+
+function renderMarket() {
+  const list = document.getElementById("marketList");
+  document.querySelectorAll("[data-market-tab]").forEach((c) => {
+    c.classList.toggle("active", c.dataset.marketTab === marketTab);
+  });
+
+  if (marketTab === "buy") {
+    ensureEconomy();
+    if (!state.shop.length) {
+      list.innerHTML = `<div class="empty"><div class="big">🏪</div>Shop empty. Refresh!</div>`;
+      return;
+    }
+    list.innerHTML = state.shop.map((item, idx) => {
+      const f = byId[item.id];
+      if (!f || item.stock <= 0) return "";
+      return `
+        <div class="shop-item">
+          <div class="emoji">${f.emoji}</div>
+          <div class="info">
+            <h3>${f.name}</h3>
+            <p class="rarity-${f.rarity}">${f.rarity} · stock ${item.stock}</p>
+          </div>
+          <button class="btn btn-mint btn-sm" type="button" data-buy="${idx}">${item.price}🪙</button>
+        </div>`;
+    }).join("") || `<div class="empty"><div class="big">✅</div>Sold out — refresh the shop</div>`;
+
+    list.querySelectorAll("[data-buy]").forEach((btn) => {
+      btn.onclick = () => {
+        const idx = +btn.dataset.buy;
+        const item = state.shop[idx];
+        if (!item || item.stock <= 0) return;
+        if (state.coins < item.price) { toast("Not enough coins", "bad"); sfxBad(); return; }
+        state.coins -= item.price;
+        item.stock -= 1;
+        addItem(item.id, 1);
+        const f = byId[item.id];
+        sfxCoin();
+        toast(`Bought ${f.emoji} ${f.name}`, "good");
+        if (["epic", "legendary", "mythic"].includes(f.rarity)) sfxRare();
+        updateHud();
+        renderMarket();
+        save();
+      };
+    });
+  } else {
+    const owned = CATALOG.filter((f) => qty(f.id) > 0);
+    if (!owned.length) {
+      list.innerHTML = `<div class="empty"><div class="big">📭</div>Nothing to sell yet</div>`;
+      return;
+    }
+    list.innerHTML = owned.map((f) => `
+      <div class="shop-item">
+        <div class="emoji">${f.emoji}</div>
+        <div class="info">
+          <h3>${f.name}</h3>
+          <p class="rarity-${f.rarity}">${f.rarity} · you have ×${qty(f.id)}</p>
+        </div>
+        <button class="btn btn-gold btn-sm" type="button" data-sell="${f.id}">${sellPrice(f.id)}🪙</button>
+      </div>`).join("");
+    list.querySelectorAll("[data-sell]").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.dataset.sell;
+        if (!removeItem(id, 1)) return;
+        const p = sellPrice(id);
+        state.coins += p;
+        sfxCoin();
+        toast(`Sold for ${p}🪙`, "good");
+        updateHud();
+        renderMarket();
+        save();
+      };
+    });
+  }
+}
+
+function renderTrade() {
+  ensureEconomy();
+  const list = document.getElementById("traderList");
+  list.innerHTML = state.traders.map((t, idx) => {
+    const npc = NPCS.find((n) => n.id === t.npcId) || NPCS[0];
+    const want = byId[t.wantId];
+    const bonus = t.bonusId ? byId[t.bonusId] : null;
+    const have = qty(t.wantId);
+    const can = have >= t.wantQty;
+    return `
+      <div class="npc-card">
+        <div class="npc-avatar">${npc.avatar}</div>
+        <div class="npc-body">
+          <h3>${npc.name}</h3>
+          <p style="font-size:0.75rem;margin-bottom:4px">${npc.blurb}</p>
+          <div class="want">Wants: ${want.emoji} ${want.name} ×${t.wantQty} ${have ? `(you: ${have})` : ""}</div>
+          <div class="offer">Offers: ${t.offerCoins}🪙${bonus ? ` + ${bonus.emoji} ${bonus.name}` : ""}</div>
+          <button class="btn ${can ? "btn-mint" : "btn-ghost"} btn-sm" style="margin-top:8px" type="button" data-trade="${idx}" ${can ? "" : "disabled"}>
+            ${can ? "Trade now" : "Missing item"}
+          </button>
+        </div>
+      </div>`;
+  }).join("");
+
+  list.querySelectorAll("[data-trade]").forEach((btn) => {
+    btn.onclick = () => {
+      const idx = +btn.dataset.trade;
+      const t = state.traders[idx];
+      if (!t) return;
+      if (qty(t.wantId) < t.wantQty) { toast("You don't have that", "bad"); return; }
+      removeItem(t.wantId, t.wantQty);
+      state.coins += t.offerCoins;
+      if (t.bonusId) addItem(t.bonusId, 1);
+      addXp(12);
+      sfxCoin();
+      sfxRare();
+      const bonus = t.bonusId ? byId[t.bonusId] : null;
+      toast(`Trade complete! +${t.offerCoins}🪙${bonus ? ` + ${bonus.emoji}` : ""}`, "good");
+      // replace this trader deal
+      const npc = NPCS[Math.floor(Math.random() * NPCS.length)];
+      const want = randomFidget({ premium: Math.random() > 0.4 });
+      state.traders[idx] = {
+        npcId: npc.id,
+        wantId: want.id,
+        wantQty: 1,
+        offerCoins: Math.floor(RARITY_VALUE[want.rarity] * (1.35 + Math.random() * 0.5)),
+        bonusId: Math.random() > 0.4 ? randomFidget({ minRarity: "uncommon" }).id : null,
+      };
+      updateHud();
+      renderTrade();
+      save();
+    };
+  });
+}
+
+// Packs
+function openPack(premium) {
+  const cost = premium ? 200 : 75;
+  if (state.coins < cost) { toast("Not enough coins", "bad"); sfxBad(); return; }
+  state.coins -= cost;
+  const pack = document.getElementById("packVisual");
+  pack.classList.add("opening");
+  setTimeout(() => pack.classList.remove("opening"), 500);
+
+  const results = [];
+  for (let i = 0; i < 3; i++) results.push(randomFidget({ premium }));
+  results.forEach((f) => addItem(f.id, 1));
+  state.packsOpened += 1;
+  addXp(premium ? 20 : 10);
+
+  const grid = document.getElementById("revealGrid");
+  const claim = document.getElementById("claimRevealBtn");
+  grid.hidden = false;
+  claim.hidden = false;
+  grid.innerHTML = results.map((f, i) => `
+    <div class="reveal-card r-${f.rarity}" style="animation-delay:${i * 0.12}s;border-color:var(--${f.rarity})">
+      <span class="emoji">${f.emoji}</span>
+      <div class="name">${f.name}</div>
+      <div class="rarity rarity-${f.rarity}">${f.rarity}</div>
+    </div>`).join("");
+
+  const best = results.reduce((a, b) => RARITIES.indexOf(b.rarity) > RARITIES.indexOf(a.rarity) ? b : a);
+  if (["epic", "legendary", "mythic"].includes(best.rarity)) sfxRare();
+  else sfxCoin();
+  toast(`Opened pack! Best: ${best.emoji} ${best.rarity}`, "good");
+  updateHud();
+  save();
+}
+
+// ═══════════════════════════════════════════════════════════
+// WIRING
+// ═══════════════════════════════════════════════════════════
+function init() {
+  ensureEconomy();
+  updateHud();
+  renderHome();
+
+  if (qty(state.activeFidgetId) <= 0) {
+    const first = CATALOG.find((f) => qty(f.id) > 0);
+    if (first) state.activeFidgetId = first.id;
+  }
+  const af = byId[state.activeFidgetId];
+  if (af) {
+    fx.type = af.type;
+    fx.color = af.color;
+    fx.emoji = af.emoji;
+  }
+  initPops();
+  setupFidgetInput();
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+  cancelAnimationFrame(animId);
+  animId = requestAnimationFrame(loop);
+
+  document.querySelectorAll("[data-go]").forEach((el) => {
+    el.addEventListener("click", () => go(el.dataset.go));
+  });
+
+  document.getElementById("muteBtn").onclick = () => {
+    state.muted = !state.muted;
+    updateHud();
+    save();
+  };
+
+  document.getElementById("refreshShopBtn").onclick = () => {
+    if (state.coins < 25) { toast("Need 25🪙", "bad"); return; }
+    state.coins -= 25;
+    genShop();
+    updateHud();
+    renderMarket();
+    save();
+    toast("Shop refreshed");
+  };
+
+  document.getElementById("refreshTradersBtn").onclick = () => {
+    genTraders();
+    renderTrade();
+    save();
+    toast("New trader deals");
+  };
+
+  document.querySelectorAll("[data-market-tab]").forEach((c) => {
+    c.onclick = () => { marketTab = c.dataset.marketTab; renderMarket(); };
+  });
+
+  document.getElementById("buyPackBtn").onclick = () => openPack(false);
+  document.getElementById("buyPremiumBtn").onclick = () => openPack(true);
+  document.getElementById("packVisual").onclick = () => openPack(false);
+  document.getElementById("claimRevealBtn").onclick = () => {
+    document.getElementById("revealGrid").hidden = true;
+    document.getElementById("claimRevealBtn").hidden = true;
+    document.getElementById("revealGrid").innerHTML = "";
+  };
+
+  document.getElementById("pickFidgetBtn").onclick = () => go("collection");
+  document.getElementById("autoFidgetBtn").onclick = () => {
+    const f = byId[state.activeFidgetId];
+    if (!f || qty(f.id) <= 0) { toast("Equip a fidget first", "bad"); return; }
+    let n = 0;
+    const burst = setInterval(() => {
+      if (fx.type === "spinner") fx.spinVel += 0.35;
+      else if (fx.type === "popit") {
+        const p = fx.pops[Math.floor(Math.random() * fx.pops.length)];
+        if (p) p.popped = !p.popped;
+        sfxPop();
+      } else if (fx.type === "cube") {
+        fx.cubeFace = (fx.cubeFace + 1) % 6;
+        sfxClick();
+      } else if (fx.type === "switch") {
+        const i = Math.floor(Math.random() * 4);
+        fx.switches[i] = !fx.switches[i];
+        sfxClick();
+      } else {
+        fx.slimeVel += (Math.random() - 0.5) * 0.3;
+        sfxPop();
+      }
+      onFidgetAction(1.2);
+      n++;
+      if (n >= 12) clearInterval(burst);
+    }, 90);
+  };
+
+  // Autosave
+  setInterval(save, 8000);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
+}
+
+init();
+})();
+</script>
+</body>
+</html>
